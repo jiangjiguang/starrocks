@@ -22,6 +22,7 @@
 namespace starrocks {
 class SequentialFile;
 class RandomAccessFile;
+class TempRandomAccessFile;
 } // namespace starrocks
 
 namespace starrocks {
@@ -86,6 +87,8 @@ protected:
     // materialize is used to transform source chunk depicted by src_slot_descriptors into destination
     // chunk depicted by dest_slot_descriptors
     StatusOr<ChunkPtr> materialize(const starrocks::ChunkPtr& src, starrocks::ChunkPtr& cast);
+    std::string create_tmp_file_path();
+    StatusOr<std::shared_ptr<TempRandomAccessFile>> create_tmp_file(std::unique_ptr<SequentialFile> broker_file);
 
 protected:
     RuntimeState* _state;

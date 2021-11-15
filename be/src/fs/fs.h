@@ -27,6 +27,7 @@
 namespace starrocks {
 
 class RandomAccessFile;
+class TempRandomAccessFile;
 class WritableFile;
 class SequentialFile;
 struct ResultFileOptions;
@@ -340,7 +341,7 @@ private:
 };
 
 // A `RandomAccessFile` is an `io::SeekableInputStream` with a name.
-class RandomAccessFile final : public io::SeekableInputStreamWrapper {
+class RandomAccessFile : public io::SeekableInputStreamWrapper {
 public:
     explicit RandomAccessFile(std::shared_ptr<io::SeekableInputStream> stream, std::string name)
             : io::SeekableInputStreamWrapper(stream.get(), kDontTakeOwnership),
@@ -368,6 +369,26 @@ private:
     std::string _name;
     // for cachefs in fs_starlet
     bool _is_cache_hit{false};
+};
+
+// Wrap `RandomAccessFile`
+class TempRandomAccessFile : public RandomAccessFile {
+public:
+    TempRandomAccessFile(std::string filename, std::shared_ptr<RandomAccessFile> file)
+            : RandomAccessFile(file->stream(), filename), _filename(filename), _file(std::move(file)) {}
+    ~TempRandomAccessFile() {
+        LOG(INFO) << "delete broker cache TempRandomAccessFile: " << _filename;
+        FileSystem::Default()->delete_file(_filename);
+    }
+
+    std::shared_ptr<io::SeekableInputStream> stream() { return _file->stream(); }
+
+    // Return name of this file
+    const std::string& filename() const { return _file->filename(); }
+
+private:
+    std::string _filename;
+    std::shared_ptr<RandomAccessFile> _file;
 };
 
 // A file abstraction for sequential writing.  The implementation

@@ -1319,6 +1319,8 @@ CONF_mBool(enable_stream_load_verbose_log, "false");
 
 CONF_mInt32(get_txn_status_internal_sec, "10");
 
+CONF_Bool(use_local_filecache_for_broker_random_access_file, "true");
+
 CONF_mBool(dump_metrics_with_bvar, "true");
 
 CONF_mBool(enable_drop_tablet_if_unfinished_txn, "true");
