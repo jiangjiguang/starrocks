@@ -145,7 +145,17 @@ public class SparkEtlJobHandler {
             throw new LoadException(e.getMessage());
         }
 
-        SparkLauncher launcher = new SparkLauncher();
+        Map<String, String> envs = Maps.newHashMap();
+        Map<String, String> brokerProperties = brokerDesc.getProperties();
+        if (brokerProperties != null) {
+            if (brokerProperties.containsKey("username")) {
+                envs.put("HADOOP_USER_NAME", brokerProperties.get("username"));
+            }
+            if (brokerProperties.containsKey("password")) {
+                envs.put("HADOOP_USER_PASSWORD", brokerProperties.get("password"));
+            }
+        }
+        SparkLauncher launcher = new SparkLauncher(envs);
         // master      |  deployMode
         // ------------|-------------
         // yarn        |  cluster
