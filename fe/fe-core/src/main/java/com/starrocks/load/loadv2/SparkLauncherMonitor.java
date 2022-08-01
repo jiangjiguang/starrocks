@@ -89,12 +89,13 @@ public class SparkLauncherMonitor {
         private boolean isStop;
         private OutputStream outputStream;
 
-        private static final String STATE = "state";
+        private static final String STATE = "status";
         private static final String QUEUE = "queue";
         private static final String START_TIME = "start time";
-        private static final String FINAL_STATUS = "final status";
-        private static final String URL = "tracking URL";
+        private static final String FINAL_STATUS = "Final app status";
+        private static final String URL = "Tracking URL";
         private static final String USER = "user";
+        private static final String APPLICATION = "application_";
 
         public LogMonitor(SparkLoadAppHandle handle) {
             this.handle = handle;
@@ -131,8 +132,18 @@ public class SparkLauncherMonitor {
             try {
                 outReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 while (!isStop && (line = outReader.readLine()) != null) {
+                    LOG.info("spark process line:{}", line);
                     if (outputStream != null) {
                         outputStream.write((line + "\n").getBytes());
+                    }
+                    // 2. appId
+                    if (line.contains(APPLICATION)) {
+                        String appId = regexGetAppId(line);
+                        if (appId != null && handle.getAppId() != null) {
+                            if (!appId.equals(handle.getAppId())) {
+                                handle.setAppId(appId);
+                            }
+                        }
                     }
                     SparkLoadAppHandle.State oldState = handle.getState();
                     SparkLoadAppHandle.State newState = oldState;
@@ -147,14 +158,6 @@ public class SparkLauncherMonitor {
                                 handle.setState(newState);
                             }
                         }
-                        // 2. appId
-                        String appId = regexGetAppId(line);
-                        if (appId != null) {
-                            if (!appId.equals(handle.getAppId())) {
-                                handle.setAppId(appId);
-                            }
-                        }
-
                         LOG.debug("spark appId that handle get is {}, state: {}", handle.getAppId(),
                                 handle.getState().toString());
                         switch (newState) {
@@ -188,7 +191,7 @@ public class SparkLauncherMonitor {
                         }
                         // parse other values
                     } else if (line.contains(QUEUE) || line.contains(START_TIME) || line.contains(FINAL_STATUS) ||
-                            line.contains(URL) || line.contains(USER)) {
+                            line.contains(URL) || line.contains(USER) || line.contains(APPLICATION)) {
                         String value = getValue(line);
                         if (!Strings.isNullOrEmpty(value)) {
                             try {
