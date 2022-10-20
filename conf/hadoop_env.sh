@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-export HADOOP_CLASSPATH=${STARROCKS_HOME}/lib/hadoop/common/*:${STARROCKS_HOME}/lib/hadoop/common/lib/*:${STARROCKS_HOME}/lib/hadoop/hdfs/*:${STARROCKS_HOME}/lib/hadoop/hdfs/lib/*
-if [ -z "${HADOOP_USER_NAME}" ]
-then
-    if [ -z "${USER}" ]
-    then
-        export HADOOP_USER_NAME=$(id -u -n)
-    else
-        export HADOOP_USER_NAME=${USER}
-    fi
+for f in ${STARROCKS_HOME}/lib/hadoop/common/*.jar ${STARROCKS_HOME}/lib/hadoop/common/lib/*.jar ${STARROCKS_HOME}/lib/hadoop/hdfs/*.jar ${STARROCKS_HOME}/lib/hadoop/hdfs/lib/*.jar; do
+  HADOOP_CLASSPATH=$f:${HADOOP_CLASSPATH};
+done
+export HADOOP_CLASSPATH=$HADOOP_CLASSPATH
+
+if [ ${HADOOP_USER_NAME}"X" != "X" ]; then
+    export HADOOP_USER_NAME=${USER}
 fi
 
 # the purpose is to use local hadoop configuration first.
