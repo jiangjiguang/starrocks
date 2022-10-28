@@ -757,6 +757,12 @@ under the License.
                 </exclusion>
             </exclusions>
         </dependency>
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>18.0.0</version>
+            <scope>compile</scope>
+        </dependency>
 
         <!-- https://mvnrepository.com/artifact/org.apache.hudi/hudi-io -->
         <dependency>

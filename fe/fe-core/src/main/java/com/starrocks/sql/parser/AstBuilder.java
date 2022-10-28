@@ -3503,6 +3503,10 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
     public ParseNode visitInstallPluginStatement(StarRocksParser.InstallPluginStatementContext context) {
         String pluginPath = ((Identifier) visit(context.identifierOrString())).getValue();
         Map<String, String> properties = getProperties(context.properties());
+        // plugin package can put in STARROCKS_HOME
+        if (!StringUtils.startsWithIgnoreCase(org.apache.commons.lang.StringUtils.trim(pluginPath), "/")) {
+            pluginPath = System.getenv("STARROCKS_HOME") + "/" + pluginPath;
+        }
         return new InstallPluginStmt(pluginPath, properties, createPos(context));
     }
 

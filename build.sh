@@ -465,8 +465,12 @@ if [ ${FE_MODULES}x != ""x ]; then
         ${MVN_CMD} clean
     fi
     ${MVN_CMD} package -am -pl ${FE_MODULES} -DskipTests
+    
     cd ${STARROCKS_HOME}/java-extensions
     ${MVN_CMD} package -am -pl hadoop-ext -DskipTests
+
+    echo "build AuditLoader plugin ..."
+    ${STARROCKS_HOME}/fe_plugins/auditloader/build.sh
     cd ${STARROCKS_HOME}
 fi
 
@@ -510,6 +514,8 @@ if [ ${BUILD_FE} -eq 1 -o ${BUILD_SPARK_DPP} -eq 1 ]; then
         cp -r -p ${STARROCKS_HOME}/fe/spark-dpp/target/spark-dpp-*-jar-with-dependencies.jar ${STARROCKS_OUTPUT}/fe/spark-dpp/
         cp -r -p ${STARROCKS_HOME}/fe/hive-udf/target/hive-udf-1.0.0.jar ${STARROCKS_OUTPUT}/fe/hive-udf/
         cp -r -p ${STARROCKS_THIRDPARTY}/installed/async-profiler ${STARROCKS_OUTPUT}/fe/bin/
+        # copy audit loader plugin
+        cp -r -p ${STARROCKS_HOME}/fe_plugins/auditloader/auditloader.zip ${STARROCKS_OUTPUT}/fe/
         MSG="${MSG} √ ${MSG_FE}"
     elif [ ${BUILD_SPARK_DPP} -eq 1 ]; then
         install -d ${STARROCKS_OUTPUT}/fe/spark-dpp/
