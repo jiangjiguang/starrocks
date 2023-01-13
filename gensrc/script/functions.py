@@ -712,7 +712,8 @@ vectorized_functions = [
 
 
     # Utility functions
-    [100011, 'sleep', True, False, 'BOOLEAN', ['INT'], "UtilityFunctions::sleep"],
+    # Forbiden sleep function, sleep function is row-level function, will make cluster block when table has many rows.
+    # [100011, 'sleep', True, False, 'BOOLEAN', ['INT'], "UtilityFunctions::sleep"],
     [100012, 'version', True, False, 'VARCHAR', [], "UtilityFunctions::version"],
     [100013, 'current_version', True, False, 'VARCHAR', [], "UtilityFunctions::current_version"],
     [100014, 'last_query_id', True, False, 'VARCHAR', [], "UtilityFunctions::last_query_id"],

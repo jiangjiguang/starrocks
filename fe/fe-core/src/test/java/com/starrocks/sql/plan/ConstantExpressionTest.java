@@ -407,12 +407,12 @@ public class ConstantExpressionTest extends PlanTestBase {
         Assert.assertTrue(plan.contains("  |  <slot 4> : rand()"));
         Assert.assertTrue(plan.contains("PREDICATES: rand() > 0.0"));
 
-        sql = "select sleep(1), sleep(1), sleep(2)";
+        /*sql = "select sleep(1), sleep(1), sleep(2)";
         plan = getFragmentPlan(sql);
         Assert.assertTrue(plan.contains("  1:Project\n" +
                 "  |  <slot 2> : sleep(1)\n" +
                 "  |  <slot 3> : sleep(1)\n" +
-                "  |  <slot 4> : sleep(2)"));
+                "  |  <slot 4> : sleep(2)"));*/
 
         sql = "select random(), random()";
         plan = getFragmentPlan(sql);
