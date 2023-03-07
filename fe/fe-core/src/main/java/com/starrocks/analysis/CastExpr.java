@@ -97,6 +97,7 @@ public class CastExpr extends Expr {
         Preconditions.checkNotNull(targetTypeDef);
         Preconditions.checkNotNull(e);
         this.targetTypeDef = targetTypeDef;
+        this.type = targetTypeDef.getType();
         isImplicit = false;
         children.add(e);
     }
