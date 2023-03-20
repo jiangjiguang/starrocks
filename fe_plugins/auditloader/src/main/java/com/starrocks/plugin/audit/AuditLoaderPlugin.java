@@ -107,6 +107,16 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         conf = new AuditLoaderConf();
         conf.init(properties);
         conf.feIdentity = ctx.getFeIdentity();
+        if (conf.autoConfig) {
+            LOG.info("start auto config, found feIdentity[{}]", conf.feIdentity);
+            String[] ipAndPorts = conf.feIdentity.split("_");
+            if (ipAndPorts.length != 3) {
+                LOG.info("auto config failed, split result length less than 3, not contain http port");
+            } else {
+                conf.frontendHostPort = "127.0.0.1:" + ipAndPorts[2];
+                LOG.info("auto config succeed, use frontendHostPort[{}] for stream load", conf.frontendHostPort);
+            }
+        }
     }
 
     @Override
@@ -214,6 +224,8 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         public static final String PROP_TABLE = "table";
         // the max stmt length to be loaded in audit table.
         public static final String MAX_STMT_LENGTH = "max_stmt_length";
+        // get host and port from FE which load this plugin, default is true
+        public static final String AUTO_CONFIG = "auto_config";
 
         public long maxBatchSize = 50 * 1024 * 1024;
         public long maxBatchIntervalSec = 60;
@@ -225,6 +237,7 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         // the identity of FE which run this plugin
         public String feIdentity = "";
         public int max_stmt_length = 4096;
+        public boolean autoConfig = true;
 
         public void init(Map<String, String> properties) throws PluginException {
             try {
@@ -251,6 +264,9 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
                 }
                 if (properties.containsKey(MAX_STMT_LENGTH)) {
                     max_stmt_length = Integer.parseInt(properties.get(MAX_STMT_LENGTH));
+                }
+                if (properties.containsKey(AUTO_CONFIG)) {
+                    autoConfig = Boolean.parseBoolean(properties.get(AUTO_CONFIG));
                 }
             } catch (Exception e) {
                 throw new PluginException(e.getMessage());

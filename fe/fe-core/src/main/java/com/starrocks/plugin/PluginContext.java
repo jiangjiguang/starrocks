@@ -29,7 +29,7 @@ public class PluginContext {
     private String feIdentity;
 
     public PluginContext() {
-        this.feIdentity = FrontendOptions.getLocalHostAddress() + "_" + Config.edit_log_port;
+        this.feIdentity = FrontendOptions.getLocalHostAddress() + "_" + Config.edit_log_port + "_" + Config.http_port;
     }
 
     protected void setPluginPath(String pluginPath) {
