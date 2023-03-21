@@ -2643,7 +2643,7 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
 
     public ParseNode visitDropResourceStatement(StarRocksParser.DropResourceStatementContext context) {
         Identifier identifier = (Identifier) visit(context.identifierOrString());
-        return new DropResourceStmt(identifier.getValue(), createPos(context));
+        return new DropResourceStmt(context.IF() != null, identifier.getValue(), createPos(context));
     }
 
     public ParseNode visitAlterResourceStatement(StarRocksParser.AlterResourceStatementContext context) {
