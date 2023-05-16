@@ -714,7 +714,7 @@ public final class SparkDpp implements java.io.Serializable {
         int sourceSchemaSize = sourceData.schema().size();
         int tableSchemaSize = schemaSet.size();
         if (sourceSchemaSize != tableSchemaSize) {
-            throw new SparkDppException("The schema of file and table must be equal.file schema size: "
+            LOG.warn("The schema of file and table must be equal.file schema size: "
                     + sourceSchemaSize + ", table schema size:" + tableSchemaSize + ", file schema: "
                     + sourceData.schema().treeString() + ", table schema: " + srcSchema.treeString());
         }

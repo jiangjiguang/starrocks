@@ -212,7 +212,7 @@ public class SparkEtlJobHandler {
             }
             throw new LoadException(
                     errMsg + "spark app state: " + state.toString() + ", loadJobId:" + loadJobId + ", logPath:" +
-                            logPath);
+                            logPath + ", applicationId:" + appId);
         }
 
         if (appId == null) {
@@ -296,6 +296,9 @@ public class SparkEtlJobHandler {
                 }
             }
             status.setTrackingUrl(handle.getUrl() != null ? handle.getUrl() : report.getTrackingUrl());
+            if (status.getTrackingUrl() == null) {
+                status.setTrackingUrl(handle.getAppId());
+            }
             status.setProgress((int) (report.getProgress() * 100));
         } else {
             // state from handle

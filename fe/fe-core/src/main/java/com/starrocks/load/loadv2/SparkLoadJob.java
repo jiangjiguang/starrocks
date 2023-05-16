@@ -355,7 +355,7 @@ public class SparkLoadJob extends BulkLoadJob {
     private void unprotectedUpdateEtlStatusInternal(EtlStatus etlStatus) {
         loadingStatus = etlStatus;
         progress = etlStatus.getProgress();
-        if (!sparkResource.isYarnMaster()) {
+        if (!sparkResource.isYarnMaster() || loadingStatus.getTrackingUrl() == null) {
             loadingStatus.setTrackingUrl(appId);
         }
 
