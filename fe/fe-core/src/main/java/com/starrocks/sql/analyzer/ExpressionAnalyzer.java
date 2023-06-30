@@ -1273,6 +1273,13 @@ public class ExpressionAnalyzer {
             switch (fnName) {
                 case FunctionSet.TIME_SLICE:
                 case FunctionSet.DATE_SLICE:
+                    if (node.getChild(1) instanceof StringLiteral) {
+                        try {
+                            String intervalValue = ((StringLiteral) node.getChild(1)).getStringValue();
+                            node.setChild(1, new IntLiteral(Integer.parseInt(intervalValue)));
+                        } catch (Throwable ignore) {
+                        }
+                    }
                     if (!(node.getChild(1) instanceof IntLiteral)) {
                         throw new SemanticException(
                                 fnName + " requires second parameter must be a constant interval", node.getPos());
