@@ -817,6 +817,13 @@ Status Tablet::check_version_integrity(const Version& version) {
     return capture_consistent_versions(version, nullptr);
 }
 
+Status Tablet::wait_for_update_version(const EditVersion& version, int64_t timeout_ms) {
+    if (_updates != nullptr) {
+        return _updates->wait_for_version(version, timeout_ms);
+    }
+    return Status::OK();
+}
+
 void Tablet::list_versions(vector<Version>* versions) const {
     DCHECK(versions != nullptr && versions->empty());
 

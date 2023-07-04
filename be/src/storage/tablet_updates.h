@@ -381,6 +381,9 @@ public:
 
     void rewrite_rs_meta(bool is_fatal);
 
+    // wait a version to be applied, so reader can read this version
+    Status wait_for_version(const EditVersion& version, int64_t timeout_ms);
+
 private:
     friend class Tablet;
     friend class PrimaryIndex;

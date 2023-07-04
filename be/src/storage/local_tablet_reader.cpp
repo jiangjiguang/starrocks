@@ -119,14 +119,15 @@ Status LocalTabletReader::multi_get(const Chunk& keys, const std::vector<uint32_
     PrimaryKeyEncoder::encode(*tablet_schema->schema(), keys, 0, keys.num_rows(), pk_column.get());
 
     // search pks in pk index to get rowids
-    EditVersion edit_version;
+    EditVersion edit_version(_version, 0);
+    RETURN_IF_ERROR(_tablet->wait_for_update_version(edit_version, 55000));
     std::vector<uint64_t> rowids(n);
     RETURN_IF_ERROR(_tablet->updates()->get_rss_rowids_by_pk(_tablet.get(), *pk_column, &edit_version, &rowids));
-    if (edit_version.major_number() != _version) {
+    /*if (edit_version.major() != _version) {
         return Status::InternalError(
                 strings::Substitute("multi_get version not match tablet:$0 current_version:$1 read_version:$2",
                                     _tablet->tablet_id(), edit_version.to_string(), _version));
-    }
+    }*/
     if (rowids.size() != n) {
         return Status::InternalError(strings::Substitute("multi_get rowid size not match tablet:$0 $1 != $2",
                                                          _tablet->tablet_id(), rowids.size(), n));

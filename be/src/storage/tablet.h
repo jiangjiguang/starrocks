@@ -45,6 +45,7 @@
 #include <vector>
 
 #include "common/statusor.h"
+#include "edit_version.h"
 #include "gen_cpp/AgentService_types.h"
 #include "gen_cpp/MasterService_types.h"
 #include "gen_cpp/olap_file.pb.h"
@@ -153,6 +154,7 @@ public:
 
     [[nodiscard]] Status capture_consistent_versions(const Version& spec_version, vector<Version>* version_path) const;
     [[nodiscard]] Status check_version_integrity(const Version& version);
+    [[nodiscard]] Status wait_for_update_version(const EditVersion& version, int64_t timeout_ms);
     void list_versions(std::vector<Version>* versions) const;
 
     // REQUIRE: `obtain_header_rdlock()`ed

@@ -5504,6 +5504,12 @@ int64_t TabletUpdates::max_rowset_creation_time() {
     return max_rowset_creation_time;
 }
 
+Status TabletUpdates::wait_for_version(const EditVersion& version, int64_t timeout_ms) {
+    std::unique_lock<std::mutex> ul(_lock);
+    (void)_wait_for_version(version, timeout_ms, ul);
+    return Status::OK();
+}
+
 Status TabletUpdates::recover() {
     if (!_error) {
         // no need to recover
