@@ -778,6 +778,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public static final String DISABLE_GENERATED_COLUMN_REWRITE = "disable_generated_column_rewrite";
 
+    public static final String FORCE_DISTINCT_TO_AGG = "force_distinct_to_agg";
+
     public static final List<String> DEPRECATED_VARIABLES = ImmutableList.<String>builder()
             .add(CODEGEN_LEVEL)
             .add(MAX_EXECUTION_TIME)
@@ -1569,6 +1571,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)
     private boolean enableRewriteBitmapUnionToBitmapAgg = true;
+
+    @VariableMgr.VarAttr(name = FORCE_DISTINCT_TO_AGG)
+    private boolean forceDistinctToAgg = false;
 
     public boolean isEnableRewriteBitmapUnionToBitmapAgg() {
         return enableRewriteBitmapUnionToBitmapAgg;
@@ -4097,6 +4102,10 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnableCountDistinctRewriteByHllBitmap(boolean enableCountDistinctRewriteByHllBitmap) {
         this.enableCountDistinctRewriteByHllBitmap = enableCountDistinctRewriteByHllBitmap;
+    }
+
+    public boolean isForceDistinctToAgg() {
+        return forceDistinctToAgg;
     }
 
     // Serialize to thrift object

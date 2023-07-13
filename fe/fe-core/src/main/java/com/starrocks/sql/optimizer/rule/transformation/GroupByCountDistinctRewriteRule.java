@@ -140,6 +140,10 @@ public class GroupByCountDistinctRewriteRule extends TransformationRule {
             return false;
         }
 
+        if (context.getSessionVariable().isForceDistinctToAgg()) {
+            return true;
+        }
+
         // check limit
         if (aggregate.hasLimit()) {
             return false;
