@@ -437,8 +437,13 @@ public class MetaService {
         }
 
         @Override
+        public boolean needPassword() {
+            return true;
+        }
+
+        @Override
         protected boolean needCheckClientIsFe() {
-            return false;
+            return true;
         }
 
         @Override
