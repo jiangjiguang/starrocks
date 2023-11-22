@@ -159,7 +159,7 @@ public class ResourceMgr implements Writable {
             String type = resource.getType().name().toLowerCase(Locale.ROOT);
             String catalogName = getResourceMappingCatalogName(resource.getName(), type);
 
-            if (nameToResource.containsKey(resource.name)) {
+            if (containsResource(resource.name)) {
                 DropCatalogStmt dropCatalogStmt = new DropCatalogStmt(catalogName);
                 GlobalStateMgr.getCurrentState().getCatalogMgr().dropCatalog(dropCatalogStmt);
             }
@@ -207,11 +207,16 @@ public class ResourceMgr implements Writable {
     }
 
     public void replayDropResource(DropResourceOperationLog operationLog) {
-        Resource resource = nameToResource.remove(operationLog.getName());
-        if (resource.needMappingCatalog()) {
-            String catalogName = getResourceMappingCatalogName(resource.name, resource.type.name().toLowerCase(Locale.ROOT));
-            DropCatalogStmt dropCatalogStmt = new DropCatalogStmt(catalogName);
-            GlobalStateMgr.getCurrentState().getCatalogMgr().dropCatalog(dropCatalogStmt);
+        this.writeLock();
+        try {
+            Resource resource = nameToResource.remove(operationLog.getName());
+            if (resource.needMappingCatalog()) {
+                String catalogName = getResourceMappingCatalogName(resource.name, resource.type.name().toLowerCase(Locale.ROOT));
+                DropCatalogStmt dropCatalogStmt = new DropCatalogStmt(catalogName);
+                GlobalStateMgr.getCurrentState().getCatalogMgr().dropCatalog(dropCatalogStmt);
+            }
+        } finally {
+            this.writeUnLock();
         }
     }
 
@@ -243,9 +248,14 @@ public class ResourceMgr implements Writable {
     }
 
     public List<Resource> getNeedMappingCatalogResources() {
-        return nameToResource.values().stream()
-                .filter(Resource::needMappingCatalog)
-                .collect(Collectors.toList());
+        this.readLock();
+        try {
+            return nameToResource.values().stream()
+                    .filter(Resource::needMappingCatalog)
+                    .collect(Collectors.toList());
+        } finally {
+            this.readUnlock();
+        }
     }
 
     /**
@@ -312,6 +322,15 @@ public class ResourceMgr implements Writable {
         }
     }
 
+    public HashMap<String, Resource> getNameToResource() {
+        this.readLock();
+        try {
+            return nameToResource;
+        } finally {
+            this.readUnlock();
+        }
+    }
+
     public ResourceProcNode getProcNode() {
         return procNode;
     }
@@ -332,8 +351,8 @@ public class ResourceMgr implements Writable {
         public ProcResult fetchResult() {
             BaseProcResult result = new BaseProcResult();
             result.setNames(RESOURCE_PROC_NODE_TITLE_NAMES);
-
-            for (Map.Entry<String, Resource> entry : nameToResource.entrySet()) {
+            Map<String, Resource> resourceMap = getNameToResource();
+            for (Map.Entry<String, Resource> entry : resourceMap.entrySet()) {
                 Resource resource = entry.getValue();
                 // Since `nameToResource.entrySet` may change after it is called, resource
                 // may be dropped during `show resources`.So that we should do a null pointer
