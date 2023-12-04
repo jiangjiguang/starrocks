@@ -141,6 +141,8 @@ public class MaterializedViewAnalyzer {
                     Table.TableType.HIVE_VIEW,
                     Table.TableType.ICEBERG_VIEW);
 
+    public static ThreadLocal<String> baseTableName = new ThreadLocal<>();
+
     public static void analyze(StatementBase stmt, ConnectContext session) {
         new MaterializedViewAnalyzerVisitor().visit(stmt, session);
     }
@@ -797,6 +799,7 @@ public class MaterializedViewAnalyzer {
                 throw new SemanticException("Materialized view with partition does not support base table type : %s",
                         table.getType());
             }
+            baseTableName.set(slotRef.getTblNameWithoutAnalyzed().getDb() + "." + table.getName());
             replaceTableAlias(slotRef, statement, tableNameTableMap);
         }
 

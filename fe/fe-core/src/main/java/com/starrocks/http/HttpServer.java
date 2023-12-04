@@ -74,6 +74,7 @@ import com.starrocks.http.rest.LoadAction;
 import com.starrocks.http.rest.MetaReplayerCheckAction;
 import com.starrocks.http.rest.MetricsAction;
 import com.starrocks.http.rest.MigrationAction;
+import com.starrocks.http.rest.PartitionBaseTableAction;
 import com.starrocks.http.rest.ProfileAction;
 import com.starrocks.http.rest.QueryDetailAction;
 import com.starrocks.http.rest.QueryDumpAction;
@@ -214,6 +215,7 @@ public class HttpServer {
         TableRowCountAction.registerAction(controller);
         TableSchemaAction.registerAction(controller);
         TableQueryPlanAction.registerAction(controller);
+        PartitionBaseTableAction.registerAction(controller);
 
         BootstrapFinishAction.registerAction(controller);
     }
