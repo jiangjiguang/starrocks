@@ -22,12 +22,17 @@ import com.baidu.bjf.remoting.protobuf.ProtobufProxy;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.starrocks.catalog.Replica.ReplicaState;
+import com.starrocks.common.FeMetaVersion;
+import com.starrocks.common.jmockit.Deencapsulation;
+import com.starrocks.meta.MetaContext;
+import com.starrocks.metric.MetricRepo;
 import com.starrocks.persist.gson.GsonUtils;
 import com.starrocks.proto.TxnFinishStatePB;
 import com.starrocks.thrift.TUniqueId;
 import com.starrocks.transaction.TransactionState.LoadJobSourceType;
 import com.starrocks.transaction.TransactionState.TxnCoordinator;
 import com.starrocks.transaction.TransactionState.TxnSourceType;
+import mockit.Expectations;
 import org.jetbrains.annotations.NotNull;
 import org.junit.After;
 import org.junit.Assert;
@@ -166,5 +171,33 @@ public class TransactionStateTest {
         Assert.assertTrue(transactionState.tabletCommitInfosContainsReplica(1001, 1001, ReplicaState.ALTER));
         Assert.assertTrue(transactionState.tabletCommitInfosContainsReplica(1001, 1001, ReplicaState.SCHEMA_CHANGE));
         Assert.assertTrue(transactionState.tabletCommitInfosContainsReplica(1001, 1001, ReplicaState.CLONE));
+    }
+
+    @Test
+    public void testSetTransactionStatusWithUserError() {
+        TransactionState transactionState = new TransactionState();
+        new Expectations() {
+            {
+                Deencapsulation.setField(transactionState, "reason", "too many filtered rows");
+            }
+        };
+        MetricRepo metricRepo = new MetricRepo();
+        metricRepo.init();
+        new Expectations() {
+            {
+                Deencapsulation.setField(metricRepo, "isInit", true);
+            }
+        };
+
+        transactionState.setTransactionStatus(TransactionStatus.ABORTED);
+        Assert.assertEquals(metricRepo.USER_COUNTER_TXN_FAILED.getValue(), (Long) 1L);
+
+        new Expectations() {
+            {
+                Deencapsulation.setField(transactionState, "reason", "xxx");
+            }
+        };
+        transactionState.setTransactionStatus(TransactionStatus.ABORTED);
+        Assert.assertEquals(metricRepo.SYSTEM_COUNTER_TXN_FAILED.getValue(), (Long) 1L);
     }
 }

@@ -154,6 +154,8 @@ public final class MetricRepo {
     public static LongCounterMetric COUNTER_TXN_REJECT;
     public static LongCounterMetric COUNTER_TXN_BEGIN;
     public static LongCounterMetric COUNTER_TXN_FAILED;
+    public static LongCounterMetric SYSTEM_COUNTER_TXN_FAILED;
+    public static LongCounterMetric USER_COUNTER_TXN_FAILED;
     public static LongCounterMetric COUNTER_TXN_SUCCESS;
     public static LongCounterMetric COUNTER_ROUTINE_LOAD_ROWS;
     public static LongCounterMetric COUNTER_ROUTINE_LOAD_RECEIVED_BYTES;
@@ -488,6 +490,12 @@ public final class MetricRepo {
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_TXN_SUCCESS);
         COUNTER_TXN_FAILED = new LongCounterMetric("txn_failed", MetricUnit.REQUESTS, "counter of failed transactions");
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_TXN_FAILED);
+        USER_COUNTER_TXN_FAILED = new LongCounterMetric("user_txn_failed", MetricUnit.REQUESTS,
+                "counter of failed transactions from user");
+        STARROCKS_METRIC_REGISTER.addMetric(USER_COUNTER_TXN_FAILED);
+        SYSTEM_COUNTER_TXN_FAILED = new LongCounterMetric("system_txn_failed", MetricUnit.REQUESTS,
+                "counter of failed transactions from system");
+        STARROCKS_METRIC_REGISTER.addMetric(SYSTEM_COUNTER_TXN_FAILED);
 
         COUNTER_ROUTINE_LOAD_ROWS =
                 new LongCounterMetric("routine_load_rows", MetricUnit.ROWS, "total rows of routine load");

@@ -538,7 +538,14 @@ public class TransactionState implements Writable {
         } else if (transactionStatus == TransactionStatus.ABORTED) {
             if (MetricRepo.hasInit) {
                 MetricRepo.COUNTER_TXN_FAILED.increase(1L);
+                LOG.info("error reason is {}", reason);
+                if ("too many filtered rows".equals(reason) || reason.endsWith("primary key size exceed the limit.")) {
+                    MetricRepo.USER_COUNTER_TXN_FAILED.increase(1L);
+                } else {
+                    MetricRepo.SYSTEM_COUNTER_TXN_FAILED.increase(1L);
+                }
             }
+
             txnSpan.setAttribute("state", "aborted");
             txnSpan.end();
         } else if (transactionStatus == TransactionStatus.COMMITTED) {
