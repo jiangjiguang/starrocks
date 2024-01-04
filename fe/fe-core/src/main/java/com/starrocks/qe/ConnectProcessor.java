@@ -317,6 +317,7 @@ public class ConnectProcessor {
             try (Timer ignored = Tracers.watchScope(Tracers.Module.PARSER, "Parser")) {
                 stmts = com.starrocks.sql.parser.SqlParser.parse(originStmt, ctx.getSessionVariable());
             } catch (ParsingException parsingException) {
+                MetricRepo.COUNTER_QUERY_ERR.increase(1L);
                 throw new AnalysisException(parsingException.getMessage());
             }
 
