@@ -111,6 +111,8 @@ public class AuditEvent {
     public boolean isQuery = false;
     @AuditField(value = "feIp")
     public String feIp = "";
+    @AuditField(value = "isParseSqlFail")
+    public Boolean isParseSqlFail = false;
     @AuditField(value = "Stmt")
     public String stmt = "";
     @AuditField(value = "Digest")
@@ -206,6 +208,11 @@ public class AuditEvent {
 
         public AuditEventBuilder setQueryTime(long queryTime) {
             auditEvent.queryTime = queryTime;
+            return this;
+        }
+
+        public AuditEventBuilder setParseSqlFail(Boolean parseSqlFail) {
+            auditEvent.isParseSqlFail = parseSqlFail;
             return this;
         }
 

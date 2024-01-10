@@ -102,6 +102,7 @@ public final class MetricRepo {
     public static LongCounterMetric COUNTER_REQUEST_ALL;
     public static LongCounterMetric COUNTER_QUERY_ALL;
     public static LongCounterMetric COUNTER_QUERY_ERR;
+    public static LongCounterMetric COUNTER_QUERY_USER_ERR;
     public static LongCounterMetric COUNTER_QUERY_TIMEOUT;
     public static LongCounterMetric COUNTER_QUERY_SUCCESS;
     public static LongCounterMetric COUNTER_SLOW_QUERY;
@@ -420,8 +421,10 @@ public final class MetricRepo {
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_REQUEST_ALL);
         COUNTER_QUERY_ALL = new LongCounterMetric("query_total", MetricUnit.REQUESTS, "total query");
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_QUERY_ALL);
-        COUNTER_QUERY_ERR = new LongCounterMetric("query_err", MetricUnit.REQUESTS, "total error query");
+        COUNTER_QUERY_ERR = new LongCounterMetric("internal_sql_err", MetricUnit.REQUESTS, "internal sql error");
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_QUERY_ERR);
+        COUNTER_QUERY_USER_ERR = new LongCounterMetric("user_sql_err", MetricUnit.REQUESTS, "user sql error");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_QUERY_USER_ERR);
         COUNTER_QUERY_TIMEOUT = new LongCounterMetric("query_timeout", MetricUnit.REQUESTS, "total timeout query");
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_QUERY_TIMEOUT);
         COUNTER_QUERY_SUCCESS = new LongCounterMetric("query_success", MetricUnit.REQUESTS, "total success query");
