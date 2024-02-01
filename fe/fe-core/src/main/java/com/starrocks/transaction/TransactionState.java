@@ -539,7 +539,10 @@ public class TransactionState implements Writable {
             if (MetricRepo.hasInit) {
                 MetricRepo.COUNTER_TXN_FAILED.increase(1L);
                 LOG.info("error reason is {}", reason);
-                if ("too many filtered rows".equals(reason) || reason.endsWith("primary key size exceed the limit.")) {
+                if ("too many filtered rows".equals(reason)
+                        || "Only primary key table support partial update".equals(reason)
+                        || reason.endsWith("primary key size exceed the limit.")
+                        || reason.endsWith("not in partial update columns")) {
                     MetricRepo.USER_COUNTER_TXN_FAILED.increase(1L);
                 } else {
                     MetricRepo.SYSTEM_COUNTER_TXN_FAILED.increase(1L);
