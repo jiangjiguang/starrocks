@@ -59,6 +59,8 @@ import com.starrocks.common.util.LogKey;
 import com.starrocks.common.util.ProfileManager;
 import com.starrocks.common.util.PropertyAnalyzer;
 import com.starrocks.common.util.TimeUtils;
+import com.starrocks.common.util.Util;
+import com.starrocks.common.util.concurrent.QueryableReentrantReadWriteLock;
 import com.starrocks.load.EtlJobType;
 import com.starrocks.load.EtlStatus;
 import com.starrocks.load.FailMsg;
@@ -101,7 +103,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public abstract class LoadJob extends AbstractTxnStateChangeCallback implements LoadTaskCallback, Writable, LoadJobWithWarehouse {
@@ -199,7 +201,7 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
     // During committing, the load job could not be cancelled.
     protected boolean isCommitting = false;
 
-    protected ReentrantReadWriteLock lock = new ReentrantReadWriteLock(true);
+    protected QueryableReentrantReadWriteLock lock = new QueryableReentrantReadWriteLock(true);
 
     // this request id is only used for checking if a load begin request is a duplicate request.
     protected TUniqueId requestId;
@@ -231,6 +233,20 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
         lock.readLock().lock();
     }
 
+    protected boolean tryReadLock(long timeout, TimeUnit unit) {
+        try {
+            String threadDump = getOwnerInfo(lock.getOwner());
+            if (!this.lock.readLock().tryLock(timeout, unit)) {
+                logTryLockFailureEvent("readLock", threadDump);
+                return false;
+            }
+            return true;
+        } catch (InterruptedException e) {
+            LOG.warn("failed to try read lock at LoadJob[" + id + "]", e);
+            return false;
+        }
+    }
+
     protected void readUnlock() {
         lock.readLock().unlock();
     }
@@ -260,6 +276,20 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
     @Override
     public long getFinishTimestampMs() {
         return getFinishTimestamp();
+    }
+
+    private String getOwnerInfo(Thread owner) {
+        if (owner == null) {
+            return "no owner";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("owner id: ").append(owner.getId()).append(", owner name: ")
+            .append(owner.getName()).append(", owner stack: ").append(Util.dumpThread(owner, 50));
+        return sb.toString();
+    }
+
+    private void logTryLockFailureEvent(String type, String threadDump) {
+        LOG.warn("try LoadJob lock failed. type: {}, current {}", type, threadDump);
     }
 
     public long getId() {
@@ -817,7 +847,9 @@ public abstract class LoadJob extends AbstractTxnStateChangeCallback implements 
     }
 
     public List<Comparable> getShowInfo() throws DdlException {
-        readLock();
+        if (!tryReadLock(5, TimeUnit.SECONDS)) {
+            throw new RuntimeException("try get LoadJob read lock failed.");
+        }
         try {
             List<Comparable> jobInfo = Lists.newArrayList();
             // jobId

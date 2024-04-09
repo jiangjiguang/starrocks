@@ -35,15 +35,24 @@
 package com.starrocks.analysis;
 
 import com.google.common.collect.ImmutableSet;
+import com.starrocks.catalog.Database;
 import com.starrocks.common.AnalysisException;
+import com.starrocks.common.DdlException;
+import com.starrocks.common.MetaNotFoundException;
 import com.starrocks.common.UserException;
 import com.starrocks.load.loadv2.JobState;
+import com.starrocks.load.loadv2.LoadJob;
+import com.starrocks.load.loadv2.SparkLoadJob;
+import com.starrocks.qe.ShowResultSet;
 import com.starrocks.qe.ShowResultSetMetaData;
+import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.analyzer.AnalyzeTestUtil;
 import com.starrocks.sql.ast.ShowLoadStmt;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeFail;
 import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeSuccess;
@@ -134,5 +143,25 @@ public class ShowLoadStmtTest {
     public void testShowLoadAll() {
         analyzeSuccess("show load all");
         analyzeSuccess("show load all where label = 'hehe'");
+    }
+
+    @Test
+    public void testShowLoadLockTimeout() throws DdlException, AnalysisException, MetaNotFoundException {
+        Database database = GlobalStateMgr.getCurrentState().getDb("test");
+        GlobalStateMgr.getCurrentState().getLoadMgr().replayCreateLoadJob(new SparkLoadJob(database.getId(), "label", null, null) {
+            @Override
+            protected boolean tryReadLock(long timeout, TimeUnit unit) {
+                return false;
+            }
+        });
+
+        try {
+            AnalyzeTestUtil.getStarRocksAssert().showLoad("test");
+        }
+        catch (RuntimeException e) {
+            Assert.assertTrue(e.getMessage().contains("try get LoadJob read lock failed"));
+            return;
+        }
+        Assert.fail("expect try lock failed exception.");
     }
 }

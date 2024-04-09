@@ -109,6 +109,7 @@ import com.starrocks.sql.ast.LoadStmt;
 import com.starrocks.sql.ast.ModifyTablePropertiesClause;
 import com.starrocks.sql.ast.PartitionRangeDesc;
 import com.starrocks.sql.ast.RefreshMaterializedViewStatement;
+import com.starrocks.sql.ast.ShowLoadStmt;
 import com.starrocks.sql.ast.ShowResourceGroupStmt;
 import com.starrocks.sql.ast.ShowStmt;
 import com.starrocks.sql.ast.ShowTabletStmt;
@@ -1166,5 +1167,11 @@ public class StarRocksAssert {
         TableName tableName = new TableName(db, table);
         ShowTabletStmt showTabletStmt = new ShowTabletStmt(tableName, -1, NodePosition.ZERO);
         return ShowExecutor.execute(showTabletStmt, getCtx());
+    }
+
+    public ShowResultSet showLoad(String db) throws DdlException, AnalysisException {
+        ShowLoadStmt showLoadStmt = new ShowLoadStmt(db, null, null, null);
+        ShowExecutor showExecutor = new ShowExecutor(ShowExecutor.ShowExecutorVisitor.getInstance());
+        return showExecutor.execute(showLoadStmt, ctx);
     }
 }
