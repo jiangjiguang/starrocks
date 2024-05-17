@@ -40,6 +40,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.starrocks.catalog.Database;
+import com.starrocks.catalog.SparkResource;
 import com.starrocks.common.Config;
 import com.starrocks.common.DataQualityException;
 import com.starrocks.common.DdlException;
@@ -361,6 +362,19 @@ public class LoadMgr implements Writable, MemoryTrackable {
             List<LoadJob> loadJobList = labelToLoadJobs.values().stream()
                     .flatMap(entity -> entity.stream()).collect(Collectors.toList());
             return (int) loadJobList.stream().filter(entity -> entity.getState() == jobState).count();
+        } finally {
+            readUnlock();
+        }
+    }
+
+    public long getUnFinishedLoadJobNumByResource(SparkResource sparkResource) {
+        readLock();
+        try {
+            return idToLoadJob.values().stream()
+                    .filter(j -> j.getState() != JobState.CANCELLED && j.getState() != JobState.FINISHED)
+                    .filter(loadJob ->  (loadJob instanceof SparkLoadJob)
+                            && loadJob.getResourceName().equals(sparkResource.getName()))
+                    .count();
         } finally {
             readUnlock();
         }
