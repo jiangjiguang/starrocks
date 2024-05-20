@@ -72,13 +72,13 @@ public class PartitionBaseTableAction extends RestBaseAction {
 
     public static void registerAction(ActionController controller) throws IllegalArgException {
         // the extra `/api` path is so disgusting
-        controller.registerHandler(HttpMethod.GET, "/api/show_baseTable", new PartitionBaseTableAction(controller));
+        controller.registerHandler(HttpMethod.POST, "/api/show_baseTable", new PartitionBaseTableAction(controller));
     }
 
     @Override
     protected void executeWithoutPassword(BaseRequest request, BaseResponse response) throws DdlException {
         String dbName = request.getRequest().headers().get(DB_KEY);
-        String originSql = request.getRequest().headers().get(SQL_KEY);
+        String originSql = request.getContent();
         try {
             if (Strings.isNullOrEmpty(dbName) || Strings.isNullOrEmpty(originSql)) {
                 LOG.warn("No database or originSql selected.");
