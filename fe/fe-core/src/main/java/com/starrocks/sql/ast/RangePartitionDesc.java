@@ -21,9 +21,11 @@ import com.google.common.collect.Sets;
 import com.starrocks.analysis.TimestampArithmeticExpr;
 import com.starrocks.catalog.AggregateType;
 import com.starrocks.catalog.Column;
+import com.starrocks.catalog.DynamicPartitionProperty;
 import com.starrocks.catalog.PartitionInfo;
 import com.starrocks.catalog.PartitionType;
 import com.starrocks.catalog.RangePartitionInfo;
+import com.starrocks.catalog.TableProperty;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
 import com.starrocks.common.DdlException;
@@ -161,6 +163,21 @@ public class RangePartitionDesc extends PartitionDesc {
                 throw new AnalysisException("You can only use one of these methods to create partitions");
             }
             desc.analyze(partitionColNames.size(), givenProperties);
+        }
+
+        // check dynamic partition column type when time unit is hour
+        TableProperty tableProperty = new TableProperty(otherProperties);
+        tableProperty.buildDynamicProperty();
+        DynamicPartitionProperty dynamicPartitionProperty = tableProperty.getDynamicPartitionProperty();
+        if (dynamicPartitionProperty != null) {
+            if (firstPartitionColumn.getType().isDate()) {
+                String timeUnit = tableProperty.getDynamicPartitionProperty().getTimeUnit();
+                String hourTimeUnit = TimestampArithmeticExpr.TimeUnit.HOUR.toString();
+                if (timeUnit != null && timeUnit.equalsIgnoreCase(hourTimeUnit)) {
+                    throw new AnalysisException("Dynamic partition tables that are partitioned by hours " +
+                            "need to set the partition field type to datetime");
+                }
+            }
         }
     }
 

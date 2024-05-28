@@ -878,5 +878,37 @@ public class CreateTableWithPartitionTest {
         Assert.assertFalse(partitionDesc.toString().contains("PARTITION p4 VALUES [('4'), ('5'))"));
 
     }
+
+    @Test(expected = AnalysisException.class)
+    public void testCreateDynamicPartitionHourTableBatchWithDatePartitionType() throws Exception {
+        ConnectContext ctx = starRocksAssert.getCtx();
+        String createTableSql = "CREATE TABLE `testCreateDynamicPartitionHourTableBatchWithDatePartitionType` (\n" +
+                "  `k1` date NULL COMMENT \"\",\n" +
+                "  `k2` int(11) NULL COMMENT \"\",\n" +
+                "  `k3` smallint(6) NULL COMMENT \"\",\n" +
+                "  `v1` varchar(2048) NULL COMMENT \"\",\n" +
+                "  `v2` datetime NULL DEFAULT \"2014-02-04 15:36:00\" COMMENT \"\"\n" +
+                ") ENGINE=OLAP\n" +
+                "DUPLICATE KEY(`k1`, `k2`, `k3`)\n" +
+                "COMMENT \"OLAP\"\n" +
+                "PARTITION BY RANGE(`k1`)\n" +
+                "(\n" +
+                ")\n" +
+                "DISTRIBUTED BY HASH(`k2`) BUCKETS 10\n" +
+                "PROPERTIES (\n" +
+                "\"dynamic_partition.enable\" = \"true\",\n" +
+                "\"dynamic_partition.time_unit\" = \"HOUR\",\n" +
+                "\"dynamic_partition.time_zone\" = \"Asia/Shanghai\",\n" +
+                "\"dynamic_partition.start\" = \"-360\",\n" +
+                "\"dynamic_partition.end\" = \"1\",\n" +
+                "\"dynamic_partition.prefix\" = \"p\",\n" +
+                "\"dynamic_partition.buckets\" = \"100\",\n" +
+                "\"dynamic_partition.history_partition_num\" = \"0\"," +
+                "\"replication_num\" = \"1\",\n" +
+                "\"in_memory\" = \"false\"\n" +
+                ");";
+        CreateTableStmt createTableStmt = (CreateTableStmt) UtFrameUtils.parseStmtWithNewParser(createTableSql, ctx);
+    }
+
 }
 
