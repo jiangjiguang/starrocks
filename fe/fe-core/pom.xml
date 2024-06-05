@@ -648,6 +648,10 @@ under the License.
                     <groupId>ch.qos.reload4j</groupId>
                     <artifactId>reload4j</artifactId>
                 </exclusion>
+                <exclusion>
+                    <groupId>org.apache.spark</groupId>
+                    <artifactId>spark-network-yarn_2.11</artifactId>
+                </exclusion>
             </exclusions>
         </dependency>
 
