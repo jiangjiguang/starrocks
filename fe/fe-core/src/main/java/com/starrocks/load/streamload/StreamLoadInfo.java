@@ -88,6 +88,8 @@ public class StreamLoadInfo {
     private long warehouseId = WarehouseManager.DEFAULT_WAREHOUSE_ID;
 
     private TCompressionType payloadCompressionType = TCompressionType.NO_COMPRESSION;
+    private Integer partitionWriteStart = null;
+    private Integer partitionWriteEnd = null;
 
     public StreamLoadInfo(TUniqueId id, long txnId, TFileType fileType, TFileFormatType formatType) {
         this.id = id;
@@ -266,6 +268,14 @@ public class StreamLoadInfo {
 
     public long getWarehouseId() {
         return warehouseId;
+    }
+
+    public Integer getPartitionWriteStart() {
+        return partitionWriteStart;
+    }
+
+    public Integer getPartitionWriteEnd() {
+        return partitionWriteEnd;
     }
 
     public static StreamLoadInfo fromStreamLoadContext(TUniqueId id, long txnId, int timeout, StreamLoadParam context)
@@ -466,6 +476,13 @@ public class StreamLoadInfo {
             if (payloadCompressionType == null) {
                 throw new UserException("unsupported compression type: " + request.getPayload_compression_type());
             }
+        }
+
+        if (request.isSetPartition_write_start()) {
+            partitionWriteStart = request.getPartition_write_start();
+        }
+        if (request.isSetPartition_write_end()) {
+            partitionWriteEnd = request.getPartition_write_end();
         }
     }
 

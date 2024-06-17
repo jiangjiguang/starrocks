@@ -588,6 +588,22 @@ Status StreamLoadAction::_process_put(HttpRequest* http_req, StreamLoadContext* 
             return Status::InvalidArgument("Invalid log_rejected_record_num format");
         }
     }
+    if (!http_req->header(HTTP_PARTITION_WRITE_START).empty()) {
+        try {
+            auto partition_write_start = std::stoll(http_req->header(HTTP_PARTITION_WRITE_START));
+            request.__set_partition_write_start(partition_write_start);
+        } catch (const std::invalid_argument& e) {
+            return Status::InvalidArgument("Invalid partition_write_start format");
+        }
+    }
+    if (!http_req->header(HTTP_PARTITION_WRITE_END).empty()) {
+        try {
+            auto partition_write_end = std::stoll(http_req->header(HTTP_PARTITION_WRITE_END));
+            request.__set_partition_write_end(partition_write_end);
+        } catch (const std::invalid_argument& e) {
+            return Status::InvalidArgument("Invalid partition_write_end format");
+        }
+    }
     int32_t rpc_timeout_ms = config::txn_commit_rpc_timeout_ms;
     if (ctx->timeout_second != -1) {
         request.__set_timeout(ctx->timeout_second);

@@ -939,6 +939,8 @@ struct TStreamLoadPutRequest {
     30: optional bool enable_replicated_storage
     31: optional string merge_condition
     32: optional i64 log_rejected_record_num
+    33: optional i32 partition_write_start
+    34: optional i32 partition_write_end
     // only valid when file type is CSV
     50: optional string rowDelimiter
     // only valid when file type is CSV
