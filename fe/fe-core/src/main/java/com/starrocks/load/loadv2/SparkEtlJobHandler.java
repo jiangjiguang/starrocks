@@ -269,8 +269,9 @@ public class SparkEtlJobHandler {
             boolean isYarnExpire = false;
             if (result.getReturnCode() != 0) {
                 String stderr = result.getStderr();
+                String stdout = result.getStdout();
                 // case application not exists
-                if (stderr != null && stderr.contains("doesn't exist in RM")) {
+                if (stdout != null && stdout.contains("doesn't exist in RM")) {
                     LOG.warn("spark application not found. spark app id: {}, load job id: {}, stderr: {}",
                             appId, loadJobId, stderr);
                     // retry from spark log to check if spark application exist
@@ -292,7 +293,7 @@ public class SparkEtlJobHandler {
                 if (!isYarnExpire) {
                     LOG.warn("yarn application status failed. spark app id: {}, load job id: {}, timeout: {}" +
                                     ", return code: {}, stderr: {}, stdout: {}",
-                            appId, loadJobId, EXEC_CMD_TIMEOUT_MS, result.getReturnCode(), stderr, result.getStdout());
+                            appId, loadJobId, EXEC_CMD_TIMEOUT_MS, result.getReturnCode(), stderr, stdout);
                     throw new LoadException("yarn application status failed. error: " + stderr);
                 }
             }
