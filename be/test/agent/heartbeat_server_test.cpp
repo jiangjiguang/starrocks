@@ -98,6 +98,7 @@ TEST(HeartbeatServerTest, test_frontend_aware_of_exit) {
     clear_frontend_aware_of_exit();
     ASSERT_FALSE(is_frontend_aware_of_exit());
 
+TEST(HeartbeatServerTest, test_shutdown_heartbeat) {
     HeartbeatServer server;
     {
         THeartbeatResult result;

@@ -773,7 +773,7 @@ public class Config extends ConfigBase {
      * The http server min worker threads, recommend set much smaller if thrift_server_nio_enabled
      */
     @ConfField(mutable = true)
-    public static int http_server_min_worker_threads = 10;
+    public static int http_server_min_worker_threads = 50;
 
     /**
      * The http server max worker threads
