@@ -82,8 +82,6 @@ option(WITH_GCOV "Build binary with gcov to get code coverage" OFF)
 
 option(WITH_COMPRESS "Build binary with compresss debug section" ON)
 
-option(WITH_CACHELIB "Build binary with cachelib library" OFF)
-
 option(WITH_STARCACHE "Build binary with starcache library" ON)
 option(WITH_BRCP_KEEPALIVE "Build binary with brpc_socket_keepalive (requires brpc 1.8)" OFF)
 
@@ -400,45 +398,6 @@ if ("${CMAKE_BUILD_TARGET_ARCH}" STREQUAL "x86" OR "${CMAKE_BUILD_TARGET_ARCH}" 
     set_target_properties(libdeflate PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/lib64/libdeflate.a)
 endif()
 
-# cachelib
-set(CACHELIB_DEPENDENCIES
-    cachelib_common
-    cachelib_allocator
-    cachelib_datatype
-    cachelib_navy
-    cachelib_shm
-    folly
-    fmtd
-    thriftcpp2
-    thrift-core
-    thriftmetadata
-    thriftfrozen2
-    thriftprotocol
-    thrifttype
-    transport
-    rpcmetadata
-    thriftanyrep
-    thrifttyperep
-    thriftannotation
-    concurrency
-    async
-    wangle
-)
-
-if (${WITH_CACHELIB} STREQUAL "ON")
-    LINK_LIBRARIES(${THIRDPARTY_DIR}/cachelib/deps/lib64/libunwind.so)
-    LINK_LIBRARIES(${THIRDPARTY_DIR}/cachelib/deps/lib64/liblzma.so)
-    foreach(dep ${CACHELIB_DEPENDENCIES})
-        add_library(${dep} STATIC IMPORTED)
-        set(location "${THIRDPARTY_DIR}/cachelib/lib/lib${dep}.a")
-        if(NOT EXISTS ${location})
-            set(location "${THIRDPARTY_DIR}/cachelib/lib64/lib${dep}.a")
-        endif()
-        set_target_properties(${dep} PROPERTIES IMPORTED_LOCATION "${location}")
-        message(STATUS "add cachelib dependency: ${location}")
-    endforeach()
-endif()
-
 if (${WITH_STARCACHE} STREQUAL "ON")
     add_library(starcache STATIC IMPORTED GLOBAL)
     set(STARCACHE_DIR "${THIRDPARTY_DIR}/starcache")
@@ -446,6 +405,7 @@ if (${WITH_STARCACHE} STREQUAL "ON")
     include_directories(SYSTEM ${STARCACHE_DIR}/include)
     message(STATUS "link the starcache in directory: ${STARCACHE_DIR}")
 endif()
+
 if ("${WITH_BRPC_KEEPALIVE}" STREQUAL "ON")
   set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DWITH_BRPC_KEEPALIVE")
 endif()
@@ -684,9 +644,6 @@ set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_SYSTEM_NO_DEPRECATED -DBOOST_U
 set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Werror=return-type -Werror=switch")
 if (${USE_STAROS} STREQUAL "ON")
     set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DUSE_STAROS")
-endif()
-if (${WITH_CACHELIB} STREQUAL "ON")
-    set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DWITH_CACHELIB")
 endif()
 if (${WITH_STARCACHE} STREQUAL "ON")
     set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DWITH_STARCACHE")
@@ -954,16 +911,6 @@ set(STARROCKS_DEPENDENCIES
     ${LLVM_LIBRARIES}
     ${WL_END_GROUP}
 )
-
-if (${WITH_CACHELIB} STREQUAL "ON")
-    set(STARROCKS_DEPENDENCIES
-        ${STARROCKS_DEPENDENCIES}
-        ${WL_START_GROUP}
-        ${Boost_LIBRARIES}
-        ${CACHELIB_DEPENDENCIES}
-        ${WL_END_GROUP}
-    )
-endif()
 
 if (${WITH_STARCACHE} STREQUAL "ON")
     set(STARROCKS_DEPENDENCIES
