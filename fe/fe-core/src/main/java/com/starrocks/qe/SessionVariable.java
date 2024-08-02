@@ -780,6 +780,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public static final String FORCE_DISTINCT_TO_AGG = "force_distinct_to_agg";
 
+    public static final String INVERTED_CASE_WHEN_RULE_BRANCH_LIMIT = "inverted_case_when_rule_branch_limit";
+
     public static final List<String> DEPRECATED_VARIABLES = ImmutableList.<String>builder()
             .add(CODEGEN_LEVEL)
             .add(MAX_EXECUTION_TIME)
@@ -1545,6 +1547,15 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VarAttr(name = ENABLE_COUNT_DISTINCT_REWRITE_BY_HLL_BITMAP)
     private boolean enableCountDistinctRewriteByHllBitmap = true;
 
+    @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)
+    private boolean enableRewriteBitmapUnionToBitmapAgg = true;
+
+    @VariableMgr.VarAttr(name = FORCE_DISTINCT_TO_AGG)
+    private boolean forceDistinctToAgg = false;
+
+    @VariableMgr.VarAttr(name = INVERTED_CASE_WHEN_RULE_BRANCH_LIMIT)
+    private int invertedCaseWhenRuleBranchLimit = 2;
+
     public int getCboPruneJsonSubfieldDepth() {
         return cboPruneJsonSubfieldDepth;
     }
@@ -1568,12 +1579,6 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public boolean isEnableArrayLowCardinalityOptimize() {
         return enableArrayLowCardinalityOptimize;
     }
-
-    @VarAttr(name = ENABLE_REWRITE_BITMAP_UNION_TO_BITMAP_AGG)
-    private boolean enableRewriteBitmapUnionToBitmapAgg = true;
-
-    @VariableMgr.VarAttr(name = FORCE_DISTINCT_TO_AGG)
-    private boolean forceDistinctToAgg = false;
 
     public boolean isEnableRewriteBitmapUnionToBitmapAgg() {
         return enableRewriteBitmapUnionToBitmapAgg;
@@ -4106,6 +4111,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public boolean isForceDistinctToAgg() {
         return forceDistinctToAgg;
+    }
+
+    public int getInvertedCaseWhenRuleBranchLimit() {
+        return invertedCaseWhenRuleBranchLimit;
+    }
+
+    public void setInvertedCaseWhenRuleBranchLimit(int invertedCaseWhenRuleBranchLimit) {
+        this.invertedCaseWhenRuleBranchLimit = invertedCaseWhenRuleBranchLimit;
     }
 
     // Serialize to thrift object

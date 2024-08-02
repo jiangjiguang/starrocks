@@ -193,3 +193,20 @@ select * from t0 where v1<=>v1
 [result]
 SCAN (columns[1: v1, 2: v2, 3: v3] predicate[null])
 [end]
+
+[sql]
+select /*+ SET_VAR(inverted_case_when_branch_limit=3) */ * from t0
+where
+  (
+    case
+      when v1='1' then 'a'
+      when v1='2' then 'b'
+      when v1='3' then 'c'
+      when v1='4' then 'd'
+      when v1='5' then 'e'
+      else 'f'
+    end
+  ) in ('a', 'b', 'c')
+[result]
+SCAN (columns[1: v1, 2: v2, 3: v3] predicate[1: v1 = 1 OR 1: v1 = 2 AND 1: v1 != 1 OR 1: v1 IS NULL OR 1: v1 = 3 AND 1: v1 != 1 OR 1: v1 IS NULL AND 1: v1 != 2 OR 1: v1 IS NULL AND 1: v1 IN (1, 2, 3)])
+[end]

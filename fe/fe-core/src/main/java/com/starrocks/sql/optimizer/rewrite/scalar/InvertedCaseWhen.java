@@ -23,6 +23,7 @@ import com.starrocks.analysis.Expr;
 import com.starrocks.catalog.Function;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CaseWhenOperator;
@@ -52,6 +53,8 @@ public class InvertedCaseWhen {
 
     private final ScalarOperator elseBranch;
 
+    private final int branchLimit;
+
     private InvertedCaseWhen(boolean isWithCaseAndConstWhen, CaseWhenOperator caseWhen,
                              Map<ConstantOperator, ScalarOperator> thenToWhen,
                              Map<ConstantOperator, Integer> thenToOrdinal) {
@@ -71,6 +74,7 @@ public class InvertedCaseWhen {
             }
         }
         elseBranch = tmp;
+        branchLimit = ConnectContext.get().getSessionVariable().getInvertedCaseWhenRuleBranchLimit();
     }
 
     private Optional<ScalarOperator> getBranchToNull() {
@@ -376,7 +380,7 @@ public class InvertedCaseWhen {
             // but the or(selected) returns null. So we prohibit rewriting it.
             // When there doesn't exist a branch to null but branches is too much, the rewrite result is too inefficient,
             // we prohibit rewriting it.
-            if (branchToNull.isPresent() || Math.min(selected.size(), unSelected.size()) > 2) {
+            if (branchToNull.isPresent() || Math.min(selected.size(), unSelected.size()) > invertedCaseWhen.branchLimit) {
                 return result;
             }
 
