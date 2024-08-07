@@ -480,8 +480,8 @@ public class ExpressionTest extends PlanTestBase {
         String sql = "select t2.tb from tall t1 join tall t2 " +
                 "on t1.tc = t2.tb and t2.tt = 123 and (t2.tt != 'ax') = t2.td;";
         String plan = getFragmentPlan(sql);
-        assertContains(plan, "PREDICATES: 20: tt = '123', " +
-                "CAST(20: tt != 'ax' AS BIGINT) = 14: td, 14: td = 1");
+        Assert.assertTrue(plan.contains("PREDICATES: 20: tt = '123', " +
+                "if(20: tt != 'ax', 1, 0) = 14: td, 14: td = 1"));
     }
 
     @Test
@@ -1256,7 +1256,7 @@ public class ExpressionTest extends PlanTestBase {
 
         sql = "select cast(cast(id_date as boolean) as string) from test_all_type;";
         plan = getFragmentPlan(sql);
-        assertContains(plan, "CAST(CAST(9: id_date AS BOOLEAN) AS VARCHAR(65533))");
+        assertContains(plan, "if(CAST(9: id_date AS BOOLEAN), '1', '0')");
 
         sql = "select cast(cast(id_datetime as string) as date) from test_all_type;";
         plan = getFragmentPlan(sql);
@@ -1386,15 +1386,15 @@ public class ExpressionTest extends PlanTestBase {
 
         sql = "select cast(cast(id_bool as bigint) as int) from test_bool;";
         plan = getFragmentPlan(sql);
-        assertContains(plan, "CAST(11: id_bool AS INT)");
+        assertContains(plan, "if(11: id_bool, 1, 0)");
 
         sql = "select cast(cast(id_bool as bigint) as string) from test_bool;";
         plan = getFragmentPlan(sql);
-        assertContains(plan, "CAST(11: id_bool AS VARCHAR(65533))");
+        assertContains(plan, "if(11: id_bool, '1', '0')");
 
         sql = "select cast(cast(id_bool as boolean) as string) from test_bool;";
         plan = getFragmentPlan(sql);
-        assertContains(plan, "CAST(11: id_bool AS VARCHAR(65533))");
+        assertContains(plan, "if(11: id_bool, '1', '0')");
     }
 
     @Test
@@ -1830,7 +1830,9 @@ public class ExpressionTest extends PlanTestBase {
 
             sql = "select id_bool = 'abc' from test_bool";
             plan = getVerboseExplain(sql);
-            assertContains(plan, "cast([11: id_bool, BOOLEAN, true] as DOUBLE) = cast('abc' as DOUBLE)");
+            assertContains(plan, "if[([11: id_bool, BOOLEAN, true], 1.0, 0.0); " +
+                    "args: BOOLEAN,DOUBLE,DOUBLE; result: DOUBLE; args nullable: true; " +
+                    "result nullable: true] = cast('abc' as DOUBLE)");
 
             sql = "select id_bool = 'false' from test_bool";
             plan = getVerboseExplain(sql);
@@ -1846,7 +1848,8 @@ public class ExpressionTest extends PlanTestBase {
 
             sql = "select id_bool < '123' from test_bool";
             plan = getVerboseExplain(sql);
-            assertContains(plan, "cast([11: id_bool, BOOLEAN, true] as DOUBLE) < 123.0");
+            assertContains(plan, "if[([11: id_bool, BOOLEAN, true], 1.0, 0.0); " +
+                    "args: BOOLEAN,DOUBLE,DOUBLE; result: DOUBLE; args nullable: true; result nullable: true] < 123.0");
         } finally {
             connectContext.getSessionVariable().setCboEqBaseType("VARCHAR");
         }
@@ -1890,7 +1893,9 @@ public class ExpressionTest extends PlanTestBase {
 
             sql = "select id_bool = 'abc' from test_bool";
             plan = getVerboseExplain(sql);
-            assertContains(plan, "cast([11: id_bool, BOOLEAN, true] as DOUBLE) = cast('abc' as DOUBLE)");
+            assertContains(plan, "if[([11: id_bool, BOOLEAN, true], 1.0, 0.0); " +
+                    "args: BOOLEAN,DOUBLE,DOUBLE; result: DOUBLE; " +
+                    "args nullable: true; result nullable: true] = cast('abc' as DOUBLE)");
 
             sql = "select id_bool = 'false' from test_bool";
             plan = getVerboseExplain(sql);

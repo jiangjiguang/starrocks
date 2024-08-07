@@ -247,6 +247,10 @@ public class ThreadPoolManager {
     }
 
     public static void setFixedThreadPoolSize(ThreadPoolExecutor executor, int poolSize) {
+        // corePoolSize and maximumPoolSize are same.
+        // When the previous poolSize is larger than the poolSize to be set,
+        // you need to setCorePoolSize first and then setMaximumPoolSize, and vice versa.
+        // Otherwise, it will throw IllegalArgumentException
         int coreSize = executor.getCorePoolSize();
         if (coreSize == poolSize) { // no change
             return;

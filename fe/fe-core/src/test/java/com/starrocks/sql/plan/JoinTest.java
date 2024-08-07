@@ -367,7 +367,7 @@ public class JoinTest extends PlanTestBase {
         assertContains(plan, "|  colocate: false, reason: \n" +
                 "  |  equal join conjunct: 1: v1 = 4: v4\n" +
                 "  |  equal join conjunct: 2: v2 = 5: v5\n" +
-                "  |  other join predicates: CAST(CAST(3: v3 <= 3: v3 AS BIGINT) < 6: v6 AS BIGINT) = 5: v5");
+                "  |  other join predicates: if(if(3: v3 <= 3: v3, 1, 0) < 6: v6, 1, 0) = 5: v5");
     }
 
     @Test
@@ -390,7 +390,7 @@ public class JoinTest extends PlanTestBase {
         assertContains(plan, "|  colocate: false, reason: \n" +
                 "  |  equal join conjunct: 1: v1 = 4: v4\n" +
                 "  |  equal join conjunct: 2: v2 = 5: v5\n" +
-                "  |  other join predicates: CAST(CAST(3: v3 <= 3: v3 AS BIGINT) < 6: v6 AS BIGINT) = 5: v5");
+                "  |  other join predicates: if(if(3: v3 <= 3: v3, 1, 0) < 6: v6, 1, 0) = 5: v5");
     }
 
     @Test
@@ -2026,7 +2026,7 @@ public class JoinTest extends PlanTestBase {
                 "  9:HASH JOIN\n" +
                 "  |  join op: INNER JOIN (PARTITIONED)\n" +
                 "  |  colocate: false, reason: \n" +
-                "  |  equal join conjunct: 1: v4 = 10: cast");
+                "  |  equal join conjunct: 1: v4 = 10: if");
     }
 
     @Test

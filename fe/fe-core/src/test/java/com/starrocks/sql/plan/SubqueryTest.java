@@ -981,7 +981,7 @@ public class SubqueryTest extends PlanTestBase {
             assertContains(plan, "  8:HASH JOIN\n" +
                     "  |  join op: INNER JOIN (PARTITIONED)\n" +
                     "  |  colocate: false, reason: \n" +
-                    "  |  equal join conjunct: 1: v1 = 13: cast");
+                    "  |  equal join conjunct: 1: v1 = 13: if");
         }
         {
             // Uncorrelated 2
@@ -995,7 +995,7 @@ public class SubqueryTest extends PlanTestBase {
             assertContains(plan, "HASH JOIN\n" +
                     "  |  join op: INNER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
-                    "  |  equal join conjunct: 1: v1 = 13: cast");
+                    "  |  equal join conjunct: 1: v1 = 13: if");
         }
         {
             // Uncorrelated 3, multi subqueries
@@ -1010,11 +1010,11 @@ public class SubqueryTest extends PlanTestBase {
             assertContains(plan, "HASH JOIN\n" +
                     "  |  join op: INNER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
-                    "  |  equal join conjunct: 1: v1 = 20: cast");
-            assertContains(plan, "HASH JOIN\n" +
+                    "  |  equal join conjunct: 1: v1 = 20: if");
+            assertContains(plan, "  16:HASH JOIN\n" +
                     "  |  join op: INNER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
-                    "  |  equal join conjunct: 4: v4 = 19: cast");
+                    "  |  equal join conjunct: 4: v4 = 19: if");
         }
         {
             // correlated 1
@@ -1026,12 +1026,12 @@ public class SubqueryTest extends PlanTestBase {
                     "  |  join op: INNER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
                     "  |  equal join conjunct: 4: v4 = 1: v1\n" +
-                    "  |  equal join conjunct: 12: cast = 1: v1");
+                    "  |  equal join conjunct: 12: if = 1: v1");
             assertContains(plan, "  4:HASH JOIN\n" +
                     "  |  join op: LEFT OUTER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
                     "  |  equal join conjunct: 5: v5 = 8: v8\n" +
-                    "  |  other predicates: CAST(11: countRows IS NOT NULL AS BIGINT) IS NOT NULL");
+                    "  |  other predicates: if(11: countRows IS NOT NULL, 1, 0) IS NOT NULL");
         }
         {
             // correlated 2
@@ -1042,12 +1042,12 @@ public class SubqueryTest extends PlanTestBase {
             assertContains(plan, "  8:HASH JOIN\n" +
                     "  |  join op: INNER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
-                    "  |  equal join conjunct: 12: cast = 1: v1");
+                    "  |  equal join conjunct: 12: if = 1: v1");
             assertContains(plan, "  4:HASH JOIN\n" +
                     "  |  join op: LEFT OUTER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
                     "  |  equal join conjunct: 5: v5 = 8: v8\n" +
-                    "  |  other predicates: CAST(11: countRows IS NOT NULL AS BIGINT) IS NOT NULL");
+                    "  |  other predicates: if(11: countRows IS NOT NULL, 1, 0) IS NOT NULL");
         }
         {
             // correlated 3, multi subqueries
@@ -1060,17 +1060,17 @@ public class SubqueryTest extends PlanTestBase {
             assertContains(plan, "HASH JOIN\n" +
                     "  |  join op: INNER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
-                    "  |  equal join conjunct: 17: cast = 1: v1");
+                    "  |  equal join conjunct: 17: if = 1: v1");
             assertContains(plan, "  4:HASH JOIN\n" +
                     "  |  join op: LEFT OUTER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
                     "  |  equal join conjunct: 5: v5 = 8: v8\n" +
-                    "  |  other predicates: CAST(15: countRows IS NOT NULL AS BIGINT) IS NOT NULL");
+                    "  |  other predicates: if(15: countRows IS NOT NULL, 1, 0) IS NOT NULL");
             assertContains(plan, "HASH JOIN\n" +
                     "  |  join op: LEFT OUTER JOIN (BROADCAST)\n" +
                     "  |  colocate: false, reason: \n" +
                     "  |  equal join conjunct: 1: v1 = 11: v10\n" +
-                    "  |  other predicates: 2: v2 = CAST(16: countRows IS NULL AS BIGINT)");
+                    "  |  other predicates: 2: v2 = if(16: countRows IS NULL, 1, 0)");
         }
     }
 
@@ -1868,7 +1868,8 @@ public class SubqueryTest extends PlanTestBase {
                 "then (select type1 from tmp) > (select pretype from tmp) else null end end from tmp a;";
         String plan = getFragmentPlan(sql);
         assertContains(plan, " 19:Project\n" +
-                "  |  <slot 32> : if(8 = abs(0), 'a', CAST(if(17: expr, 24: type1 > 30: pretype, NULL) AS VARCHAR))");
+                "  |  <slot 32> : if(8 = abs(0), 'a', " +
+                "if(if(17: expr, 24: type1 > 30: pretype, NULL), '1', '0'))");
     }
 
     // we can enable this  test after support constant in sub-query

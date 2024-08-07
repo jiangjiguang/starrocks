@@ -195,7 +195,7 @@ SCAN (columns[1: v1, 2: v2, 3: v3] predicate[null])
 [end]
 
 [sql]
-select /*+ SET_VAR(inverted_case_when_branch_limit=3) */ * from t0
+select /*+ SET_VAR(inverted_case_when_rule_branch_limit=3) */ * from t0
 where
   (
     case
@@ -209,4 +209,10 @@ where
   ) in ('a', 'b', 'c')
 [result]
 SCAN (columns[1: v1, 2: v2, 3: v3] predicate[1: v1 = 1 OR 1: v1 = 2 AND 1: v1 != 1 OR 1: v1 IS NULL OR 1: v1 = 3 AND 1: v1 != 1 OR 1: v1 IS NULL AND 1: v1 != 2 OR 1: v1 IS NULL AND 1: v1 IN (1, 2, 3)])
+[end]
+
+[sql]
+select * from t0 where CAST((v1 > 0 AND v1 < 2) AS BIGINT) IN ('1')
+[result]
+SCAN (columns[1: v1, 2: v2, 3: v3] predicate[1: v1 > 0 AND 1: v1 < 2])
 [end]
