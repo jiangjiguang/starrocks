@@ -37,6 +37,10 @@ struct WorkGroupMetrics {
     int128_t group_unique_id;
 
     std::unique_ptr<DoubleGauge> cpu_limit = nullptr;
+    std::unique_ptr<UIntGauge> cpu_schedule = nullptr;
+    std::unique_ptr<UIntGauge> cpu_used = nullptr;
+    std::unique_ptr<UIntGauge> scan_schedule = nullptr;
+    std::unique_ptr<UIntGauge> scan_used = nullptr;
     std::unique_ptr<DoubleGauge> inuse_cpu_ratio = nullptr;
     std::unique_ptr<DoubleGauge> inuse_scan_ratio = nullptr;
     std::unique_ptr<DoubleGauge> inuse_connector_scan_ratio = nullptr;
@@ -76,6 +80,7 @@ template <typename Q>
 void WorkGroupSchedEntity<Q>::incr_runtime_ns(int64_t runtime_ns) {
     _vruntime_ns += runtime_ns / cpu_weight();
     _unadjusted_runtime_ns += runtime_ns;
+    _schedule_count += 1;
 }
 
 template <typename Q>
@@ -312,6 +317,14 @@ void WorkGroupManager::add_metrics_unlocked(const WorkGroupPtr& wg, UniqueLockTy
                 "resource_group_cpu_limit_ratio", MetricLabels().add("name", wg->name()),
                 resource_group_cpu_limit_ratio.get());
         // cpu use ratio.
+        auto resource_group_cpu_schedule = std::make_unique<starrocks::UIntGauge>(MetricUnit::NOUNIT);
+        bool cpu_schedule_registered = StarRocksMetrics::instance()->metrics()->register_metric(
+                "resource_group_cpu_schedule", MetricLabels().add("name", wg->name()),
+                resource_group_cpu_schedule.get());
+        auto resource_group_cpu_use = std::make_unique<starrocks::UIntGauge>(MetricUnit::NANOSECONDS);
+        bool cpu_used_registered = StarRocksMetrics::instance()->metrics()->register_metric(
+                "resource_group_cpu_use", MetricLabels().add("name", wg->name()),
+                resource_group_cpu_use.get());
         auto inuse_cpu_cores = std::make_unique<DoubleGauge>(MetricUnit::NOUNIT);
         bool inuse_cpu_cores_registered = StarRocksMetrics::instance()->metrics()->register_metric(
                 "resource_group_inuse_cpu_cores", MetricLabels().add("name", wg->name()), inuse_cpu_cores.get());
@@ -326,6 +339,14 @@ void WorkGroupManager::add_metrics_unlocked(const WorkGroupPtr& wg, UniqueLockTy
                 "resource_group_scan_use_ratio", MetricLabels().add("name", wg->name()),
                 resource_group_scan_use_ratio.get());
         // connector scan use ratio.
+        auto resource_group_scan_schedule = std::make_unique<starrocks::UIntGauge>(MetricUnit::NOUNIT);
+        bool scan_schedule_registered = StarRocksMetrics::instance()->metrics()->register_metric(
+                "resource_group_scan_schedule", MetricLabels().add("name", wg->name()),
+                resource_group_scan_schedule.get());
+        auto resource_group_scan_use = std::make_unique<starrocks::UIntGauge>(MetricUnit::NANOSECONDS);
+        bool scan_used_registered = StarRocksMetrics::instance()->metrics()->register_metric(
+                "resource_group_scan_use", MetricLabels().add("name", wg->name()),
+                resource_group_scan_use.get());
         auto resource_group_connector_scan_use_ratio = std::make_unique<DoubleGauge>(MetricUnit::PERCENT);
         bool connector_scan_ratio_registered = StarRocksMetrics::instance()->metrics()->register_metric(
                 "resource_group_connector_scan_use_ratio", MetricLabels().add("name", wg->name()),
@@ -375,8 +396,13 @@ void WorkGroupManager::add_metrics_unlocked(const WorkGroupPtr& wg, UniqueLockTy
             wg_metrics->cpu_runtime_ns = wg->cpu_runtime_ns();
             wg_metrics->inuse_cpu_cores = std::move(inuse_cpu_cores);
         }
+
         if (cpu_limit_registered) wg_metrics->cpu_limit = std::move(resource_group_cpu_limit_ratio);
+        if (cpu_schedule_registered) wg_metrics->cpu_schedule = std::move(resource_group_cpu_schedule);
+        if (cpu_used_registered)  wg_metrics->cpu_used = std::move(resource_group_cpu_use);
         if (cpu_ratio_registered) wg_metrics->inuse_cpu_ratio = std::move(resource_group_cpu_use_ratio);
+        if (scan_schedule_registered) wg_metrics->scan_schedule = std::move(resource_group_scan_schedule);
+        if (scan_used_registered) wg_metrics->scan_used = std::move(resource_group_scan_use);
         if (scan_ratio_registered) wg_metrics->inuse_scan_ratio = std::move(resource_group_scan_use_ratio);
         if (connector_scan_ratio_registered)
             wg_metrics->inuse_connector_scan_ratio = std::move(resource_group_connector_scan_use_ratio);
@@ -432,7 +458,11 @@ void WorkGroupManager::update_metrics_unlocked() {
                                                                sum_connector_scan_runtime_ns);
 
             wg_metrics->cpu_limit->set_value(cpu_expected_use_ratio);
+            wg_metrics->cpu_schedule->set_value(wg->driver_sched_entity()->schedule_count());
+            wg_metrics->cpu_used->set_value(wg->driver_sched_entity()->unadjusted_runtime_ns());
             wg_metrics->inuse_cpu_ratio->set_value(cpu_use_ratio);
+            wg_metrics->scan_schedule->set_value(wg->scan_sched_entity()->schedule_count());
+            wg_metrics->scan_used->set_value(wg->scan_sched_entity()->unadjusted_runtime_ns());
             wg_metrics->inuse_scan_ratio->set_value(scan_use_ratio);
             wg_metrics->inuse_connector_scan_ratio->set_value(connector_scan_use_ratio);
             wg_metrics->mem_limit->set_value(wg->mem_limit_bytes());
@@ -454,7 +484,11 @@ void WorkGroupManager::update_metrics_unlocked() {
             VLOG(2) << "workgroup update_metrics " << name << ", workgroup not exists so cleanup metrics";
 
             wg_metrics->cpu_limit->set_value(0);
+            wg_metrics->cpu_schedule->set_value(0);
+            wg_metrics->cpu_used->set_value(0);
             wg_metrics->inuse_cpu_ratio->set_value(0);
+            wg_metrics->scan_schedule->set_value(0);
+            wg_metrics->scan_used->set_value(0);
             wg_metrics->inuse_scan_ratio->set_value(0);
             wg_metrics->inuse_connector_scan_ratio->set_value(0);
             wg_metrics->mem_limit->set_value(0);

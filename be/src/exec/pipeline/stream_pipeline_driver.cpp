@@ -136,7 +136,7 @@ StatusOr<DriverState> StreamPipelineDriver::process(RuntimeState* runtime_state,
                 break;
             }
             if (_workgroup != nullptr && time_spent >= YIELD_PREEMPT_MAX_TIME_SPENT_NS &&
-                _workgroup->driver_sched_entity()->in_queue()->should_yield(this, time_spent)) {
+                _workgroup->driver_sched_entity()->in_queue()->should_yield(this->workgroup(), time_spent)) {
                 should_yield = true;
                 COUNTER_UPDATE(_yield_by_preempt_counter, 1);
                 break;

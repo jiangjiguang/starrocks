@@ -76,6 +76,7 @@ public:
     void mark_curr_runtime_ns() { _curr_unadjusted_runtime_ns = _unadjusted_runtime_ns; }
     /// Update last runtime to the curr runtime.
     void mark_last_runtime_ns() { _last_unadjusted_runtime_ns = _curr_unadjusted_runtime_ns; }
+    int64_t schedule_count() const { return _schedule_count; }
 
     int64_t unadjusted_runtime_ns() const { return _unadjusted_runtime_ns; }
 
@@ -93,6 +94,8 @@ private:
     int64_t _unadjusted_runtime_ns = 0;
     int64_t _curr_unadjusted_runtime_ns = 0;
     int64_t _last_unadjusted_runtime_ns = 0;
+
+    int64_t _schedule_count = 0;
 };
 
 using WorkGroupDriverSchedEntity = WorkGroupSchedEntity<pipeline::DriverQueue>;

@@ -326,12 +326,12 @@ size_t WorkGroupDriverQueue::size() const {
     return _num_drivers;
 }
 
-bool WorkGroupDriverQueue::should_yield(const DriverRawPtr driver, int64_t unaccounted_runtime_ns) const {
-    if (ExecEnv::GetInstance()->workgroup_manager()->should_yield(driver->workgroup())) {
+bool WorkGroupDriverQueue::should_yield(const workgroup::WorkGroup* wg, int64_t unaccounted_runtime_ns) const {
+    if (ExecEnv::GetInstance()->workgroup_manager()->should_yield(wg)) {
         return true;
     }
     // Return true, if the minimum-vruntime workgroup is not current workgroup anymore.
-    auto* wg_entity = driver->workgroup()->driver_sched_entity();
+    auto* wg_entity = wg->driver_sched_entity();
     auto* min_entity = _min_wg_entity.load();
     return min_entity != wg_entity && min_entity &&
            min_entity->vruntime_ns() < wg_entity->vruntime_ns() + unaccounted_runtime_ns / wg_entity->cpu_weight();
@@ -382,8 +382,7 @@ void WorkGroupDriverQueue::_enqueue_workgroup(workgroup::WorkGroupDriverSchedEnt
             // may be much smaller than the other workgroups. If the runtime isn't adjusted, the others
             // will starve. Therefore, the runtime is adjusted according the minimum vruntime in _ready_wgs,
             // and give it half of ideal runtime in a schedule period as compensation.
-            int64_t new_vruntime_ns = std::min(min_wg_entity->vruntime_ns() - _ideal_runtime_ns(wg_entity) / 2,
-                                               min_wg_entity->runtime_ns() / int64_t(wg_entity->cpu_weight()));
+            int64_t new_vruntime_ns = min_wg_entity->vruntime_ns() - _ideal_runtime_ns(wg_entity) * 3 / 2;
             int64_t diff_vruntime_ns = new_vruntime_ns - wg_entity->vruntime_ns();
             if (diff_vruntime_ns > 0) {
                 DCHECK(_wg_entities.find(wg_entity) == _wg_entities.end());

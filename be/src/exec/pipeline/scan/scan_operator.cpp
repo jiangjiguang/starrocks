@@ -476,26 +476,29 @@ Status ScanOperator::_trigger_next_scan(RuntimeState* state, int chunk_source_in
         }
     };
 
-    bool submit_success;
-    {
-        SCOPED_TIMER(_submit_io_task_timer);
-        submit_success = _scan_executor->submit(std::move(task));
-    }
-
-    if (submit_success) {
-        _io_task_retry_cnt = 0;
+    if (config::pipeline_scan_use_driver_thread) {
+        task.run();
     } else {
-        _chunk_sources[chunk_source_index]->unpin_chunk_token();
-        _num_running_io_tasks--;
-        _is_io_task_running[chunk_source_index] = false;
-        // TODO(hcf) set a proper retry times
-        LOG(WARNING) << "ScanOperator failed to offer io task due to thread pool overload, retryCnt="
-                     << _io_task_retry_cnt;
-        if (++_io_task_retry_cnt > 100) {
-            return Status::RuntimeError("ScanOperator failed to offer io task due to thread pool overload");
+        bool submit_success;
+        {
+            SCOPED_TIMER(_submit_io_task_timer);
+            submit_success = _scan_executor->submit(std::move(task));
+        }
+
+        if (submit_success) {
+            _io_task_retry_cnt = 0;
+        } else {
+            _chunk_sources[chunk_source_index]->unpin_chunk_token();
+            _num_running_io_tasks--;
+            _is_io_task_running[chunk_source_index] = false;
+            // TODO(hcf) set a proper retry times
+            LOG(WARNING) << "ScanOperator failed to offer io task due to thread pool overload, retryCnt="
+                         << _io_task_retry_cnt;
+            if (++_io_task_retry_cnt > 100) {
+                return Status::RuntimeError("ScanOperator failed to offer io task due to thread pool overload");
+            }
         }
     }
-
     return Status::OK();
 }
 

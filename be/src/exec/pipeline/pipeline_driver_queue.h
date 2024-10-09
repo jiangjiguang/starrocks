@@ -45,7 +45,7 @@ public:
     virtual size_t size() const = 0;
     bool empty() const { return size() == 0; }
 
-    virtual bool should_yield(const DriverRawPtr driver, int64_t unaccounted_runtime_ns) const = 0;
+    virtual bool should_yield(const workgroup::WorkGroup* wg, int64_t unaccounted_runtime_ns) const = 0;
 };
 
 // SubQuerySharedDriverQueue is used to store the driver waiting to be executed.
@@ -115,7 +115,7 @@ public:
 
     size_t size() const override;
 
-    bool should_yield(const DriverRawPtr driver, int64_t unaccounted_runtime_ns) const override { return false; }
+    bool should_yield(const workgroup::WorkGroup* wg, int64_t unaccounted_runtime_ns) const override { return false; }
 
     static double ratio_of_adjacent_queue() { return config::pipeline_driver_queue_ratio_of_adjacent_queue; }
     static constexpr size_t QUEUE_SIZE = 8;
@@ -171,7 +171,7 @@ public:
 
     size_t size() const override;
 
-    bool should_yield(const DriverRawPtr driver, int64_t unaccounted_runtime_ns) const override;
+    bool should_yield(const workgroup::WorkGroup* wg, int64_t unaccounted_runtime_ns) const override;
 
 private:
     /// These methods should be guarded by the outside _global_mutex.

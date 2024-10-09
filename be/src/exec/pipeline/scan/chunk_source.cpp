@@ -93,9 +93,14 @@ Status ChunkSource::buffer_next_batch_chunks_blocking(RuntimeState* state, size_
             break;
         }
 
-        if (running_wg != nullptr && time_spent_ns >= workgroup::WorkGroup::YIELD_PREEMPT_MAX_TIME_SPENT &&
-            _scan_sched_entity(running_wg)->in_queue()->should_yield(running_wg, time_spent_ns)) {
-            break;
+        if (running_wg != nullptr && time_spent_ns >= workgroup::WorkGroup::YIELD_PREEMPT_MAX_TIME_SPENT) {
+            if (config::pipeline_scan_use_driver_thread) {
+                if (running_wg->driver_sched_entity()->in_queue()->should_yield(running_wg, time_spent_ns)) {
+                    break;
+                }
+            } else if (_scan_sched_entity(running_wg)->in_queue()->should_yield(running_wg, time_spent_ns)) {
+                break;
+            }
         }
     }
     return _status;
