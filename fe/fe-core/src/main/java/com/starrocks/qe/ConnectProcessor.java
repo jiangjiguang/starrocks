@@ -67,6 +67,7 @@ import com.starrocks.rpc.RpcException;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.server.WarehouseManager;
 import com.starrocks.service.FrontendOptions;
+import com.starrocks.sql.analyzer.AstToEncryptFunctionSQLBuilder;
 import com.starrocks.sql.analyzer.AstToSQLBuilder;
 import com.starrocks.sql.ast.AstTraverser;
 import com.starrocks.sql.ast.ExecuteStmt;
@@ -257,7 +258,16 @@ public class ConnectProcessor {
             // invalid sql, record the original statement to avoid audit log can't replay
             ctx.getAuditEventBuilder().setStmt(origStmt);
         } else {
-            ctx.getAuditEventBuilder().setStmt(LogUtil.removeLineSeparator(origStmt));
+            if (origStmt.toLowerCase().contains("sm4_encrypt") || origStmt.toLowerCase().contains("sm4_decrypt")) {
+                String toSqlSm4 = AstToEncryptFunctionSQLBuilder.toSQL(parsedStmt);
+                if (null == toSqlSm4) {
+                    ctx.getAuditEventBuilder().setStmt(LogUtil.removeLineSeparator(origStmt));
+                } else {
+                    ctx.getAuditEventBuilder().setStmt(LogUtil.removeLineSeparator(toSqlSm4));
+                }
+            } else {
+                ctx.getAuditEventBuilder().setStmt(LogUtil.removeLineSeparator(origStmt));
+            }
         }
 
         GlobalStateMgr.getCurrentState().getAuditEventProcessor().handleAuditEvent(ctx.getAuditEventBuilder().build());
