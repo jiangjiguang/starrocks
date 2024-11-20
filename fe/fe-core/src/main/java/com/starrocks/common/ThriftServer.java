@@ -26,12 +26,14 @@ import org.apache.logging.log4j.Logger;
 import org.apache.thrift.TProcessor;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.server.TServer;
+import org.apache.thrift.transport.TNonblockingServerSocket;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TTransportException;
 
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 public class ThriftServer {
     private static final Logger LOG = LogManager.getLogger(ThriftServer.class);
@@ -49,29 +51,53 @@ public class ThriftServer {
     }
 
     private void createThreadPoolServer() throws TTransportException {
-        TServerSocket.ServerSocketTransportArgs socketTransportArgs = new TServerSocket.ServerSocketTransportArgs()
-                .bindAddr(NetUtils.getSockAddrBasedOnCurrIpVersion(port))
-                .clientTimeout(Config.thrift_client_timeout_ms)
-                .backlog(Config.thrift_backlog_num);
-
-        TBinaryProtocol.Factory factory =
-                new TBinaryProtocol.Factory(Config.thrift_rpc_strict_mode, true, Config.thrift_rpc_max_body_size, -1);
-        SRTThreadPoolServer.Args serverArgs =
-                new SRTThreadPoolServer.Args(new TServerSocket(socketTransportArgs)).protocolFactory(
-                        factory).processor(processor);
-        ThreadPoolExecutor threadPoolExecutor = ThreadPoolManager
-                .newDaemonFixedThreadPool(Config.thrift_server_max_worker_threads,
-                        Config.thrift_server_queue_size,
-                        "thrift-server-pool", true);
+        executor = ThreadPoolManager.newDaemonCacheThreadPool(
+                Config.thrift_server_min_worker_threads, Config.thrift_server_max_worker_threads,
+                Config.thrift_server_queue_size, Config.thrift_server_worker_keep_alive_second,
+                "thrift-server-pool", true);
         // allow core thread time out so that the thread can be released
         // if not used for ThreadPoolManager.KEEP_ALIVE_TIME
-        threadPoolExecutor.allowCoreThreadTimeOut(true);
-        serverArgs.executorService(threadPoolExecutor);
-        executor = threadPoolExecutor;
-        server = new SRTThreadPoolServer(serverArgs);
+        executor.allowCoreThreadTimeOut(true);
+
+        TBinaryProtocol.Factory factory = new TBinaryProtocol.Factory(Config.thrift_rpc_strict_mode, true,
+                Config.thrift_rpc_max_body_size, -1);
+
+        if (Config.thrift_server_nio_enabled) {
+            TNonblockingServerSocket.NonblockingAbstractServerSocketArgs socketTransportArgs =
+                    new TNonblockingServerSocket.NonblockingAbstractServerSocketArgs()
+                            .bindAddr(NetUtils.getSockAddrBasedOnCurrIpVersion(port))
+                            .clientTimeout(Config.thrift_client_timeout_ms)
+                            .backlog(Config.thrift_backlog_num);
+
+            SRTThreadedSelectorServer.Args serverArgs = new SRTThreadedSelectorServer.Args(
+                    new TNonblockingServerSocket(socketTransportArgs)).protocolFactory(factory).executorService(executor)
+                    .selectorThreads(Config.thrift_server_nio_selector_threads)
+                    .processor(processor);
+
+            server = new SRTThreadedSelectorServer(serverArgs);
+        } else {
+            TServerSocket.ServerSocketTransportArgs socketTransportArgs = new TServerSocket.ServerSocketTransportArgs().bindAddr(
+                            NetUtils.getSockAddrBasedOnCurrIpVersion(port)).clientTimeout(Config.thrift_client_timeout_ms)
+                    .backlog(Config.thrift_backlog_num);
+
+            SRTThreadPoolServer.Args serverArgs = new SRTThreadPoolServer.Args(
+                    new TServerSocket(socketTransportArgs)).protocolFactory(factory).executorService(executor)
+                    .processor(processor);
+
+            server = new SRTThreadPoolServer(serverArgs);
+        }
+
 
         GlobalStateMgr.getCurrentState().getConfigRefreshDaemon().registerListener(() -> {
-            ThreadPoolManager.setFixedThreadPoolSize(threadPoolExecutor, Config.thrift_server_max_worker_threads);
+            if (executor.getCorePoolSize() != Config.thrift_server_min_worker_threads) {
+                executor.setCorePoolSize(Config.thrift_server_min_worker_threads);
+            }
+            if (executor.getMaximumPoolSize() != Config.thrift_server_max_worker_threads) {
+                executor.setMaximumPoolSize(Config.thrift_server_max_worker_threads);
+            }
+            if (executor.getKeepAliveTime(TimeUnit.SECONDS) != Config.thrift_server_worker_keep_alive_second) {
+                executor.setKeepAliveTime(Config.thrift_server_max_worker_threads, TimeUnit.SECONDS);
+            }
         });
     }
 
@@ -120,5 +146,9 @@ public class ThriftServer {
 
     public static ThreadPoolExecutor getExecutor() {
         return executor;
+    }
+
+    public boolean isServing() {
+        return server.isServing();
     }
 }

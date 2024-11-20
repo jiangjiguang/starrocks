@@ -46,6 +46,7 @@ import org.apache.thrift.transport.TTransport;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.channels.SocketChannel;
 
 public class ThriftServerEventProcessor implements TServerEventHandler {
     private static final Logger LOG = LogManager.getLogger(ThriftServerEventProcessor.class);
@@ -69,26 +70,30 @@ public class ThriftServerEventProcessor implements TServerEventHandler {
     @Override
     public ServerContext createContext(TProtocol input, TProtocol output) {
         // param input is class org.apache.thrift.protocol.TBinaryProtocol
+        SocketAddress socketAddress = null;
         TTransport transport = input.getTransport();
-        Preconditions.checkState(transport instanceof TSocket);
+        if (transport instanceof SRAbstractNonblockingServer.TStreamPipedTransport) {
+            SocketChannel socketChannel = ((SRAbstractNonblockingServer.TStreamPipedTransport) transport).getSocketChannel();
+            socketAddress = socketChannel.socket().getRemoteSocketAddress();
+        } else if (transport instanceof TSocket) {
+            TSocket tSocket = (TSocket) transport;
+            socketAddress = tSocket.getSocket().getRemoteSocketAddress();
+        } else {
+            return null;
+        }
 
-        TSocket tSocket = (TSocket) transport;
-        SocketAddress socketAddress = tSocket.getSocket().getRemoteSocketAddress();
-        InetSocketAddress inetSocketAddress = null;
         if (socketAddress instanceof InetSocketAddress) {
-            inetSocketAddress = (InetSocketAddress) socketAddress;
+            InetSocketAddress address = (InetSocketAddress) socketAddress;
+            TNetworkAddress clientAddress = new TNetworkAddress(
+                    address.getHostString(),
+                    address.getPort());
+            thriftServer.addConnect(clientAddress);
+            LOG.debug("create thrift context. client: {}", clientAddress);
+            return new ThriftServerContext(clientAddress);
         } else {
             LOG.warn("fail to get client socket address");
             return null;
         }
-        TNetworkAddress clientAddress = new TNetworkAddress(
-                inetSocketAddress.getHostString(),
-                inetSocketAddress.getPort());
-
-        thriftServer.addConnect(clientAddress);
-
-        LOG.debug("create thrift context. client: {}", clientAddress);
-        return new ThriftServerContext(clientAddress);
     }
 
     @Override

@@ -920,6 +920,24 @@ public class Config extends ConfigBase {
     public static boolean lake_enable_tablet_creation_optimization = false;
 
     /**
+     * Frontend Service nio option
+     */
+    @ConfField
+    public static boolean thrift_server_nio_enabled = false;
+
+    /**
+     *
+     */
+    @ConfField
+    public static int thrift_server_nio_selector_threads = 1;
+
+    /**
+     * The thrift server min worker threads, recommend set much smaller if thrift_server_nio_enabled
+     */
+    @ConfField(mutable = true)
+    public static int thrift_server_min_worker_threads = 4096;
+
+    /**
      * The thrift server max worker threads
      */
     @ConfField(mutable = true)
@@ -931,6 +949,12 @@ public class Config extends ConfigBase {
      */
     @ConfField
     public static int thrift_server_queue_size = 4096;
+
+    /**
+     * thrift server thread pool keep alive time, terminate idle threads
+     */
+    @ConfField(mutable = true)
+    public static int thrift_server_worker_keep_alive_second = 60;
 
     /**
      * Maximal wait seconds for straggler node in load

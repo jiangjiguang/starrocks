@@ -131,6 +131,13 @@ public class ThreadPoolManager {
                 new BlockedPolicy(poolName, 5), poolName, needRegisterMetric);
     }
 
+    public static ThreadPoolExecutor newDaemonCacheThreadPool(int minNumThread, int maxNumThread, int queueSize,
+            long keepAliveTime, String poolName, boolean needRegisterMetric) {
+        return newDaemonThreadPool(minNumThread, maxNumThread, keepAliveTime, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(queueSize),
+            new BlockedPolicy(poolName, 5), poolName, needRegisterMetric);
+    }
+
     public static ThreadPoolExecutor newDaemonFixedThreadPool(int numThread, int queueSize, String poolName,
                                                               boolean needRegisterMetric) {
         return newDaemonThreadPool(numThread, numThread, KEEP_ALIVE_TIME, TimeUnit.SECONDS,

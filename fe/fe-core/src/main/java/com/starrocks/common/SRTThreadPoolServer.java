@@ -17,6 +17,8 @@
 
 package com.starrocks.common;
 
+import com.google.common.base.Stopwatch;
+import com.starrocks.metric.MetricRepo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.thrift.TException;
@@ -297,10 +299,11 @@ public class SRTThreadPoolServer extends TServer {
                 if (eventHandler != null) {
                     connectionContext = eventHandler.createContext(inputProtocol, outputProtocol);
                 }
+                Stopwatch stopwatch = Stopwatch.createUnstarted();
                 // we check stopped_ first to make sure we're not supposed to be shutting
                 // down. this is necessary for graceful shutdown.
                 while (true) {
-
+                    stopwatch.start();
                     if (eventHandler != null) {
                         eventHandler.processContext(connectionContext, inputTransport, outputTransport);
                     }
@@ -309,6 +312,9 @@ public class SRTThreadPoolServer extends TServer {
                         break;
                     }
                     processor.process(inputProtocol, outputProtocol);
+                    stopwatch.stop();
+                    long time = stopwatch.elapsed(TimeUnit.NANOSECONDS);
+                    MetricRepo.HISTO_THRIFT_RPC_LATENCY.update(time);
                 }
             } catch (Exception x) {
                 // We'll usually receive RuntimeException types here

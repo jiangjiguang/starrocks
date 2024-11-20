@@ -171,6 +171,7 @@ public final class MetricRepo {
     public static Histogram HISTO_JOURNAL_WRITE_BATCH;
     public static Histogram HISTO_JOURNAL_WRITE_BYTES;
     public static Histogram HISTO_SHORTCIRCUIT_RPC_LATENCY;
+    public static Histogram HISTO_THRIFT_RPC_LATENCY;
 
     // following metrics will be updated by metric calculator
     public static GaugeMetricImpl<Double> GAUGE_QUERY_PER_SECOND;
@@ -544,6 +545,8 @@ public final class MetricRepo {
         HISTO_JOURNAL_WRITE_BYTES =
                 METRIC_REGISTER.histogram(MetricRegistry.name("journal", "write", "bytes"));
         HISTO_SHORTCIRCUIT_RPC_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name("shortcircuit", "latency", "ms"));
+        HISTO_THRIFT_RPC_LATENCY =
+               METRIC_REGISTER.histogram(MetricRegistry.name("thrift", "rpc", "latency", "ns"));
 
         // init system metrics
         initSystemMetrics();
