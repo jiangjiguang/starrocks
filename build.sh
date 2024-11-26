@@ -207,10 +207,10 @@ fi
 HELP=0
 if [ $# == 1 ] ; then
     # default. `sh build.sh``
-    BUILD_BE=1
-    BUILD_FE=1
-    BUILD_SPARK_DPP=1
-    BUILD_HIVE_UDF=1
+    BUILD_BE=${OE_BUILD_BE}
+    BUILD_FE=${OE_BUILD_FE}
+    BUILD_SPARK_DPP=${OE_BUILD_FE}
+    BUILD_HIVE_UDF=${OE_BUILD_FE}
     CLEAN=0
     RUN_UT=0
 elif [[ $OPTS =~ "-j " ]] && [ $# == 3 ]; then
