@@ -583,7 +583,7 @@ under the License.
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
-                <version>${hadoop.version}</version>
+                <version>sr-3.3.6-002</version>
                 <exclusions>
                     <exclusion>
                         <artifactId>zookeeper</artifactId>
