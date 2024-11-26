@@ -211,6 +211,7 @@ if [ $# == 1 ] ; then
     BUILD_FE=${OE_BUILD_FE}
     BUILD_SPARK_DPP=${OE_BUILD_FE}
     BUILD_HIVE_UDF=${OE_BUILD_FE}
+    BUILD_BROKER=${OE_BUILD_FE}
     CLEAN=0
     RUN_UT=0
 elif [[ $OPTS =~ "-j " ]] && [ $# == 3 ]; then
@@ -219,6 +220,7 @@ elif [[ $OPTS =~ "-j " ]] && [ $# == 3 ]; then
     BUILD_FE=1
     BUILD_SPARK_DPP=1
     BUILD_HIVE_UDF=1
+    BUILD_BROKER=1
     CLEAN=0
     RUN_UT=0
     PARALLEL=$2
@@ -227,6 +229,7 @@ else
     BUILD_FE=0
     BUILD_SPARK_DPP=0
     BUILD_HIVE_UDF=0
+    BUILD_BROKER=0
     CLEAN=0
     RUN_UT=0
     while true; do
@@ -235,6 +238,7 @@ else
             --fe) BUILD_FE=1 ; shift ;;
             --spark-dpp) BUILD_SPARK_DPP=1 ; shift ;;
             --hive-udf) BUILD_HIVE_UDF=1 ; shift ;;
+            --broker) BUILD_BROKER=1 ; shift ;;
             --clean) CLEAN=1 ; shift ;;
             --ut) RUN_UT=1   ; shift ;;
             --with-gcov) WITH_GCOV=ON; shift ;;
@@ -445,6 +449,18 @@ if [ ${FE_MODULES}x != ""x ]; then
 fi
 
 
+# Build broker
+if [ ${BUILD_BROKER} -eq 1 ]; then
+    echo "Build Broker"
+    cd ${STARROCKS_HOME}/fs_brokers/apache_hdfs_broker
+    if [ ${CLEAN} -eq 1 ]; then
+        ${MVN_CMD} clean
+    fi
+    . ${STARROCKS_HOME}/fs_brokers/apache_hdfs_broker/build.sh
+    cd ${STARROCKS_HOME}
+fi
+
+
 # Clean and prepare output dir
 STARROCKS_OUTPUT=${STARROCKS_HOME}/output/
 mkdir -p ${STARROCKS_OUTPUT}
@@ -481,6 +497,12 @@ if [ ${BUILD_FE} -eq 1 -o ${BUILD_SPARK_DPP} -eq 1 ]; then
         MSG="${MSG} √ ${MSG_DPP}"
     fi
 fi
+
+
+if [ ${BUILD_BROKER} -eq 1 ]; then
+    cp -r -p ${BROKER_OUTPUT} ${STARROCKS_OUTPUT}
+fi
+
 
 if [ ${BUILD_BE} -eq 1 ]; then
     rm -rf ${STARROCKS_OUTPUT}/be/lib/*
