@@ -2568,9 +2568,9 @@ Status TimeFunctions::datetime_trunc_prepare(FunctionContext* context, FunctionC
         function = &TimeFunctions::datetime_trunc_hour;
     } else if (format_value == "day") {
         function = &TimeFunctions::datetime_trunc_day;
-    } else if (format_value == "month") {
+    } else if (format_value == "month" || format_value == "mon" || format_value == "mm") {
         function = &TimeFunctions::datetime_trunc_month;
-    } else if (format_value == "year") {
+    } else if (format_value == "year" || format_value == "yy" || format_value == "yyyy") {
         function = &TimeFunctions::datetime_trunc_year;
     } else if (format_value == "week") {
         function = &TimeFunctions::datetime_trunc_week;
@@ -2696,9 +2696,9 @@ Status TimeFunctions::date_trunc_prepare(FunctionContext* context, FunctionConte
     ScalarFunction function;
     if (format_value == "day") {
         function = &TimeFunctions::date_trunc_day;
-    } else if (format_value == "month") {
+    } else if (format_value == "month" || format_value == "mon" || format_value == "mm") {
         function = &TimeFunctions::date_trunc_month;
-    } else if (format_value == "year") {
+    } else if (format_value == "year" || format_value == "yy" || format_value == "yyyy") {
         function = &TimeFunctions::date_trunc_year;
     } else if (format_value == "week") {
         function = &TimeFunctions::date_trunc_week;

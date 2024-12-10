@@ -86,6 +86,23 @@ public class AnalyzeFunctionTest {
                 "date_trunc requires first parameter must be a string constant");
     }
 
+
+    @Test
+    public void testTrunc() {
+        analyzeSuccess("select trunc(\"year\", ti) from tall");
+        analyzeSuccess("select trunc(\"YEAR\", ti) from tall");
+        analyzeSuccess("select trunc(\"YYYY\", ti) from tall");
+        analyzeSuccess("select trunc(\"YY\", ti) from tall");
+        analyzeSuccess("select trunc(\"yyyy\", ti) from tall");
+        analyzeSuccess("select trunc(\"month\", ti) from tall");
+        analyzeSuccess("select trunc(\"MONTH\", ti) from tall");
+        analyzeSuccess("select trunc(\"MON\", ti) from tall");
+        analyzeSuccess("select trunc(\"MM\", ti) from tall");
+        analyzeSuccess("select trunc(\"day\", ti) from tall");
+        analyzeSuccess("select trunc(\"week\", ti) from tall");
+        analyzeSuccess("select trunc(\"quarter\", ti) from tall");
+    }
+
     @Test
     public void testTimeSlice() {
         analyzeSuccess("select time_slice(th, interval 1 year) from tall");

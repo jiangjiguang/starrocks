@@ -2779,10 +2779,78 @@ TEST_F(TimeFunctionsTest, datetimeTruncTest) {
         }
     }
 
+    //MON
+    {
+        auto text = BinaryColumn::create();
+        text->append("MON");
+        auto format = ConstColumn::create(text, 1);
+
+        Columns columns;
+        columns.emplace_back(format);
+        columns.emplace_back(tc);
+
+        _utils->get_fn_ctx()->set_constant_columns(columns);
+
+        ASSERT_TRUE(TimeFunctions::datetime_trunc_prepare(_utils->get_fn_ctx(),
+                                                          FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        ColumnPtr result = TimeFunctions::datetime_trunc(_utils->get_fn_ctx(), columns).value();
+        ASSERT_TRUE(TimeFunctions::datetime_trunc_close(
+                            _utils->get_fn_ctx(), FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        auto datetimes = ColumnHelper::cast_to<TYPE_DATETIME>(result);
+
+        TimestampValue check_result[6] = {
+                TimestampValue::create(2020, 1, 1, 0, 0, 0), TimestampValue::create(2020, 2, 1, 0, 0, 0),
+                TimestampValue::create(2020, 3, 1, 0, 0, 0), TimestampValue::create(2020, 4, 1, 0, 0, 0),
+                TimestampValue::create(2020, 5, 1, 0, 0, 0), TimestampValue::create(2020, 11, 1, 0, 0, 0)};
+
+        for (size_t i = 0; i < sizeof(check_result) / sizeof(check_result[0]); ++i) {
+            ASSERT_EQ(check_result[i], datetimes->get_data()[i]);
+        }
+    }
+
+
     //year
     {
         auto text = BinaryColumn::create();
         text->append("year");
+        auto format = ConstColumn::create(text, 1);
+
+        Columns columns;
+        columns.emplace_back(format);
+        columns.emplace_back(tc);
+
+        _utils->get_fn_ctx()->set_constant_columns(columns);
+
+        ASSERT_TRUE(TimeFunctions::datetime_trunc_prepare(_utils->get_fn_ctx(),
+                                                          FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        ColumnPtr result = TimeFunctions::datetime_trunc(_utils->get_fn_ctx(), columns).value();
+        ASSERT_TRUE(TimeFunctions::datetime_trunc_close(
+                            _utils->get_fn_ctx(), FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        auto datetimes = ColumnHelper::cast_to<TYPE_DATETIME>(result);
+
+        TimestampValue check_result[6] = {
+                TimestampValue::create(2020, 1, 1, 0, 0, 0), TimestampValue::create(2020, 1, 1, 0, 0, 0),
+                TimestampValue::create(2020, 1, 1, 0, 0, 0), TimestampValue::create(2020, 1, 1, 0, 0, 0),
+                TimestampValue::create(2020, 1, 1, 0, 0, 0), TimestampValue::create(2020, 1, 1, 0, 0, 0)};
+
+        for (size_t i = 0; i < sizeof(check_result) / sizeof(check_result[0]); ++i) {
+            ASSERT_EQ(check_result[i], datetimes->get_data()[i]);
+        }
+    }
+
+
+    //YYYY
+    {
+        auto text = BinaryColumn::create();
+        text->append("YYYY");
         auto format = ConstColumn::create(text, 1);
 
         Columns columns;
@@ -3927,7 +3995,7 @@ TEST_F(TimeFunctionsTest, MakeDateTest) {
     ASSERT_TRUE(nullable_col->is_null(7));
     ASSERT_TRUE(nullable_col->is_null(8));
     ASSERT_TRUE(nullable_col->is_null(9));
-} // namespace starrocks
+}
 
 TEST_F(TimeFunctionsTest, ConvertFormatTest) {
     ASSERT_EQ(TimeFunctions::convert_format(Slice("yyyy-MM-dd")), "%Y-%m-%d");
@@ -3940,5 +4008,4 @@ TEST_F(TimeFunctionsTest, ConvertFormatTest) {
     EXPECT_EQ(TimeFunctions::convert_format(Slice("HH:mm:ss")), "%H:%i:%s");
     EXPECT_EQ(TimeFunctions::convert_format(Slice("yyyy-MM-dd HH:mm:ss")), "%Y-%m-%d %H:%i:%s");
 }
-
-} // namespace starrocks::vectorized
+} // namespace starrocks
