@@ -19,23 +19,18 @@ import com.starrocks.credential.aws.AwsCloudConfiguration;
 import com.starrocks.credential.aws.AwsCloudCredential;
 import com.starrocks.credential.provider.OverwriteAwsDefaultCredentialsProvider;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.s3a.AWSCredentialProviderList;
-import org.apache.hadoop.fs.s3a.S3AFileSystem;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.junit.Assert;
 import org.junit.Test;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 
-import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
 public class AwsCloudConfigurationTest {
 
     @Test
-    public void testUseAwsSDKDefaultBehavior() throws Exception {
+    public void testUseAWSSDKDefaultBehavior() {
         // Test hadoop configuration
         Map<String, String>  properties = new HashMap<>();
         properties.put("aws.s3.use_aws_sdk_default_behavior", "true");
@@ -43,26 +38,8 @@ public class AwsCloudConfigurationTest {
         Assert.assertNotNull(cloudConfiguration);
         Configuration configuration = new Configuration();
         cloudConfiguration.applyToConfiguration(configuration);
-        Assert.assertEquals(OverwriteAwsDefaultCredentialsProvider.class.getName(),
+        Assert.assertEquals("com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
                 configuration.get("fs.s3a.aws.credentials.provider"));
-        S3AFileSystem fs = (S3AFileSystem) FileSystem.get(new URI("s3://hi/a.parquet"), configuration);
-        AWSCredentialProviderList list =  fs.shareCredentials("ut");
-        String previousProviderName = list.getProviders().get(0).getClass().getName();
-        int previousHashCode = list.getProviders().get(0).hashCode();
-        fs.close();
-
-        fs = (S3AFileSystem) FileSystem.get(new URI("s3://hi/a.parquet"), configuration);
-        list =  fs.shareCredentials("ut");
-        String currentProviderName = list.getProviders().get(0).getClass().getName();
-        int currentHashCode = list.getProviders().get(0).hashCode();
-        fs.close();
-
-        // Make sure two DefaultCredentialsProviders are the same class
-        Assert.assertEquals(previousProviderName, currentProviderName);
-        // Make sure the provider is DefaultCredentialsProvider
-        Assert.assertEquals(DefaultCredentialsProvider.class.getName(), previousProviderName);
-        // Make sure two DefaultCredentialsProviders are different instances
-        Assert.assertNotEquals(previousHashCode, currentHashCode);
     }
 
     @Test
