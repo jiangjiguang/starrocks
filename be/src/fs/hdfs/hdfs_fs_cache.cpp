@@ -50,10 +50,11 @@ static Status create_hdfs_fs_handle(const std::string& namenode, const std::shar
         if (properties->__isset.hdfs_username) {
             hdfsBuilderSetUserName(hdfs_builder, properties->hdfs_username.data());
         }
+        if (properties->__isset.hdfs_password) {
+            hdfsBuilderSetPassword(hdfs_builder, properties->hdfs_password.data());
+        }
+
     }
-    LOG(INFO) << "Starrocks on hive enabled....";
-    hdfsBuilderSetUserName(hdfs_builder, "datae-manager");
-    hdfsBuilderSetPassword(hdfs_builder, "b558307fc89c3a3ce046ff40f369f760");
 
     hdfsBuilderSetForceNewInstance(hdfs_builder);
 

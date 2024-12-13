@@ -49,6 +49,10 @@ public class HiveRemoteFileIO implements RemoteFileIO {
 
     private final Configuration configuration;
 
+    private String hdfsUsername;
+
+    private String hdfsPassword;
+
     // only used for ut.
     private FileSystem fileSystem;
 
@@ -60,6 +64,12 @@ public class HiveRemoteFileIO implements RemoteFileIO {
 
     public HiveRemoteFileIO(Configuration configuration) {
         this.configuration = configuration;
+    }
+
+    public HiveRemoteFileIO(Configuration configuration, String hdfsUsername, String hdfsPassword) {
+        this.configuration = configuration;
+        this.hdfsUsername = hdfsUsername;
+        this.hdfsPassword = hdfsPassword;
     }
 
     public Map<RemotePathKey, List<RemoteFileDesc>> getRemoteFiles(RemotePathKey pathKey) {
@@ -74,7 +84,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
             URI uri = new Path(path).toUri();
             FileSystem fileSystem;
             if (!FeConstants.runningUnitTest) {
-                fileSystem = FileSystem.get(uri, configuration);
+                fileSystem = FileSystem.get(uri, configuration, hdfsUsername, hdfsPassword);
             } else {
                 fileSystem = this.fileSystem;
             }

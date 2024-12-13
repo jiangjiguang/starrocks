@@ -422,6 +422,12 @@ struct THdfsTable {
 
     // timezone
     11: optional string time_zone
+
+    // just for hadoop authentication
+    12: optional string hdfs_username
+
+    13: optional string hdfs_password
+
 }
 
 struct TFileTable {
