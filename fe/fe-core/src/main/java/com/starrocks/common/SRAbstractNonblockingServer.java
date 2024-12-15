@@ -53,6 +53,8 @@ import java.util.concurrent.TimeUnit;
 public abstract class SRAbstractNonblockingServer extends TServer {
     protected static final Logger LOGGER = LoggerFactory.getLogger(SRAbstractNonblockingServer.class);
 
+    private static final int MAX_READ_BYTES = 512 * 1024;
+
     public abstract static class AbstractNonblockingServerArgs
             <T extends AbstractNonblockingServerArgs<T>> extends AbstractServerArgs<T> {
 
@@ -466,7 +468,7 @@ public abstract class SRAbstractNonblockingServer extends TServer {
         private int internalRead() {
             try {
                 int totalSize = 0;
-                while (true) {
+                while (totalSize <= MAX_READ_BYTES) {
                     int readSize = trans.read(buffer);
                     if (readSize < 0) {
                         return -1;
@@ -527,6 +529,9 @@ public abstract class SRAbstractNonblockingServer extends TServer {
 
         public TStreamPipedTransport(SocketChannel socketChannel) {
             this.socketChannel = socketChannel;
+            try {
+                this.timeoutMs = socketChannel.socket().getSoTimeout();
+            } catch (SocketException ignore) { }
         }
 
         public SocketChannel getSocketChannel() {
@@ -568,13 +573,9 @@ public abstract class SRAbstractNonblockingServer extends TServer {
             return !closed;
         }
 
+        @Override
         public void open() throws TTransportException {
-            try {
-                this.timeoutMs = socketChannel.socket().getSoTimeout();
-            } catch (SocketException e) {
-                throw new TTransportException(TTransportException.NOT_OPEN,
-                        "Open piped transport failed because cannot get socket timeout", e);
-            }
+
         }
 
         public void close() {

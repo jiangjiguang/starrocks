@@ -292,6 +292,46 @@ public class FeThriftServerTest {
         Assert.assertEquals(TStatusCode.OK, tLoadTxnBeginResult.getStatus().getStatus_code());
     }
 
+    @Test
+    public void testLarge() throws Exception {
+        ExecutorService threadPool = Executors.newFixedThreadPool(1);
+
+        // thread 1 huge msg
+        byte[] bytes = new byte[1024 * 1024 * 200];
+        String hugeMsg = new String(bytes);
+        Future<Status> firstCall = threadPool.submit(() -> {
+            TReportRequest reportRequest = new TReportRequest();
+            reportRequest.setBackend(new TBackend(hugeMsg, 1000, 2000));
+            FrontendService.Client client = null;
+            try {
+                client = frontendService.borrowObject(address, 60000);
+                TMasterResult report = client.report(reportRequest);
+                return Status.OK;
+            } catch (Exception e) {
+                return new Status(TStatusCode.INTERNAL_ERROR, e.getMessage());
+            } finally {
+                if (client != null) {
+                    frontendService.returnObject(address, client);
+                }
+            }
+        });
+        threadPool.shutdown();
+
+        while (!firstCall.isDone()) {
+            TReportRequest reportRequest = new TReportRequest();
+            reportRequest.setBackend(new TBackend("123", 1000, 2000));
+            FrontendService.Client client = null;
+            try {
+                client = frontendService.borrowObject(address, 100);
+                TMasterResult report = client.report(reportRequest);
+            } finally {
+                if (client != null) {
+                    frontendService.returnObject(address, client);
+                }
+            }
+        }
+    }
+
     private static class InternalFrontendService implements FrontendService.Iface {
 
         @Override
