@@ -21,6 +21,7 @@ import com.starrocks.analysis.FunctionName;
 import com.starrocks.catalog.Function;
 import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.Type;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.optimizer.operator.OperatorType;
 import com.starrocks.sql.optimizer.operator.scalar.BetweenPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
@@ -32,6 +33,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.InPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.LikePredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
+import com.starrocks.sql.optimizer.rewrite.ScalarOperatorRewriteContext;
 import mockit.Expectations;
 import org.junit.Test;
 
@@ -225,5 +227,60 @@ public class ImplicitCastRuleTest {
         assertTrue(result.getChild(1).getType().isVarchar());
 
         assertTrue(result.getChild(1).getChild(0).getType().isInt());
+    }
+
+    @Test
+    public void testPredicateForPrestoTranslate() {
+        // create scalar rewrite context
+        ScalarOperatorRewriteContext context = new ScalarOperatorRewriteContext();
+        ConnectContext session = new ConnectContext();
+
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        context.setSession(session);
+
+        ImplicitCastRule rule = new ImplicitCastRule();
+
+        // ==== test case for xx > 1 === begin
+        ColumnRefOperator variableColumn = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        ConstantOperator constantColumn =  new ConstantOperator(1, Type.TINYINT);
+        BinaryPredicateOperator op = new BinaryPredicateOperator(BinaryType.GT,
+                variableColumn, constantColumn);
+
+        ScalarOperator result = rule.apply(op, context);
+        assertEquals(PrimitiveType.DOUBLE, result.getChild(1).getType().getPrimitiveType());
+        // ==== test case for xx = 1 === end
+
+
+        // ==== test case for xx between 1 and 1000 === begin
+        ColumnRefOperator variableColumnBetween = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        ConstantOperator constant1ColumnBetween =  new ConstantOperator(1, Type.TINYINT);
+        ConstantOperator constant2ColumnBetween =  new ConstantOperator(1000, Type.TINYINT);
+        BetweenPredicateOperator opBetween = new BetweenPredicateOperator(false,
+                variableColumnBetween, constant1ColumnBetween, constant2ColumnBetween);
+
+        result = rule.apply(opBetween, context);
+        assertEquals(PrimitiveType.VARCHAR, result.getChild(0).getType().getPrimitiveType());
+        // ==== test case for xx between 1 and 1000 === end
+
+
+        // ==== test case for xx <> '0' === begin
+        ColumnRefOperator variableColumnNotEqual = new ColumnRefOperator(0, Type.DECIMALV2, "xx", false);
+        ConstantOperator constantColumnVarchar =  new ConstantOperator("0", Type.VARCHAR);
+        op = new BinaryPredicateOperator(BinaryType.NE, variableColumnNotEqual, constantColumnVarchar);
+
+        result = rule.apply(op, context);
+        assertEquals(PrimitiveType.DECIMALV2, result.getChild(1).getType().getPrimitiveType());
+        // ==== test case for xx <> '0' === end
+
+
+        // ==== test case for xx in ('-', '0') === begin
+        ColumnRefOperator variableColumnIn = new ColumnRefOperator(0, Type.BIGINT, "xx", false);
+        ConstantOperator constant1ColumnIn =  new ConstantOperator("-", Type.VARCHAR);
+        ConstantOperator constant2ColumnIn =  new ConstantOperator("0", Type.VARCHAR);
+        InPredicateOperator opIn = new InPredicateOperator(variableColumnIn, constant1ColumnIn, constant2ColumnIn);
+        result = rule.apply(opIn, context);
+        assertEquals(PrimitiveType.VARCHAR, result.getChild(0).getType().getPrimitiveType());
+        // ==== test case for xx in ('-', '0') === end
     }
 }

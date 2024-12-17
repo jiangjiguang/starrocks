@@ -16,6 +16,7 @@ package com.starrocks.sql.optimizer.rewrite;
 
 import com.google.common.collect.Lists;
 import com.starrocks.common.Config;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
@@ -89,6 +90,11 @@ public class ScalarOperatorRewriter {
 
     public ScalarOperatorRewriter() {
         context = new ScalarOperatorRewriteContext();
+    }
+
+    public ScalarOperatorRewriter(ConnectContext session) {
+        context = new ScalarOperatorRewriteContext();
+        context.setSession(session);
     }
 
     public ScalarOperator rewrite(ScalarOperator root, List<ScalarOperatorRewriteRule> ruleList) {

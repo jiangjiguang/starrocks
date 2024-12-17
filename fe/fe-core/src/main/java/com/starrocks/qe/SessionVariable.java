@@ -781,6 +781,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String FORCE_DISTINCT_TO_AGG = "force_distinct_to_agg";
 
     public static final String INVERTED_CASE_WHEN_RULE_BRANCH_LIMIT = "inverted_case_when_rule_branch_limit";
+    public static final String ENABLE_PRESTO_TRANSLATION = "enable_presto_translation";
 
     public static final List<String> DEPRECATED_VARIABLES = ImmutableList.<String>builder()
             .add(CODEGEN_LEVEL)
@@ -2029,6 +2030,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VarAttr(name = ENABLE_CONNECTOR_SINK_WRITER_SCALING)
     private boolean enableConnectorSinkWriterScaling = true;
+
+    @VariableMgr.VarAttr(name = ENABLE_PRESTO_TRANSLATION)
+    private boolean enablePrestoTranslation = false;
 
     private int exprChildrenLimit = -1;
 
@@ -4119,6 +4123,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setInvertedCaseWhenRuleBranchLimit(int invertedCaseWhenRuleBranchLimit) {
         this.invertedCaseWhenRuleBranchLimit = invertedCaseWhenRuleBranchLimit;
+    }
+
+    public boolean isEnablePrestoTranslation() {
+        return enablePrestoTranslation;
+    }
+
+    public void setEnablePrestoTranslation(boolean enablePrestoTranslation) {
+        this.enablePrestoTranslation = enablePrestoTranslation;
     }
 
     // Serialize to thrift object

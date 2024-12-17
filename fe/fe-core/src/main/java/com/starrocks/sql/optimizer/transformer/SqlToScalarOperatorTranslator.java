@@ -188,7 +188,7 @@ public final class SqlToScalarOperatorTranslator {
 
         ScalarOperator result = visitor.visit(expression, ctx);
 
-        ScalarOperatorRewriter scalarRewriter = new ScalarOperatorRewriter();
+        ScalarOperatorRewriter scalarRewriter = new ScalarOperatorRewriter(session);
         result = scalarRewriter.rewrite(result, ScalarOperatorRewriter.DEFAULT_REWRITE_RULES);
 
         result = ScalarOperatorRewriter.replaceScalarOperatorByColumnRef(result,

@@ -15,9 +15,22 @@
 
 package com.starrocks.sql.optimizer.rewrite;
 
+import com.starrocks.qe.ConnectContext;
+
 public class ScalarOperatorRewriteContext {
     // mark operator rewrite nums
     private int changeNum;
+
+    private ConnectContext session;
+
+    public ConnectContext getSession() {
+        return session;
+    }
+
+    public void setSession(ConnectContext session) {
+        this.session = session;
+    }
+
 
     public void reset() {
         changeNum = 0;

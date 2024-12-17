@@ -123,7 +123,7 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
     @Override
     public ScalarOperator visitBetweenPredicate(BetweenPredicateOperator predicate,
                                                 ScalarOperatorRewriteContext context) {
-        return castForBetweenAndIn(predicate, true);
+        return castForBetweenAndIn(predicate, true, context);
     }
 
     @Override
@@ -162,10 +162,58 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
             return predicate;
         }
 
+        boolean enablePrestoTranslation = false;
+        if (context != null && context.getSession() != null) {
+            enablePrestoTranslation = context.getSession().getSessionVariable().isEnablePrestoTranslation();
+        }
         // we will try cast const operator to variable operator
-        if ((rightChild.isVariable() && leftChild.isConstantRef()) ||
-                (leftChild.isVariable() && rightChild.isConstantRef())) {
-            int constant = leftChild.isVariable() ? 1 : 0;
+        if (rightChild.isVariable() && leftChild.isConstantRef()) {
+            if (enablePrestoTranslation) {
+                if (rightChild.getType().isVarchar()) {
+                    // 1 > xx => right child [xx] is varchar
+                    if (leftChild.getType().isIntegerType() || leftChild.getType().isDouble()) {
+                        // cast(1 as double)
+                        addCastChild(Type.DOUBLE, predicate, 0);
+                        // cast(xx as double)
+                        addCastChild(Type.DOUBLE, predicate, 1);
+                        return predicate;
+                    }
+                }
+                // 1 > xx => right child [xx] origin column type is decimal or double
+                if (rightChild.getType().isDecimalOfAnyVersion() || leftChild.getType().isDouble()) {
+                    // cast left child to decimal => cast(1 as decimal)
+                    // cast left child to double => cast(1 as double)
+                    addCastChild(rightChild.getType(), predicate, 0);
+                    return predicate;
+                }
+            }
+            int constant = 0;
+            int variable = 1 - constant;
+            Optional<BinaryPredicateOperator> optional = optimizeConstantAndVariable(predicate, constant, variable);
+            if (optional.isPresent()) {
+                return optional.get();
+            }
+        } else if (leftChild.isVariable() && rightChild.isConstantRef()) {
+            if (enablePrestoTranslation) {
+                if (leftChild.getType().isVarchar()) {
+                    // xx > 1 => step 1
+                    if (rightChild.getType().isIntegerType() || rightChild.getType().isDouble()) {
+                        // cast(xx as double)
+                        addCastChild(Type.DOUBLE, predicate, 0);
+                        // cast(1 as double)
+                        addCastChild(Type.DOUBLE, predicate, 1);
+                        return predicate;
+                    }
+                }
+                // xx > 1 => left child [xx] origin column type is decimal or double
+                if (leftChild.getType().isDecimalOfAnyVersion() || leftChild.getType().isDouble()) {
+                    // cast right child to decimal => cast(1 as decimal)
+                    // cast right child to double => cast(1 as double)
+                    addCastChild(leftChild.getType(), predicate, 1);
+                    return predicate;
+                }
+            }
+            int constant = 1;
             int variable = 1 - constant;
             Optional<BinaryPredicateOperator> optional = optimizeConstantAndVariable(predicate, constant, variable);
             if (optional.isPresent()) {
@@ -245,7 +293,7 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
 
     @Override
     public ScalarOperator visitInPredicate(InPredicateOperator predicate, ScalarOperatorRewriteContext context) {
-        return castForBetweenAndIn(predicate, false);
+        return castForBetweenAndIn(predicate, false, context);
     }
 
     @Override
@@ -307,15 +355,41 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
         return operator;
     }
 
-    private ScalarOperator castForBetweenAndIn(ScalarOperator predicate, boolean isBetween) {
+    private ScalarOperator castForBetweenAndIn(ScalarOperator predicate, boolean isBetween,
+                                               ScalarOperatorRewriteContext context) {
         Type firstType = predicate.getChildren().get(0).getType();
         if (predicate.getChildren().stream().skip(1).allMatch(o -> firstType.matchesType(o.getType()))) {
             return predicate;
         }
 
+        boolean enablePrestoTranslation = false;
+        if (context != null && context.getSession() != null) {
+            enablePrestoTranslation = context.getSession().getSessionVariable().isEnablePrestoTranslation();
+        }
+
         List<Type> types = predicate.getChildren().stream().map(ScalarOperator::getType).collect(Collectors.toList());
         if (predicate.getChild(0).isVariable() && predicate.getChildren().stream().skip(1)
                 .allMatch(ScalarOperator::isConstantRef)) {
+            if (enablePrestoTranslation) {
+                // xx between 1 and 1000
+                // xx is varchar and constant column is integer or double
+                // will not cast constant column to variable column
+                // and then in binary predicate, will cast xx to double
+                if (firstType.isVarchar()) {
+                    if (types.stream().skip(1).anyMatch(
+                            t -> t.isIntegerType() || t.isDouble() || t.isDecimalOfAnyVersion())) {
+                        return predicate;
+                    }
+                }
+                // xx IN ('-', '0') => xx is bigint, and '-' is varchar, we just try to cast xx to varchar
+                if (types.stream().skip(1).anyMatch(Type::isVarchar)) {
+                    if (firstType.isIntegerType()) {
+                        // cast(xx as varchar)
+                        addCastChild(Type.VARCHAR, predicate, 0);
+                        return predicate;
+                    }
+                }
+            }
             List<ScalarOperator> newChild = Lists.newArrayList();
             newChild.add(predicate.getChild(0));
             for (int i = 1; i < types.size(); i++) {
