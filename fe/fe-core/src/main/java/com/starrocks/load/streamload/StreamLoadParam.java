@@ -46,6 +46,8 @@ public class StreamLoadParam {
     private static final String MAX_FILTER_RATIO = "max_filter_ratio";
     private static final String IDLE_TRANSACTION_TIMEOUT = "idle_transaction_timeout";
     private static final String PARTIAL_UPDATE_MODE = "partial_update_mode";
+    private static final String PARTITION_WRITE_START = "partition_write_start";
+    private static final String PARTITION_WRITE_END = "partition_write_end";
 
     public TFileFormatType formatType = TFileFormatType.FORMAT_CSV_PLAIN;
     public TFileType fileType = TFileType.FILE_STREAM;
@@ -73,6 +75,8 @@ public class StreamLoadParam {
     public double maxFilterRatio = 0.0;
     public int idleTransactionTimeout = 1000;
     public String partialUpdateMode = "row";
+    public Integer partitionWriteStart = null;
+    public Integer partitionWriteEnd = null;
 
     public TFileFormatType parseStreamLoadFormat(String formatKey) {
         if (formatKey.equalsIgnoreCase("csv")) {
@@ -183,6 +187,12 @@ public class StreamLoadParam {
         }
         if (headers.contains(PARTIAL_UPDATE_MODE)) {
             context.partialUpdateMode = headers.get(PARTIAL_UPDATE_MODE);
+        }
+        if (headers.contains(PARTITION_WRITE_START)) {
+            context.partitionWriteStart = Integer.parseInt(headers.get(PARTITION_WRITE_START));
+        }
+        if (headers.contains(PARTITION_WRITE_END)) {
+            context.partitionWriteEnd = Integer.parseInt(headers.get(PARTITION_WRITE_END));
         }
         return context;
     }

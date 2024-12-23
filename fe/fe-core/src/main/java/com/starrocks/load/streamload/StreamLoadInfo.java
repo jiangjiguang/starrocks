@@ -358,6 +358,12 @@ public class StreamLoadInfo {
                 partialUpdateMode = TPartialUpdateMode.ROW_MODE;
             }
         }
+        if (context.partitionWriteStart != null) {
+            partitionWriteStart = context.partitionWriteStart;
+        }
+        if (context.partitionWriteEnd != null) {
+            partitionWriteEnd = context.partitionWriteEnd;
+        }
     }
 
     public static StreamLoadInfo fromTStreamLoadPutRequest(TStreamLoadPutRequest request, Database db)

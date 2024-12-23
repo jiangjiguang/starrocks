@@ -16,6 +16,7 @@ package com.starrocks.sql;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Range;
 import com.google.common.collect.Sets;
 import com.starrocks.analysis.Analyzer;
 import com.starrocks.analysis.BrokerDesc;
@@ -26,9 +27,12 @@ import com.starrocks.analysis.SlotRef;
 import com.starrocks.analysis.TupleDescriptor;
 import com.starrocks.catalog.AggregateType;
 import com.starrocks.catalog.Column;
+import com.starrocks.catalog.DynamicPartitionProperty;
 import com.starrocks.catalog.KeysType;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Partition;
+import com.starrocks.catalog.PartitionKey;
+import com.starrocks.catalog.RangePartitionInfo;
 import com.starrocks.catalog.Table;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
@@ -39,6 +43,7 @@ import com.starrocks.common.LoadException;
 import com.starrocks.common.Pair;
 import com.starrocks.common.UserException;
 import com.starrocks.common.util.DebugUtil;
+import com.starrocks.common.util.DynamicPartitionUtil;
 import com.starrocks.load.BrokerFileGroup;
 import com.starrocks.load.EtlJobType;
 import com.starrocks.load.Load;
@@ -60,6 +65,7 @@ import com.starrocks.server.WarehouseManager;
 import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.ast.ImportColumnDesc;
 import com.starrocks.sql.ast.PartitionNames;
+import com.starrocks.sql.ast.PartitionValue;
 import com.starrocks.sql.optimizer.statistics.ColumnDict;
 import com.starrocks.sql.optimizer.statistics.IDictManager;
 import com.starrocks.sql.plan.ExecPlan;
@@ -73,7 +79,10 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -519,6 +528,65 @@ public class LoadPlanner {
                         throw new LoadException("unknown partition " + partName + " in table " + destTable.getName());
                     }
                     partitionIds.add(part.getId());
+                }
+            } else if (streamLoadInfo.getPartitionWriteStart() != null || streamLoadInfo.getPartitionWriteEnd() != null) {
+                if (!DynamicPartitionUtil.isDynamicPartitionTable(destTable)) {
+                    throw new LoadException("partition_write_start or partition_write_end options " +
+                            "only support dynamic partition table.");
+                }
+                RangePartitionInfo rangePartitionInfo = (RangePartitionInfo) olapDestTable.getPartitionInfo();
+                Column partitionColumn = rangePartitionInfo.getPartitionColumns().get(0);
+                if (partitionColumn.getType().isDateType()) {
+                    Integer start = streamLoadInfo.getPartitionWriteStart();
+                    Integer end = streamLoadInfo.getPartitionWriteEnd();
+                    if (start != null && end != null && start > end) {
+                        throw  new LoadException("partition_write_start must less than partition_write_end.");
+                    }
+                    Range<PartitionKey> writeRange;
+                    try {
+                        String partitionFormat = DynamicPartitionUtil.getPartitionFormat(partitionColumn);
+                        DynamicPartitionProperty dynamicPartitionProperty = olapDestTable.getTableProperty()
+                                .getDynamicPartitionProperty();
+                        ZonedDateTime now = ZonedDateTime.now(dynamicPartitionProperty.getTimeZone().toZoneId());
+                        Range<PartitionKey> startRange;
+                        Range<PartitionKey> endRange;
+                        if (start != null) {
+                            String startBorder = DynamicPartitionUtil.getPartitionRangeString(
+                                    dynamicPartitionProperty, now, start, partitionFormat);
+                            PartitionValue startPartitionValue = new PartitionValue(startBorder);
+                            PartitionKey startKey = PartitionKey.createPartitionKey(
+                                    Collections.singletonList(startPartitionValue), Collections.singletonList(partitionColumn));
+                            startRange = Range.atLeast(startKey);
+                        } else {
+                            startRange = Range.all();
+                        }
+                        if (end != null) {
+                            String endBorder = DynamicPartitionUtil.getPartitionRangeString(dynamicPartitionProperty, now, end,
+                                    partitionFormat);
+                            PartitionValue endPartitionValue = new PartitionValue(endBorder);
+                            PartitionKey endKey = PartitionKey.createPartitionKey(Collections.singletonList(endPartitionValue),
+                                    Collections.singletonList(partitionColumn));
+                            endRange = Range.atMost(endKey);
+                        } else {
+                            endRange = Range.all();
+                        }
+                        writeRange = startRange.intersection(endRange);
+                    } catch (AnalysisException | IllegalArgumentException | DdlException e) {
+                        throw new LoadException("error when create write partition range.", e);
+                    }
+                    List<Map.Entry<Long, Range<PartitionKey>>> idToRanges =
+                            new ArrayList<>(rangePartitionInfo.getIdToRange(false).entrySet());
+                    idToRanges.sort(Comparator.comparing(o -> o.getValue().upperEndpoint()));
+                    for (Map.Entry<Long, Range<PartitionKey>> idToRange : idToRanges) {
+                        Long partitionId = idToRange.getKey();
+                        Range<PartitionKey> partitionKey = idToRange.getValue();
+                        if (writeRange.isConnected(partitionKey) && !writeRange.intersection(partitionKey).isEmpty()) {
+                            partitionIds.add(partitionId);
+                        }
+                    }
+                } else {
+                    throw new LoadException("partition_write_start or partition_write_end options only support date/datetime " +
+                            "partition column.");
                 }
             }
         }
