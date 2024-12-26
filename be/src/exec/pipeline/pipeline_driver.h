@@ -387,6 +387,9 @@ public:
         if (source_operator()->is_epoch_finished() || sink_operator()->is_epoch_finished()) {
             return true;
         }
+        if (source_operator()->need_wakeup()) {
+            return true;
+        }
 
         // PRECONDITION_BLOCK
         if (_state == DriverState::PRECONDITION_BLOCK) {

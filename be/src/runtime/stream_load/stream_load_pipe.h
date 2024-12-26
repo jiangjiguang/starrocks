@@ -64,6 +64,10 @@ public:
         return _buf_queue.empty();
     }
 
+    bool has_data() const {
+        return _buffered_bytes > 0 || _finished || _cancelled;
+    }
+
     virtual StatusOr<ByteBufferPtr> read();
 
     StatusOr<ByteBufferPtr> no_block_read();
@@ -94,7 +98,7 @@ private:
 
     // Blocking queue
     std::mutex _lock;
-    size_t _buffered_bytes{0};
+    std::atomic<size_t> _buffered_bytes{0};
     size_t _max_buffered_bytes;
     size_t _min_chunk_size;
     std::deque<ByteBufferPtr> _buf_queue;
@@ -143,6 +147,8 @@ public:
     StatusOr<int64_t> read(void* data, int64_t size) override;
 
     Status skip(int64_t n) override;
+
+    bool ready_to_read() const override { return _pipe->has_data(); }
 
     std::shared_ptr<StreamLoadPipe> pipe() { return _pipe; }
 

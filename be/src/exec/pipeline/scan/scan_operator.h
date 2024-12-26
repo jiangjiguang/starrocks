@@ -52,6 +52,8 @@ public:
 
     bool is_finished() const override;
 
+    bool need_wakeup() const override;
+
     [[nodiscard]] Status set_finishing(RuntimeState* state) override;
 
     [[nodiscard]] StatusOr<ChunkPtr> pull_chunk(RuntimeState* state) override;

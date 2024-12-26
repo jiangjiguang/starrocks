@@ -50,6 +50,8 @@ public:
     // If the InputStream implementation doesn't support statistics, a null pointer or
     // an empty statistics is returned.
     virtual StatusOr<std::unique_ptr<NumericStatistics>> get_numeric_statistics() { return nullptr; }
+
+    virtual bool ready_to_read() const { return true; }
 };
 
 class InputStreamWrapper : public InputStream {
@@ -80,6 +82,8 @@ public:
     StatusOr<std::unique_ptr<NumericStatistics>> get_numeric_statistics() override {
         return _impl->get_numeric_statistics();
     }
+
+    bool ready_to_read() const override { return _impl->ready_to_read(); }
 
 private:
     InputStream* _impl;

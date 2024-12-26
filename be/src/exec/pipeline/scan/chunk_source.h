@@ -57,7 +57,10 @@ public:
 
     // Return true if eos is not reached
     // Return false if eos is reached or error occurred
-    bool has_next_chunk() const { return _status.ok(); }
+    virtual bool has_next_chunk() const { return _status.ok(); }
+    bool reach_end() const { return _status.is_end_of_file(); }
+
+    virtual bool need_wakeup() const { return true; }
 
     Status buffer_next_batch_chunks_blocking(RuntimeState* state, size_t batch_size,
                                              const workgroup::WorkGroup* running_wg);

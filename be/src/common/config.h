@@ -1465,6 +1465,8 @@ CONF_mBool(skip_schema_in_rowset_meta, "true");
 
 CONF_mInt32(max_committed_without_schema_rowset, "1000");
 
+CONF_mBool(non_blocking_stream_load_scan, "true");
+
 // if turn on, system will auto report namenode and datanode metrics
 CONF_mBool(enable_report_hdfs_metrics, "false");
 

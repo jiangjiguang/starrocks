@@ -15,6 +15,8 @@
 #include "exec/csv_scanner.h"
 
 #include <gtest/gtest.h>
+#include <runtime/exec_env.h>
+#include <runtime/stream_load/load_stream_mgr.h>
 
 #include <iostream>
 
@@ -58,7 +60,7 @@ protected:
         CHECK(st.ok()) << st.to_string();
 
         /// Init RuntimeState
-        RuntimeState* state = _obj_pool.add(new RuntimeState(TUniqueId(), TQueryOptions(), TQueryGlobals(), nullptr));
+        RuntimeState* state = _obj_pool.add(new RuntimeState(TUniqueId(), TQueryOptions(), TQueryGlobals(), ExecEnv::GetInstance()));
         state->set_desc_tbl(desc_tbl);
         state->init_instance_mem_tracker();
         state->_query_options.query_type = TQueryType::LOAD;
@@ -318,6 +320,78 @@ TEST_P(CSVScannerTest, test_adaptive_nullable_column3) {
     EXPECT_EQ(21, chunk->get(1)[2].get_int32());
     EXPECT_EQ(22, chunk->get(2)[2].get_int32());
     EXPECT_EQ(25, chunk->get(3)[2].get_int32());
+}
+
+TEST_F(CSVScannerTest, test_load_stream) {
+    std::vector<TypeDescriptor> types{TypeDescriptor(TYPE_INT), TypeDescriptor(TYPE_VARCHAR), TypeDescriptor(TYPE_INT)};
+    auto range_path = "./be/test/exec/test_data/csv_scanner/csv_file20";
+    StatusOr<std::unique_ptr<RandomAccessFile>> file = *FileSystem::Default()->new_random_access_file(range_path);
+    vector<char> buffer(16);
+    //auto res = file.value()->read(buffer.data(), 16);
+
+    std::vector<TBrokerRangeDesc> ranges;
+    TBrokerRangeDesc range;
+    TUniqueId range_id;
+    range_id.__set_lo(1);
+    TUniqueId range_id2;
+    range_id.__set_lo(2);
+    range.__set_num_of_columns_from_file(3);
+    range.__set_load_id(range_id);
+    range.__set_file_type(TFileType::FILE_STREAM);
+    ranges.push_back(range);
+
+    auto load_pipe = std::make_shared<StreamLoadPipe>();
+    load_pipe->set_non_blocking_read();
+    ExecEnv::GetInstance()->load_stream_mgr()->put(range_id, load_pipe);
+    auto res = file.value()->read(buffer.data(), 16);
+    {
+        auto write_buf = ByteBuffer::allocate(16);
+        write_buf->put_bytes(buffer.data(), res.value());
+        write_buf->flip();
+        load_pipe->append(std::move(write_buf));
+    }
+
+    auto scanner = create_csv_scanner(types, ranges, "\n", ",");
+    Status st = scanner->open();
+    ASSERT_TRUE(st.ok()) << st.to_string();
+
+    ChunkPtr chunk = scanner->get_next().value();
+    size_t size = chunk->num_rows();
+    EXPECT_EQ(false, scanner->need_wakeup());
+    while (true) {
+        res = file.value()->read(buffer.data(), 16);
+        if (res.ok() && res.value() > 0) {
+            auto write_buf = ByteBuffer::allocate(16);
+            write_buf->put_bytes(buffer.data(), res.value());
+            write_buf->flip();
+            load_pipe->append(std::move(write_buf));
+        } else {
+            break;
+        }
+    }
+    ChunkPtr chunk2 = scanner->get_next().value();
+
+    size += chunk2->num_rows();
+
+    EXPECT_EQ(4, size);
+
+
+    EXPECT_EQ(true, chunk->get(0)[0].is_null());
+    EXPECT_EQ(2, chunk2->get(0)[0].get_int32());
+    EXPECT_EQ(true, chunk2->get(1)[0].is_null());
+    EXPECT_EQ(4, chunk2->get(2)[0].get_int32());
+
+    EXPECT_EQ(true, chunk->get(0)[1].is_null());
+    EXPECT_EQ(true, chunk2->get(0)[1].is_null());
+    EXPECT_EQ(true, chunk2->get(1)[1].is_null());
+    EXPECT_EQ("Julia", chunk2->get(2)[1].get_slice());
+
+    EXPECT_EQ(true, chunk->get(0)[2].is_null());
+    EXPECT_EQ(true, chunk2->get(0)[2].is_null());
+    EXPECT_EQ(25, chunk2->get(1)[2].get_int32());
+    EXPECT_EQ(25, chunk2->get(2)[2].get_int32());
+
+
 }
 
 TEST_P(CSVScannerTest, test_multi_seprator) {

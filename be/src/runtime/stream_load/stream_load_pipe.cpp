@@ -74,7 +74,7 @@ Status StreamLoadPipe::append(const char* data, size_t size) {
             RETURN_IF_ERROR(_append(_write_buf));
             _write_buf.reset();
         }
-    }
+    }//
     // need to allocate a new chunk, min chunk is 64k
     size_t chunk_size = std::max(_min_chunk_size, size - pos);
     chunk_size = BitUtil::RoundUpToPowerOfTwo(chunk_size);
@@ -110,7 +110,7 @@ StatusOr<ByteBufferPtr> StreamLoadPipe::read() {
 StatusOr<ByteBufferPtr> StreamLoadPipe::no_block_read() {
     std::unique_lock<std::mutex> l(_lock);
 
-    _get_cond.wait_for(l, std::chrono::milliseconds(100),
+    _get_cond.wait_for(l, std::chrono::milliseconds(1),
                        [&]() { return _cancelled || _finished || !_buf_queue.empty(); });
 
     // cancelled
@@ -177,7 +177,7 @@ Status StreamLoadPipe::no_block_read(uint8_t* data, size_t* data_size, bool* eof
         if (_read_buf == nullptr || !_read_buf->has_remaining()) {
             std::unique_lock<std::mutex> l(_lock);
 
-            _get_cond.wait_for(l, std::chrono::milliseconds(100),
+            _get_cond.wait_for(l, std::chrono::milliseconds(1),
                                [&]() { return _cancelled || _finished || !_buf_queue.empty(); });
 
             // cancelled
@@ -193,7 +193,7 @@ Status StreamLoadPipe::no_block_read(uint8_t* data, size_t* data_size, bool* eof
                 } else {
                     if (bytes_read > 0) {
                         // put back the read data to the buf_queue, read the data in the next time
-                        size_t chunk_size = bytes_read;
+                        /*size_t chunk_size = bytes_read;
                         chunk_size = BitUtil::RoundUpToPowerOfTwo(chunk_size);
                         ASSIGN_OR_RETURN(ByteBufferPtr write_buf, ByteBuffer::allocate_with_tracker(chunk_size));
                         write_buf->put_bytes((char*)data, bytes_read);
@@ -201,9 +201,12 @@ Status StreamLoadPipe::no_block_read(uint8_t* data, size_t* data_size, bool* eof
                         // error happens iff pipe is cancelled
                         RETURN_IF_ERROR(_push_front_unlocked(write_buf));
                         write_buf.reset();
-                        _read_buf.reset();
+                        _read_buf.reset();*/
+                        *data_size = bytes_read;
+                        return Status::OK();
+                    } else {
+                        return Status::TimedOut("stream load pipe time out");
                     }
-                    return Status::TimedOut("stream load pipe time out");
                 }
             }
             _read_buf = _buf_queue.front();
@@ -243,6 +246,9 @@ void StreamLoadPipe::cancel(const Status& status) {
         _cancelled = true;
         if (_err_st.ok()) {
             _err_st = status;
+        }
+        if (_err_st.ok()) {
+            _err_st = Status::Cancelled("Cancelled");
         }
     }
     _get_cond.notify_all();

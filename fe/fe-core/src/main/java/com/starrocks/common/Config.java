@@ -2423,6 +2423,9 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true)
     public static boolean enable_pipeline_load = true;
 
+    @ConfField(mutable = true)
+    public static boolean enable_stream_load_non_block_read = true;
+
     /**
      * Enable shuffle load
      */

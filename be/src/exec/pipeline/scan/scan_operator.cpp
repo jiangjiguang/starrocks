@@ -132,6 +132,9 @@ bool ScanOperator::has_output() const {
     if (_is_finished) {
         return false;
     }
+    if (need_wakeup()) {
+        return true;
+    }
     // if storage layer returns an error, we should make sure `pull_chunk` has a chance to get it
     if (!_get_scan_status().ok()) {
         return true;
@@ -220,6 +223,16 @@ bool ScanOperator::is_finished() const {
     // This scan operator is finished, if no more io tasks are running
     // or need to run, and all the read chunks are consumed.
     return true;
+}
+
+bool ScanOperator::need_wakeup() const {
+    for (int i = 0; i < _io_tasks_per_scan_operator; ++i) {
+        std::shared_lock guard(_task_mutex);
+        if (_chunk_sources[i] != nullptr && !_is_io_task_running[i] && _chunk_sources[i]->need_wakeup()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void ScanOperator::_detach_chunk_sources() {
@@ -313,8 +326,10 @@ Status ScanOperator::_try_to_trigger_next_scan(RuntimeState* state) {
             if (_is_io_task_running[i]) {
                 skip[i] = true;
                 total_cnt -= 1;
-            } else if (_chunk_sources[i] != nullptr && _chunk_sources[i]->has_next_chunk()) {
-                RETURN_IF_ERROR(_trigger_next_scan(state, i));
+            } else if (_chunk_sources[i] != nullptr && !_chunk_sources[i]->reach_end()) {
+                if (_chunk_sources[i]->has_next_chunk()) {
+                    RETURN_IF_ERROR(_trigger_next_scan(state, i));
+                }
                 skip[i] = true;
                 total_cnt -= 1;
             } else {
@@ -372,7 +387,7 @@ void ScanOperator::_finish_chunk_source_task(RuntimeState* state, int chunk_sour
         // Therefore, closing chunk source and storing/loading `_is_finished` and `_is_io_task_running`
         // must be protected by lock
         std::lock_guard guard(_task_mutex);
-        if (!_chunk_sources[chunk_source_index]->has_next_chunk() || _is_finished) {
+        if (_chunk_sources[chunk_source_index]->reach_end() || _is_finished) {
             _close_chunk_source_unlocked(state, chunk_source_index);
         }
         _is_io_task_running[chunk_source_index] = false;

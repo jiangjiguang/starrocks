@@ -236,6 +236,7 @@ public class StreamLoadScanNode extends LoadScanNode {
         if (streamLoadInfo.getConfluentSchemaRegistryUrl() != null) {
             params.setConfluent_schema_registry_url(streamLoadInfo.getConfluentSchemaRegistryUrl());
         }
+        params.setNon_blocking_read(Config.enable_stream_load_non_block_read);
         initColumns();
         initWhereExpr(streamLoadInfo.getWhereExpr(), analyzer);
     }

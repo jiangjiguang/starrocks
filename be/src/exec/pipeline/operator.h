@@ -111,6 +111,8 @@ public:
     // Only source and sink operator may return true, and other operators always return false.
     virtual bool pending_finish() const { return false; }
 
+    virtual bool need_wakeup() const { return false; }
+
     // Pull chunk from this operator
     // Use shared_ptr, because in some cases (local broadcast exchange),
     // the chunk need to be shared

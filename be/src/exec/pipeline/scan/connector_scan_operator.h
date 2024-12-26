@@ -138,6 +138,12 @@ public:
     void close(RuntimeState* state) override;
     const std::string get_custom_coredump_msg() const override;
 
+    bool has_next_chunk() const override { return _status.ok() && _data_source->need_wakeup(); }
+
+    bool need_wakeup() const override {
+        return _data_source->need_wakeup();
+    }
+
     bool reach_limit() override { return _limit != -1 && _reach_limit.load(); }
 
     uint64_t avg_row_mem_bytes() const;

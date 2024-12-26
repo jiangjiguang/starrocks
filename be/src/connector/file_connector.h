@@ -68,6 +68,8 @@ public:
     int64_t num_bytes_read() const override;
     int64_t cpu_time_spent() const override;
 
+    bool need_wakeup() const override { return _scanner == nullptr || _scanner->need_wakeup(); }
+
 private:
     const FileDataSourceProvider* _provider;
     mutable TBrokerScanRange _scan_range;

@@ -14,6 +14,9 @@
 
 #pragma once
 
+#include <common/config.h>
+#include <fs/fs.h>
+
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -39,6 +42,8 @@ public:
 
     StatusOr<ChunkPtr> get_next() override;
 
+    bool need_wakeup() const override { return _curr_reader == nullptr || _curr_reader->need_wakeup(); }
+
     Status get_schema(std::vector<SlotDescriptor>* schema) override;
 
     void close() override;
@@ -62,6 +67,8 @@ private:
         void set_counter(ScannerCounter* counter) { _counter = counter; }
 
         Status _fill_buffer() override;
+
+        bool need_wakeup() const { return config::non_blocking_stream_load_scan && _file->ready_to_read(); }
 
         char* _find_line_delimiter(CSVBuffer& buffer, size_t pos) override;
 
