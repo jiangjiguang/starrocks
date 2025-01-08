@@ -269,10 +269,9 @@ public abstract class SRAbstractNonblockingServer extends TServer {
         protected final AbstractSelectThread selectThread;
 
         // where in the process of reading/writing are we?
-        protected StreamBufferState state = StreamBufferState.AWAITING_READING;
+        protected volatile StreamBufferState state = StreamBufferState.AWAITING_READING;
 
-        // the ByteBuffer we'll be using to write and read, depending on the state
-        protected ByteBuffer buffer;
+        protected volatile ByteBuffer writeBuffer;
 
         protected final TByteArrayOutputStream response;
 
@@ -295,7 +294,6 @@ public abstract class SRAbstractNonblockingServer extends TServer {
             this.trans = trans;
             this.selectionKey = selectionKey;
             this.selectThread = selectThread;
-            buffer = ByteBuffer.allocate(64);
 
             inTrans = new TStreamPipedTransport(((TNonblockingSocket) trans).getSocketChannel());
             response = new TByteArrayOutputStream();
@@ -349,7 +347,7 @@ public abstract class SRAbstractNonblockingServer extends TServer {
         public boolean write() {
             if (state == StreamBufferState.WRITING) {
                 try {
-                    if (trans.write(buffer) < 0) {
+                    if (trans.write(writeBuffer) < 0) {
                         return false;
                     }
                 } catch (TTransportException e) {
@@ -358,7 +356,8 @@ public abstract class SRAbstractNonblockingServer extends TServer {
                 }
 
                 // we're done writing. now we need to switch back to reading.
-                if (buffer.remaining() == 0) {
+                if (writeBuffer.remaining() == 0) {
+                    writeBuffer = null;
                     prepareRead();
                 }
                 return true;
@@ -417,12 +416,15 @@ public abstract class SRAbstractNonblockingServer extends TServer {
          * to write and instead go back to reading.
          */
         public void responseReady() {
-            if (response.len() == 0) {
+            if (inTrans.available()) {
+                // input should reach end
+                state = StreamBufferState.AWAITING_CLOSE;
+            } else if (response.len() == 0) {
                 // go straight to reading again. this was probably an oneway method
                 state = StreamBufferState.AWAITING_REGISTER_READ;
-                buffer = null;
+                writeBuffer = null;
             } else {
-                buffer = ByteBuffer.wrap(response.get(), 0, response.len());
+                writeBuffer = ByteBuffer.wrap(response.get(), 0, response.len());
 
                 // set state that we're waiting to be switched to write. we do this
                 // asynchronously through requestSelectInterestChange() because there is
@@ -469,16 +471,16 @@ public abstract class SRAbstractNonblockingServer extends TServer {
             try {
                 int totalSize = 0;
                 while (totalSize <= MAX_READ_BYTES) {
-                    int readSize = trans.read(buffer);
+                    ByteBuffer readBuffer = ByteBuffer.allocate(64);
+                    int readSize = trans.read(readBuffer);
                     if (readSize < 0) {
                         return -1;
                     } else if (readSize == 0) {
                         break;
                     } else {
                         totalSize += readSize;
-                        inTrans.writeBuffer(buffer);
+                        inTrans.writeBuffer(readBuffer);
                     }
-                    buffer = ByteBuffer.allocate(64);
                 }
                 return totalSize;
             } catch (TTransportException e) {
@@ -494,9 +496,11 @@ public abstract class SRAbstractNonblockingServer extends TServer {
         private void prepareRead() {
             // we can set our interest directly without using the queue because
             // we're in the select thread.
+            // reset input/output
+            writeBuffer = null;
+            inTrans.clear();
             selectionKey.interestOps(SelectionKey.OP_READ);
             // get ready for another go-around
-            buffer = ByteBuffer.allocate(64);
             state = StreamBufferState.AWAITING_READING;
         }
 
@@ -552,6 +556,15 @@ public abstract class SRAbstractNonblockingServer extends TServer {
             this.current = buf;
             this.pos = offset;
             this.endPos = offset + length;
+        }
+
+        public boolean available() {
+            return pos < endPos || !bufferQueue.isEmpty();
+        }
+
+        public void clear() {
+            bufferQueue.clear();
+            reset();
         }
 
         public void writeBuffer(ByteBuffer buffer) {
