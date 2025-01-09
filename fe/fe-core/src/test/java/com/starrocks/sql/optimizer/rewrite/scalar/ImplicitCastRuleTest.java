@@ -26,6 +26,7 @@ import com.starrocks.sql.optimizer.operator.OperatorType;
 import com.starrocks.sql.optimizer.operator.scalar.BetweenPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
+import com.starrocks.sql.optimizer.operator.scalar.CaseWhenOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
@@ -39,6 +40,7 @@ import org.junit.Test;
 
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -282,5 +284,19 @@ public class ImplicitCastRuleTest {
         result = rule.apply(opIn, context);
         assertEquals(PrimitiveType.VARCHAR, result.getChild(0).getType().getPrimitiveType());
         // ==== test case for xx in ('-', '0') === end
+
+
+        // ==== test case for CASE WHEN xx IN (6, 7) THEN yy ELSE 0 END === begin
+        ColumnRefOperator xx = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        ConstantOperator in1 =  new ConstantOperator("6", Type.TINYINT);
+        ConstantOperator in2 =  new ConstantOperator("7", Type.TINYINT);
+        InPredicateOperator caseWhenInOperator = new InPredicateOperator(xx, in1, in2);
+        ColumnRefOperator yy = new ColumnRefOperator(1, Type.VARCHAR, "yy", false);
+        List<ScalarOperator> whenClause = Lists.newArrayList(caseWhenInOperator, yy);
+        ConstantOperator constantColumnElse =  new ConstantOperator("0", Type.TINYINT);
+        CaseWhenOperator caseWhenOperator = new CaseWhenOperator(Type.VARCHAR, null, constantColumnElse, whenClause);
+        result = rule.apply(caseWhenOperator, context);
+        assertEquals(PrimitiveType.BOOLEAN, result.getChild(0).getType().getPrimitiveType());
+        // ==== test case for CASE WHEN xx IN (6, 7) THEN yy ELSE 0 END === end
     }
 }
