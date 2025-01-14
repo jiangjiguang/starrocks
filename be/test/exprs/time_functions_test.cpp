@@ -1768,6 +1768,51 @@ TEST_F(TimeFunctionsTest, date_format) {
         ASSERT_EQ(Slice("20200625"), v->get_data()[0]);
     }
     {
+        auto fmt_col = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice("yyyy"), 1);
+
+        Columns columns;
+        columns.emplace_back(dt_col);
+        columns.emplace_back(fmt_col);
+        ctx->impl()->set_constant_columns(columns);
+        TimeFunctions::format_prepare(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ColumnPtr result = TimeFunctions::datetime_format(ctx, columns).value();
+        TimeFunctions::format_close(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result->is_binary());
+        ASSERT_EQ(1, result->size());
+        auto v = ColumnHelper::cast_to<TYPE_VARCHAR>(result);
+        ASSERT_EQ(Slice("2020"), v->get_data()[0]);
+    }
+    {
+        auto fmt_col = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice("yyyyMM"), 1);
+
+        Columns columns;
+        columns.emplace_back(dt_col);
+        columns.emplace_back(fmt_col);
+        ctx->impl()->set_constant_columns(columns);
+        TimeFunctions::format_prepare(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ColumnPtr result = TimeFunctions::datetime_format(ctx, columns).value();
+        TimeFunctions::format_close(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result->is_binary());
+        ASSERT_EQ(1, result->size());
+        auto v = ColumnHelper::cast_to<TYPE_VARCHAR>(result);
+        ASSERT_EQ(Slice("202006"), v->get_data()[0]);
+    }
+    {
+        auto fmt_col = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice("%Y-%m-%d %H"), 1);
+
+        Columns columns;
+        columns.emplace_back(dt_col);
+        columns.emplace_back(fmt_col);
+        ctx->impl()->set_constant_columns(columns);
+        TimeFunctions::format_prepare(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ColumnPtr result = TimeFunctions::datetime_format(ctx, columns).value();
+        TimeFunctions::format_close(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
+        ASSERT_TRUE(result->is_binary());
+        ASSERT_EQ(1, result->size());
+        auto v = ColumnHelper::cast_to<TYPE_VARCHAR>(result);
+        ASSERT_EQ(Slice("2020-06-25 15"), v->get_data()[0]);
+    }
+    {
         auto fmt_col = ColumnHelper::create_const_column<TYPE_VARCHAR>(Slice("yyyy-MM-dd"), 1);
 
         Columns columns;

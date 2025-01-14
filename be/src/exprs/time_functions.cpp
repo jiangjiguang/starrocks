@@ -2063,7 +2063,6 @@ Status TimeFunctions::format_prepare(FunctionContext* context, FunctionContext::
     }
 
     Slice slice = ColumnHelper::get_const_value<TYPE_VARCHAR>(column);
-    fc->fmt = slice.to_string();
 
     fc->len = DateTimeValue::compute_format_len(slice.data, slice.size);
     if (fc->len >= 128) {
@@ -2071,13 +2070,53 @@ Status TimeFunctions::format_prepare(FunctionContext* context, FunctionContext::
         return Status::OK();
     }
 
-    if (fc->fmt == "%Y%m%d" || fc->fmt == "yyyyMMdd") {
+    static const std::unordered_map<std::string, std::string> format_map = {
+            {"yyyy", "%Y"},
+            {"MM", "%m"},
+            {"dd", "%d"},
+            {"HH", "%H"},
+            {"mm", "%i"},
+            {"ss", "%s"},
+            {"u", "u"},
+            {"01", "%F"},
+    };
+
+    std::string input_format(slice.data, slice.size);
+    std::string result;
+    size_t pos = 0;
+
+    while (pos < input_format.size()) {
+        bool matched = false;
+
+        // Try to match the longest keyword
+        for (const auto& [key, value] : format_map) {
+            if (input_format.compare(pos, key.size(), key) == 0) {
+                result += value;
+                pos += key.size();
+                matched = true;
+                break;
+            }
+        }
+
+        // If no keyword is matched, keep the original character
+        if (!matched) {
+            result += input_format[pos];
+            ++pos;
+        }
+    }
+    fc->fmt = result;
+
+    if (fc->fmt == "%Y%m%d") {
         fc->fmt_type = TimeFunctions::yyyyMMdd;
-    } else if (fc->fmt == "%Y-%m-%d" || fc->fmt == "yyyy-MM-dd") {
+    } else if (fc->fmt == "%Y%m%F") {
+        fc->fmt_type = TimeFunctions::yyyyMMFF;
+    } else if (fc->fmt == "%Y-%m-%d") {
         fc->fmt_type = TimeFunctions::yyyy_MM_dd;
-    } else if (fc->fmt == "yyyy-MM-dd HH") {
+    } else if (fc->fmt == "%Y-%m-%F") {
+        fc->fmt_type = TimeFunctions::yyyy_MM_FF;
+    } else if (fc->fmt == "%Y-%m-%d %H") {
         fc->fmt_type = TimeFunctions::yyyy_MM_dd_HH;
-    } else if (fc->fmt == "%Y-%m-%d %H:%i:%s" || fc->fmt == "yyyy-MM-dd HH:mm:ss") {
+    } else if (fc->fmt == "%Y-%m-%d %H:%i:%s") {
         fc->fmt_type = TimeFunctions::yyyy_MM_dd_HH_mm_ss;
     } else if (fc->fmt == "%Y-%m") {
         fc->fmt_type = TimeFunctions::yyyy_MM;
@@ -2152,6 +2191,30 @@ DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyyMMddImpl, v) {
     return format_for_yyyyMMdd((DateValue)v);
 }
 
+std::string format_for_yyyyMMFF(const DateValue& date_value) {
+    int y, m, d, t;
+    date_value.to_date(&y, &m, &d);
+    char to[8];
+
+    t = y / 100;
+    to[0] = t / 10 + '0';
+    to[1] = t % 10 + '0';
+
+    t = y % 100;
+    to[2] = t / 10 + '0';
+    to[3] = t % 10 + '0';
+
+    to[4] = m / 10 + '0';
+    to[5] = m % 10 + '0';
+    to[6] = 0 + '0';
+    to[7] = 1 + '0';
+    return std::string(to, 8);
+}
+
+DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyyMMFFImpl, v) {
+return format_for_yyyyMMFF((DateValue)v);
+}
+
 std::string format_for_yyyy_MM_dd_Impl(const DateValue& date_value) {
     return date_value.to_string();
 }
@@ -2159,6 +2222,32 @@ std::string format_for_yyyy_MM_dd_Impl(const DateValue& date_value) {
 DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyy_MM_dd_Impl, v) {
     auto d = (DateValue)v;
     return format_for_yyyy_MM_dd_Impl((DateValue)d);
+}
+
+std::string format_for_yyyy_MM_FF_Impl(const DateValue& date_value) {
+    int y, m, d, t;
+    date_value.to_date(&y, &m, &d);
+    char to[10];
+
+    t = y / 100;
+    to[0] = t / 10 + '0';
+    to[1] = t % 10 + '0';
+
+    t = y % 100;
+    to[2] = t / 10 + '0';
+    to[3] = t % 10 + '0';
+    to[4] = '-';
+    to[5] = m / 10 + '0';
+    to[6] = m % 10 + '0';
+    to[7] = '-';
+    to[8] = 0 + '0';
+    to[9] = 1 + '0';
+    return std::string(to, 10);
+}
+
+DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyy_MM_FF_Impl, v) {
+auto d = (DateValue)v;
+return format_for_yyyy_MM_FF_Impl((DateValue)d);
 }
 
 std::string format_for_yyyyMMddHHmmssImpl(const TimestampValue& date_value) {
@@ -2286,6 +2375,10 @@ StatusOr<ColumnPtr> do_format(const TimeFunctions::FormatCtx* ctx, const Columns
         return date_format_func<yyyyMMddImpl, Type>(cols, 8);
     } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_dd) {
         return date_format_func<yyyy_MM_dd_Impl, Type>(cols, 10);
+    } else if (ctx->fmt_type == TimeFunctions::yyyyMMFF) {
+        return date_format_func<yyyyMMFFImpl, Type>(cols, 8);
+    } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_FF) {
+        return date_format_func<yyyy_MM_FF_Impl, Type>(cols, 10);
     } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_dd_HH) {
         return date_format_func<yyyyMMddHHImpl, Type>(cols, 28);
     } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_dd_HH_mm_ss) {
