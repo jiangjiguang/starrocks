@@ -29,6 +29,7 @@ import com.starrocks.sql.optimizer.rewrite.scalar.FoldConstantsRule;
 import com.starrocks.sql.optimizer.rewrite.scalar.ImplicitCastRule;
 import com.starrocks.sql.optimizer.rewrite.scalar.MvNormalizePredicateRule;
 import com.starrocks.sql.optimizer.rewrite.scalar.NormalizePredicateRule;
+import com.starrocks.sql.optimizer.rewrite.scalar.PrestoCastRule;
 import com.starrocks.sql.optimizer.rewrite.scalar.PruneTediousPredicateRule;
 import com.starrocks.sql.optimizer.rewrite.scalar.ReduceCastRule;
 import com.starrocks.sql.optimizer.rewrite.scalar.ReplaceScalarOperatorRule;
@@ -50,6 +51,7 @@ public class ScalarOperatorRewriter {
             // required
             new ImplicitCastRule(),
             // optional
+            new PrestoCastRule(),
             new ReduceCastRule(),
             new NormalizePredicateRule(),
             new FoldConstantsRule(),
@@ -73,6 +75,7 @@ public class ScalarOperatorRewriter {
             // required
             new ImplicitCastRule(),
             // optional
+            new PrestoCastRule(),
             new ReduceCastRule(),
             new NormalizePredicateRule(),
             new FoldConstantsRule(),
