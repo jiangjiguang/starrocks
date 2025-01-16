@@ -35,7 +35,7 @@ $MVN_CMD clean
 $MVN_CMD package -DskipTests
 
 echo "Install broker..."
-BROKER_OUTPUT=${BROKER_HOME}/output/apache_hdfs_broker/
+export BROKER_OUTPUT=${BROKER_HOME}/output/apache_hdfs_broker/
 rm -rf ${BROKER_OUTPUT}
 
 install -d ${BROKER_OUTPUT}/bin ${BROKER_OUTPUT}/conf \
