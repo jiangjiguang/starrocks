@@ -9,7 +9,7 @@
     <version>1.0.1</version>
 
     <properties>
-        <log4j2.version>2.17.1</log4j2.version>
+        <log4j2.version>2.19.0</log4j2.version>
         <starrocks.common.version>1.0.0</starrocks.common.version>
         <starrocks.core.version>3.4.0</starrocks.core.version>
     </properties>
@@ -56,10 +56,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>2.3.2</version>
+                <version>3.8.1</version>
                 <configuration>
                     <source>1.8</source>
                     <target>1.8</target>
+                    <release>8</release>
                 </configuration>
             </plugin>
             <plugin>
