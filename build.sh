@@ -82,6 +82,7 @@ Usage: $0 <options>
      --be               build Backend
      --fe               build Frontend and Spark Dpp application
      --spark-dpp        build Spark DPP application
+     --broker           build Broker application
      --hive-udf         build Hive UDF
      --clean            clean and build target
      --enable-shared-data
@@ -149,10 +150,13 @@ eval set -- "$OPTS"
 
 BUILD_BE=
 BUILD_FE=
+RUN_BE_UT=
+RUN_FE_UT=
 BUILD_SPARK_DPP=
 BUILD_HIVE_UDF=
-CLEAN=
-RUN_UT=
+BUILD_BROKER=
+CLEAN=0
+RUN_UT=0
 WITH_GCOV=OFF
 WITH_BENCH=OFF
 WITH_CLANG_TIDY=OFF
@@ -205,6 +209,10 @@ if [[ -z ${ENABLE_FAULT_INJECTION} ]]; then
 fi
 
 HELP=0
+
+RUN_BE_UT=${OE_RUN_BE_UT}
+RUN_FE_UT=${OE_RUN_FE_UT}
+
 if [ $# == 1 ] ; then
     # default. `sh build.sh``
     BUILD_BE=${OE_BUILD_BE}
@@ -273,8 +281,10 @@ fi
 
 echo "Get params:
     BUILD_BE            -- $BUILD_BE
+    RUN_BE_UT           -- $RUN_BE_UT
     BE_CMAKE_TYPE       -- $BUILD_TYPE
     BUILD_FE            -- $BUILD_FE
+    RUN_FE_UT           -- $RUN_FE_UT
     BUILD_SPARK_DPP     -- $BUILD_SPARK_DPP
     BUILD_HIVE_UDF      -- $BUILD_HIVE_UDF
     CCACHE              -- ${CCACHE}
@@ -334,6 +344,18 @@ if [[ "${MACHINE_TYPE}" == "aarch64" ]]; then
     export LIBRARY_PATH=${JAVA_HOME}/jre/lib/aarch64/server/
 else
     export LIBRARY_PATH=${JAVA_HOME}/jre/lib/amd64/server/
+fi
+
+# Run BE UT
+if [ ${RUN_BE_UT} -eq 1 ] ; then
+    export PATH=$PATH:/opt/gcc/usr/bin
+
+    ./run-be-ut.sh
+fi
+
+# Run FE UT
+if [ ${RUN_FE_UT} -eq 1 ] ; then
+    ./run-fe-ut.sh
 fi
 
 # Clean and build Backend
@@ -465,7 +487,7 @@ fi
 STARROCKS_OUTPUT=${STARROCKS_HOME}/output/
 mkdir -p ${STARROCKS_OUTPUT}
 
-# Copy Frontend and Backend
+# Copy Frontend and Backend and Broker
 if [ ${BUILD_FE} -eq 1 -o ${BUILD_SPARK_DPP} -eq 1 ]; then
     if [ ${BUILD_FE} -eq 1 ]; then
         install -d ${STARROCKS_OUTPUT}/fe/bin ${STARROCKS_OUTPUT}/fe/conf/ \
