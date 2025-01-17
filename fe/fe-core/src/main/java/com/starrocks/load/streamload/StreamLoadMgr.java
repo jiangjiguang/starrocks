@@ -643,17 +643,11 @@ public class StreamLoadMgr implements MemoryTrackable {
 
     public static StreamLoadMgr loadStreamLoadManager(DataInput in) throws IOException {
         int size = in.readInt();
-        long currentMs = System.currentTimeMillis();
         StreamLoadMgr streamLoadManager = new StreamLoadMgr();
         streamLoadManager.init();
         for (int i = 0; i < size; i++) {
             StreamLoadTask loadTask = StreamLoadTask.read(in);
             loadTask.init();
-            // discard expired task right away
-            if (loadTask.checkNeedRemove(currentMs, false)) {
-                LOG.info("discard expired task: {}", loadTask.getLabel());
-                continue;
-            }
 
             streamLoadManager.addLoadTask(loadTask);
         }

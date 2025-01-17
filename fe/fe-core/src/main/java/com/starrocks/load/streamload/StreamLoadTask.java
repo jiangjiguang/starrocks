@@ -177,7 +177,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
     // used for sync stream load and routine load
     private boolean isSyncStreamLoad = false;
 
-    private Type type = Type.PARALLEL_STREAM_LOAD;
+    private Type type;
 
     private List<State> channels;
     private StreamLoadParam streamLoadParam;
@@ -262,6 +262,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
         this.streamLoadParam = null;
         this.streamLoadInfo = null;
         this.isCommitting = false;
+        this.type = Type.PARALLEL_STREAM_LOAD;
     }
 
     @Override
@@ -906,6 +907,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
                 for (int i = 0; i < channelNum; i++) {
                     this.channels.set(i, State.CANCELLED);
                 }
+                endTimeMs = System.currentTimeMillis();
                 this.state = State.CANCELLED;
                 writeUnlock();
             }
@@ -1488,6 +1490,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
     @Override
     public void gsonPostProcess() throws IOException {
         loadId = new TUniqueId(loadIdHi, loadIdLo);
+        init();
     }
 
     @Override
