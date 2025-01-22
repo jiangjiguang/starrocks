@@ -40,6 +40,7 @@
 #include <event2/http.h>
 #include <event2/http_struct.h>
 #include <event2/keyvalq_struct.h>
+#include <fcntl.h>
 
 #include <memory>
 #include <sstream>
@@ -110,9 +111,15 @@ EvHttpServer::~EvHttpServer() {
 
 Status EvHttpServer::start() {
     // bind to
-    RETURN_IF_ERROR(_bind());
     for (int i = 0; i < _num_workers; ++i) {
-        auto worker = [this]() {
+        int server_fd;
+        Status st = _tcp_listen(&server_fd);
+        if (!st.ok()) {
+            LOG(WARNING) << "Couldn't listen to port. " << st.to_string();
+            return st;
+        }
+        _server_fds.push_back(server_fd);
+        auto worker = [this, server_fd]() {
             struct event_base* base = event_base_new();
             if (base == nullptr) {
                 LOG(WARNING) << "Couldn't create an event_base.";
@@ -133,7 +140,7 @@ Status EvHttpServer::start() {
             _https.push_back(http);
             pthread_rwlock_unlock(&_rw_lock);
 
-            auto res = evhttp_accept_socket(http, _server_fd);
+            auto res = evhttp_accept_socket(http, server_fd);
             if (res < 0) {
                 LOG(WARNING) << "evhttp accept socket failed"
                              << ", error:" << errno_to_string(errno);
@@ -158,7 +165,9 @@ void EvHttpServer::stop() {
     }
 
     // shutdown the socket to wake up the epoll_wait
-    shutdown(_server_fd, SHUT_RDWR);
+    for (const int server_fd : _server_fds) {
+        shutdown(server_fd, SHUT_RDWR);
+    }
 }
 
 void EvHttpServer::join() {
@@ -169,7 +178,9 @@ void EvHttpServer::join() {
     }
 
     // close the socket at last
-    close(_server_fd);
+    for (const int server_fd : _server_fds) {
+        close(server_fd);
+    }
 
     // free the evhttp and event_base
     for (auto http : _https) {
@@ -181,36 +192,59 @@ void EvHttpServer::join() {
     }
 }
 
-Status EvHttpServer::_bind() {
-    butil::EndPoint point;
-    auto res = butil::str2endpoint(_host.c_str(), _port, &point);
-    if (res < 0) {
-        std::stringstream ss;
-        ss << "convert address failed, host=" << _host << ", port=" << _port;
-        return Status::InternalError(ss.str());
+Status EvHttpServer::_tcp_listen(int* fd) {
+    int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (listen_fd < 0) {
+        return Status::InternalError("Socket creation failed");
     }
-    // reuse_addr arg is removed in brpc 0.9.7 and use gflag instead.
-    // default reuse_addr is true and reuse_port is false.
-    _server_fd = butil::tcp_listen(point);
-    if (_server_fd < 0) {
-        std::stringstream ss;
-        ss << "Failed to listen port. port: " << _port << ", error: " << errno_to_string(errno);
-        return Status::InternalError(ss.str());
+
+    int opt = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        close(listen_fd);
+        return Status::InternalError("setsockopt(SO_REUSEADDR) failed");
     }
-    if (_port == 0) {
-        struct sockaddr_in addr;
-        socklen_t socklen = sizeof(addr);
-        const int rc = getsockname(_server_fd, (struct sockaddr*)&addr, &socklen);
-        if (rc == 0) {
-            _real_port = ntohs(addr.sin_port);
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+        close(listen_fd);
+        return Status::InternalError("setsockopt(SO_REUSEPORT) failed");
+    }
+
+    int flags = fcntl(listen_fd, F_GETFL, 0);
+    if (flags < 0) {
+        close(listen_fd);
+        return Status::InternalError("fcntl(F_GETFL) failed");
+    }
+    if (fcntl(listen_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+        close(listen_fd);
+        return Status::InternalError("fcntl(F_SETFL, O_NONBLOCK) failed");
+    }
+    struct sockaddr_in server_addr;
+    std::memset(&server_addr, 0, sizeof(server_addr));
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+
+    int port = _real_port != 0 ? _real_port : _port;
+    server_addr.sin_port = htons(port);
+
+    if (bind(listen_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+        close(listen_fd);
+        return Status::InternalError("Bind failed");
+    }
+
+    if (listen(listen_fd, SOMAXCONN) < 0) {
+        close(listen_fd);
+        return Status::InternalError("Listen failed");
+    }
+
+    if (_port == 0 && _real_port == 0) {
+        socklen_t len = sizeof(server_addr);
+        if (getsockname(listen_fd, (struct sockaddr*)&server_addr, &len) < 0) {
+            close(listen_fd);
+            return Status::InternalError("getsockname failed");
         }
+        _real_port = ntohs(server_addr.sin_port);
     }
-    res = butil::make_non_blocking(_server_fd);
-    if (res < 0) {
-        std::stringstream ss;
-        ss << "Failed to generate a non-blocking socket. error: " << errno_to_string(errno);
-        return Status::InternalError(ss.str());
-    }
+
+    *fd = listen_fd;
     return Status::OK();
 }
 

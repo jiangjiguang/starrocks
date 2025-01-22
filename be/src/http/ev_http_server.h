@@ -55,6 +55,7 @@ public:
 
 private:
     Status _bind();
+    Status _tcp_listen(int* fd);
     HttpHandler* _find_handler(HttpRequest* req);
 
 private:
@@ -65,7 +66,7 @@ private:
     // used for unittest, set port to 0, os will choose a free port;
     int _real_port;
 
-    int _server_fd = -1;
+    std::vector<int> _server_fds;
     std::vector<std::thread> _workers;
 
     pthread_rwlock_t _rw_lock;
