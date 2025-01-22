@@ -357,6 +357,27 @@ public class AnalyzeTestUtil {
         }
     }
 
+    public static StatementBase analyzeSuccessWithPrestoSession(String originStmt) {
+        try {
+            connectContext.getSessionVariable().setEnablePrestoTranslation(true);
+            StatementBase statementBase = parseSql(originStmt);
+            Analyzer.analyze(statementBase, connectContext);
+
+            if (statementBase instanceof QueryStatement) {
+                StatementBase viewStatement =
+                        com.starrocks.sql.parser.SqlParser.parse(AstToSQLBuilder.toSQL(statementBase),
+                                connectContext.getSessionVariable()).get(0);
+                Analyzer.analyze(viewStatement, connectContext);
+            }
+
+            return statementBase;
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            Assert.fail();
+            throw ex;
+        }
+    }
+
     public static StatementBase analyzeWithoutTestView(String originStmt) {
         try {
             StatementBase statementBase = com.starrocks.sql.parser.SqlParser.parse(originStmt,

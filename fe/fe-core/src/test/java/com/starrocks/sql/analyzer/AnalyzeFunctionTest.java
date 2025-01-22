@@ -27,6 +27,7 @@ import java.util.List;
 
 import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeFail;
 import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeSuccess;
+import static com.starrocks.sql.analyzer.AnalyzeTestUtil.analyzeSuccessWithPrestoSession;
 import static com.starrocks.sql.analyzer.AnalyzeTestUtil.getConnectContext;
 
 public class AnalyzeFunctionTest {
@@ -179,6 +180,18 @@ public class AnalyzeFunctionTest {
     }
 
     @Test
+    public void testDateAddOrSubInPrestoDialect() {
+        QueryStatement queryStatement = (QueryStatement) analyzeSuccessWithPrestoSession(
+                "select date_add('2022-01-01 10:00:00', interval 1 day)");
+        Assert.assertEquals("SELECT to_date(date_add('2022-01-01 10:00:00', INTERVAL 1 DAY))",
+                AstToStringBuilder.toString(queryStatement.getQueryRelation()));
+
+        queryStatement = (QueryStatement) analyzeSuccessWithPrestoSession(
+                "select date_sub('2022-01-01 10:00:00', interval 1 day)");
+        Assert.assertEquals("SELECT to_date(date_sub('2022-01-01 10:00:00', INTERVAL 1 DAY))",
+                AstToStringBuilder.toString(queryStatement.getQueryRelation()));
+    }
+    @Test
     public void testTimestampArithmeticExpr() {
         QueryStatement queryStatement =
                 (QueryStatement) analyzeSuccess("select date_add('2022-01-01', interval 2 day)");
@@ -238,6 +251,8 @@ public class AnalyzeFunctionTest {
                 "select timestampdiff(minute, '2020-01-01 00:00:00', '2020-01-03 00:00:00')");
         Assert.assertEquals("SELECT timestampdiff(MINUTE, '2020-01-01 00:00:00', '2020-01-03 00:00:00')",
                 AstToStringBuilder.toString(queryStatement.getQueryRelation()));
+
+
     }
 
     @Test

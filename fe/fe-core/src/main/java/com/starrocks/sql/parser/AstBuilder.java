@@ -499,6 +499,7 @@ import static java.util.stream.Collectors.toList;
 
 public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
     private final long sqlMode;
+    private boolean isPrestoDialect;
 
     private final IdentityHashMap<ParserRuleContext, List<HintNode>> hintMap;
 
@@ -517,6 +518,10 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
                     FunctionSet.DATE_ADD, FunctionSet.DATE_SUB,
                     FunctionSet.SUBDATE,
                     FunctionSet.DAYS_SUB);
+
+    private static final List<String> PRESTO_TRANSLATE_FUNCTIONS =
+            Lists.newArrayList(FunctionSet.DATE_ADD,
+                    FunctionSet.DATE_SUB);
 
     private static final List<String> PARTITION_FUNCTIONS =
             Lists.newArrayList(FunctionSet.SUBSTR, FunctionSet.SUBSTRING,
@@ -539,6 +544,10 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
             }
         }
         this.sqlMode = sqlMode | hintSqlMode;
+    }
+
+    public void setPrestoDialect(boolean prestoDialect) {
+        this.isPrestoDialect = prestoDialect;
     }
 
     private static final AstBuilder.AstBuilderFactory INSTANCE = new AstBuilder.AstBuilderFactory();
@@ -6287,8 +6296,18 @@ public class AstBuilder extends StarRocksBaseVisitor<ParseNode> {
             }
             IntervalLiteral intervalLiteral = (IntervalLiteral) e2;
 
-            return new TimestampArithmeticExpr(functionName, e1, intervalLiteral.getValue(),
-                    intervalLiteral.getUnitIdentifier().getDescription(), pos);
+            TimestampArithmeticExpr timestampArithmeticExpr =
+                    new TimestampArithmeticExpr(functionName, e1, intervalLiteral.getValue(),
+                            intervalLiteral.getUnitIdentifier().getDescription());
+
+            if (isPrestoDialect && PRESTO_TRANSLATE_FUNCTIONS.contains(functionName)) {
+                FunctionName toDate = FunctionName.createFnName(FunctionSet.TO_DATE);
+                List<Expr> params = ImmutableList.of(timestampArithmeticExpr);
+                return new FunctionCallExpr(toDate, params);
+            } else {
+                return timestampArithmeticExpr;
+            }
+
         }
 
         if (functionName.equals(FunctionSet.ELEMENT_AT)) {
