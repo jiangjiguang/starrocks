@@ -329,7 +329,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
                     break;
                 }
                 case CANCELLED: {
-                    resp.setOKMsg("stream load task " + label + " has already been cancelled: "
+                    resp.setErrorMsg("stream load task " + label + " has already been cancelled: "
                             + this.errorMsg);
                     break;
                 }
@@ -391,7 +391,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
                     return redirectAddr;
                 }
                 case PREPARED: {
-                    resp.setOKMsg("stream load task " + label + " has already been prepared");
+                    resp.setErrorMsg("stream load task " + label + " has already been prepared");
                     break;
                 }
                 case COMMITED: {
@@ -399,7 +399,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
                     break;
                 }
                 case CANCELLED: {
-                    resp.setOKMsg("stream load task " + label + " has already been cancelled: "
+                    resp.setErrorMsg("stream load task " + label + " has already been cancelled: "
                             + this.errorMsg);
                     break;
                 }
@@ -480,7 +480,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
                     break;
                 }
                 case CANCELLED: {
-                    resp.setOKMsg("stream load task " + label + " has already been cancelled: "
+                    resp.setErrorMsg("stream load task " + label + " has already been cancelled: "
                             + this.errorMsg);
                     break;
                 }
@@ -598,7 +598,7 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
                     break;
                 }
                 case CANCELLED: {
-                    resp.setOKMsg("stream load task " + label + " has already been cancelled: "
+                    resp.setErrorMsg("stream load task " + label + " has already been cancelled: "
                             + this.errorMsg);
                     break;
                 }
