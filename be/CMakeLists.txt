@@ -576,6 +576,9 @@ check_function_exists(sched_getcpu HAVE_SCHED_GETCPU)
 # support to pass cxx flags from environment.
 set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} $ENV{STARROCKS_CXX_COMMON_FLAGS}")
 
+# Disable -Wswitch-default -Wunused-parameter -Wdocumentation -Wweak-vtables -Wunsafe-buffer-usage
+set(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -Wno-switch-default -Wno-unused-parameter -Wno-documentation -Wno-weak-vtables -Wno-unsafe-buffer-usage")
+
 # -no-pie: Disable Position Independent Executables (PIE) as certain libraries cannot be linked against PIE executables.
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -no-pie")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} $ENV{STARROCKS_CXX_LINKER_FLAGS}")

@@ -419,6 +419,7 @@ set(EXEC_FILES
         ./util/fail_point_test.cpp
         ./util/faststring_test.cpp
         ./util/file_util_test.cpp
+        ./util/hdfs_util_test.cpp
         ./util/filesystem_util_test.cpp
         ./util/frame_of_reference_coding_test.cpp
         ./util/json_util_test.cpp

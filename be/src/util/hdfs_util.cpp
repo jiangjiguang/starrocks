@@ -47,19 +47,25 @@ Status get_namenode_from_path(const std::string& path, std::string* namenode) {
             // Path is not qualified, so use the default FS.
             *namenode = "default";
         }
-    } else if (n == 0) {
-        return Status::InvalidArgument(strings::Substitute("Path missing scheme: $0", path));
-    } else {
-        // Path is qualified, i.e. "scheme://authority/path/to/file".  Extract
-        // "scheme://authority/".
-        n = path.find('/', n + 3);
-        if (n == std::string::npos) {
-            return Status::InvalidArgument(strings::Substitute("Path missing '/' after authority: $0", path));
-        } else {
-            // Include the trailing '/' for local filesystem case, i.e. "file:///".
-            *namenode = path.substr(0, n + 1);
-        }
+        return Status::OK();
     }
+    if (n == 0) {
+        return Status::InvalidArgument(strings::Substitute("Path missing scheme: $0", path));
+    }
+    // Check if the scheme is "har://".
+    const std::string har_prefix("har://");
+    if (path.compare(0, har_prefix.length(), har_prefix) == 0) {
+        *namenode = path;
+        return Status::OK();
+    }
+    // Path is qualified, i.e. "scheme://authority/path/to/file".  Extract
+    // "scheme://authority/".
+    n = path.find('/', n + 3);
+    if (n == std::string::npos) {
+        return Status::InvalidArgument(strings::Substitute("Path missing '/' after authority: $0", path));
+    }
+    // Include the trailing '/' for local filesystem case, i.e. "file:///".
+    *namenode = path.substr(0, n + 1);
     return Status::OK();
 }
 
