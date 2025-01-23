@@ -298,5 +298,17 @@ public class ImplicitCastRuleTest {
         result = rule.apply(caseWhenOperator, context);
         assertEquals(PrimitiveType.BOOLEAN, result.getChild(0).getType().getPrimitiveType());
         // ==== test case for CASE WHEN xx IN (6, 7) THEN yy ELSE 0 END === end
+
+
+        // ==== test case for CASE col_a WHEN 1 THEN 2 ELSE 0 END === begin
+        ColumnRefOperator aa = new ColumnRefOperator(0, Type.BIGINT, "col_a", false);
+        ConstantOperator when1 =  new ConstantOperator("1", Type.TINYINT);
+        ConstantOperator then2 =  new ConstantOperator("2", Type.TINYINT);
+        ConstantOperator else3 =  new ConstantOperator("0", Type.TINYINT);
+        List<ScalarOperator> caseColumnWhenClause = Lists.newArrayList(when1, then2);
+        CaseWhenOperator caseColumnWhenOperator = new CaseWhenOperator(Type.TINYINT, aa, else3, caseColumnWhenClause);
+        result = rule.apply(caseColumnWhenOperator, context);
+        assertEquals(PrimitiveType.BIGINT, result.getChild(0).getType().getPrimitiveType());
+        // ==== test case for CASE xx WHEN 1 THEN 2 ELSE 0 END === end
     }
 }

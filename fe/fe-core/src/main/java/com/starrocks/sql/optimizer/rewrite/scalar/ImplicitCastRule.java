@@ -362,6 +362,9 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
             // else in VectorizedInPredicate, we will meet the exception [VectorizedInPredicate type not same]
             if (enablePrestoTranslation) {
                 ScalarOperator whenOperator = operator.getWhenClause(i);
+                if (whenOperator.getChildren() == null || whenOperator.getChildren().isEmpty()) {
+                    continue;
+                }
                 ScalarOperator firstOperator = whenOperator.getChild(0);
                 Type firstType = firstOperator.getType();
                 for (int index = 1; index < whenOperator.getChildren().size(); index++) {
