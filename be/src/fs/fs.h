@@ -378,7 +378,7 @@ public:
             : RandomAccessFile(file->stream(), filename), _filename(filename), _file(std::move(file)) {}
     ~TempRandomAccessFile() {
         LOG(INFO) << "delete broker cache TempRandomAccessFile: " << _filename;
-        FileSystem::Default()->delete_file(_filename);
+        (void)FileSystem::Default()->delete_file(_filename);
     }
 
     std::shared_ptr<io::SeekableInputStream> stream() { return _file->stream(); }
