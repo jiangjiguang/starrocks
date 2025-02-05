@@ -120,6 +120,7 @@ public class AcceptListener implements ChannelListener<AcceptingChannel<StreamCo
                         ConnectProcessor processor = new ConnectProcessor(context);
                         context.startAcceptQuery(processor);
                     } catch (AfterConnectedException e) {
+                        LOG.error("after connected exception because ", e);
                         // do not need to print log for this kind of exception.
                         // just clean up the context;
                         context.cleanup();

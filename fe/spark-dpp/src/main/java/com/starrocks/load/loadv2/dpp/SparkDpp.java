@@ -80,6 +80,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 // This class is a Spark-based data preprocessing program,
 // which will make use of the distributed compute framework of spark to
@@ -289,6 +290,10 @@ public final class SparkDpp implements java.io.Serializable {
                                 conf.set("spark.sql.parquet.outputTimestampType", "INT96");
                                 ParquetWriteSupport.setSchema(dstSchema, conf);
                                 ParquetWriteSupport parquetWriteSupport = new ParquetWriteSupport();
+                                Path tmpPathObj = new Path(tmpPath);
+                                if (fs.exists(tmpPathObj)) {
+                                    fs.delete(tmpPathObj, false);
+                                }
                                 parquetWriter = new ParquetWriter<InternalRow>(new Path(tmpPath), parquetWriteSupport,
                                         CompressionCodecName.SNAPPY,
                                         256 * 1024 * 1024, 16 * 1024,
@@ -698,12 +703,20 @@ public final class SparkDpp implements java.io.Serializable {
                 sourceData = sourceData.withColumn(fileGroup.columnsFromPath.get(i), functions.lit(columnValueFromPath.get(i)));
             }
         }
+        // Ignore the case of the field name
+        List<String> fieldList = Arrays.asList(sourceData.schema().fieldNames());
+        fieldList = fieldList.stream().map(String::toLowerCase).collect(Collectors.toList());
+        HashSet<String> schemaSet = new HashSet<>(fieldList);
+        List<String> srcFieldList = Arrays.asList(srcSchema.fieldNames());
+        srcFieldList = srcFieldList.stream().map(String::toLowerCase).collect(Collectors.toList());
+        schemaSet.addAll(srcFieldList);
         // check fields name and size
-        HashSet<String> schemaSet = new HashSet<>(Arrays.asList(sourceData.schema().fieldNames()));
-        schemaSet.addAll(Arrays.asList(srcSchema.fieldNames()));
-        if (sourceData.schema().size() != schemaSet.size()) {
-            throw new SparkDppException("The schema of file and table must be equal. " +
-                    "file schema: " + sourceData.schema().treeString() + ", table schema: " + srcSchema.treeString());
+        int sourceSchemaSize = sourceData.schema().size();
+        int tableSchemaSize = schemaSet.size();
+        if (sourceSchemaSize != tableSchemaSize) {
+            throw new SparkDppException("The schema of file and table must be equal.file schema size: "
+                    + sourceSchemaSize + ", table schema size:" + tableSchemaSize + ", file schema: "
+                    + sourceData.schema().treeString() + ", table schema: " + srcSchema.treeString());
         }
         // TODO: data quality check for orc/parquet load
         // Check process is roughly the same as the hive load, but there are some bugs to fix.
