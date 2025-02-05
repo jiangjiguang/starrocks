@@ -454,16 +454,7 @@ public class FileSystemManager {
                 FileSystem dfsFileSystem = null;
                 if (authentication.equals(AUTHENTICATION_SIMPLE) &&
                         properties.containsKey(USER_NAME_KEY) && !Strings.isNullOrEmpty(username)) {
-                    // Use the specified 'username' as the login name
-                    ugi = UserGroupInformation.createRemoteUser(username);
-                }
-                if (ugi != null) {
-                    dfsFileSystem = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
-                        @Override
-                        public FileSystem run() throws Exception {
-                            return FileSystem.get(pathUri.getUri(), conf);
-                        }
-                    });
+                    dfsFileSystem = FileSystem.get(pathUri.getUri(), conf, properties.get(USER_NAME_KEY), properties.get(PASSWORD_KEY));
                 } else {
                     dfsFileSystem = FileSystem.get(pathUri.getUri(), conf);
                 }
