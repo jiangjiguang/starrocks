@@ -34,6 +34,7 @@
 #include "runtime/datetime_value.h"
 #include "runtime/runtime_state.h"
 #include "runtime/time_types.h"
+#include "testutil/assert.h"
 #include "testutil/function_utils.h"
 #include "types/logical_type.h"
 
@@ -1208,6 +1209,22 @@ TEST_F(TimeFunctionsTest, toUnixFromDatetimeWithFormat) {
         auto v = ColumnHelper::cast_to<TYPE_INT>(result);
         ASSERT_EQ(1565080737, v->get_data()[0]);
         ASSERT_EQ(1565080738, v->get_data()[1]);
+    }
+}
+
+TEST_F(TimeFunctionsTest, toUnixFromDatetimeWithIllegalFormat) {
+    {
+        Columns columns;
+        auto tc1 = BinaryColumn::create();
+        tc1->append("2019-08-06 01:38:57");
+        auto tc2 = BinaryColumn::create();
+        tc2->append("yyyymm");
+
+        columns.emplace_back(tc1);
+        columns.emplace_back(tc2);
+
+        EXPECT_STATUS(Status::InternalError("Illegal date format yyyymm , please correct the input format."),
+                      TimeFunctions::to_unix_from_datetime_with_format(_utils->get_fn_ctx(), columns).status());
     }
 }
 

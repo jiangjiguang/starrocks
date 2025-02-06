@@ -575,6 +575,18 @@ DEFINE_BINARY_FUNCTION_WITH_IMPL(year_week_with_modeImpl, t, m) {
 }
 DEFINE_TIME_BINARY_FN(year_week_with_mode, TYPE_DATETIME, TYPE_INT, TYPE_INT);
 
+inline bool check_illegal_date_format(const std::string& input_format) {
+    const std::vector<std::string> prefixes = {"yyyymm", "yyyy-mm", "yyyy/mm", "yyyy|mm", "yyyy:mm"};
+    for (const auto& prefix : prefixes) {
+        if (input_format.length() >= prefix.length() && input_format.substr(0, prefix.length()) == prefix) {
+            LOG(ERROR) << "Illegal date format " << prefix << ", please correct the input format. ";
+            return true;
+        }
+    }
+    return false;
+}
+
+
 uint TimeFunctions::week_mode(uint mode) {
     uint week_format = (mode & 7);
     if (!(week_format & WEEK_MONDAY_FIRST)) week_format ^= WEEK_FIRST_WEEKDAY;
@@ -1434,6 +1446,12 @@ StatusOr<ColumnPtr> TimeFunctions::_t_to_unix_from_datetime_with_format(Function
             continue;
         }
         DateTimeValue tv;
+        std::string format_str(format.get_data(), format.get_size());
+        if (check_illegal_date_format(format_str)) {
+            return Status::InternalError(
+                    fmt::format("Illegal date format {} , please correct the input format.", format_str));
+        }
+
         std::string new_fmt = convert_format(format);
         if (!tv.from_date_format_str((const char*)new_fmt.c_str(), new_fmt.size(), date.data, date.size)) {
             result.append_null();
@@ -1626,6 +1644,11 @@ Status TimeFunctions::from_unix_prepare(FunctionContext* context, FunctionContex
         return Status::InvalidArgument("Time format invalid");
     }
 
+    std::string format_str(format.get_data(), format.get_size());
+    if (check_illegal_date_format(format_str)) {
+        return Status::InternalError(
+                fmt::format("Illegal date format {} , please correct the input format.", format_str));
+    }
     state->format_content = convert_format(format);
     return Status::OK();
 }
@@ -1673,6 +1696,11 @@ StatusOr<ColumnPtr> TimeFunctions::_t_from_unix_with_format_general(FunctionCont
             continue;
         }
 
+        std::string format_str(format.get_data(), format.get_size());
+        if (check_illegal_date_format(format_str)) {
+            return Status::InternalError(
+                    fmt::format("Illegal date format {} , please correct the input format.", format_str));
+        }
         std::string new_fmt = convert_format(format);
 
         char buf[128];
