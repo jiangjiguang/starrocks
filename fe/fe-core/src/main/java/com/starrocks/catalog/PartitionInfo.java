@@ -170,7 +170,7 @@ public class PartitionInfo extends JsonWriter implements Cloneable, GsonPreProce
     }
 
     public boolean getIsInMemory(long partitionId) {
-        return idToInMemory.get(partitionId);
+        return idToInMemory.getOrDefault(partitionId, false);
     }
 
     public void setIsInMemory(long partitionId, boolean isInMemory) {
