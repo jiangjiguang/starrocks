@@ -17,7 +17,7 @@ for f in ${STARROCKS_HOME}/lib/hadoop/common/*.jar ${STARROCKS_HOME}/lib/hadoop/
 done
 export HADOOP_CLASSPATH=$HADOOP_CLASSPATH
 
-if [ ${HADOOP_USER_NAME}"X" != "X" ]; then
+if [ ${HADOOP_USER_NAME}"X" == "X" ]; then
     export HADOOP_USER_NAME=${USER}
 fi
 
