@@ -57,6 +57,7 @@ import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.InPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.LikePredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
+import com.starrocks.sql.optimizer.rule.transformation.HiveMultiPartitionPruner;
 import com.starrocks.sql.optimizer.rule.transformation.ListPartitionPruner;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -304,6 +305,7 @@ public class OptExternalPartitionPruner {
             }
 
             List<Pair<PartitionKey, Long>> partitionKeys = Lists.newArrayList();
+            Map<Long, String> idToPartitionPath = Maps.newHashMap();
             if (!hmsTable.isUnPartitioned()) {
                 if (!context.getSessionVariable().isAllowHiveWithoutPartitionFilter()
                         && !checkPartitionPredicates(operator, partitionColumns)) {
@@ -335,13 +337,17 @@ public class OptExternalPartitionPruner {
                     List<String> values = toPartitionValues(partName);
                     PartitionKey partitionKey = createPartitionKey(values, partitionColumns, table.getType());
                     keys.add(partitionKey);
-                    ids.add(context.getNextUniquePartitionId());
+                    long partitionId = context.getNextUniquePartitionId();
+                    ids.add(partitionId);
+                    idToPartitionPath.put(partitionId, partName);
+
                 }
                 for (int i = 0; i < keys.size(); i++) {
                     partitionKeys.add(new Pair<>(keys.get(i), ids.get(i)));
                 }
             } else {
                 partitionKeys.add(new Pair<>(new PartitionKey(), 0L));
+                idToPartitionPath.put(0L, "");
             }
 
             partitionKeys.stream().parallel().forEach(entry -> {
@@ -366,6 +372,7 @@ public class OptExternalPartitionPruner {
                 PartitionKey key = entry.first;
                 long partitionId = entry.second;
                 operator.getScanOperatorPredicates().getIdToPartitionKey().put(partitionId, key);
+                operator.getScanOperatorPredicates().getIdToPartitionPath().put(partitionId, idToPartitionPath.get(partitionId));
             }
         } else if (table instanceof DeltaLakeTable) {
             // Init columnToPartitionValuesMap for delta lake, it will be used in classifyConjuncts function
@@ -404,6 +411,30 @@ public class OptExternalPartitionPruner {
                     new ListPartitionPruner(columnToPartitionValuesMap, columnToNullPartitions,
                             scanOperatorPredicates.getPartitionConjuncts(), null);
             Collection<Long> selectedPartitionIds = partitionPruner.prune();
+            List<ScalarOperator> noEvalConjunctList = partitionPruner.getNoEvalConjuncts();
+            // If the partition pruning is not successful, try to use multi partition pruning
+            if (!noEvalConjunctList.isEmpty()) {
+                HiveMultiPartitionPruner multiPartitionPruner = new HiveMultiPartitionPruner(
+                        noEvalConjunctList,
+                        scanOperatorPredicates.getIdToPartitionPath(),
+                        columnToNullPartitions,
+                        columnToPartitionValuesMap);
+                Collection<Long> multiSelectedPartitionIds = multiPartitionPruner.prune();
+                List<ScalarOperator> multiNoEvalConjunctList = multiPartitionPruner.getNoEvalConjuncts();
+                // If multi partition pruning is successful, use the result of multi partition pruning
+                if (selectedPartitionIds == null) {
+                    selectedPartitionIds = multiSelectedPartitionIds;
+                } else {
+                    if (multiSelectedPartitionIds != null && !multiSelectedPartitionIds.isEmpty()) {
+                        selectedPartitionIds.retainAll(multiSelectedPartitionIds);
+                    }
+                }
+
+                // If multi partition pruning is successful, use the noEvalConjunctList of multi partition pruning
+                noEvalConjunctList.retainAll(multiNoEvalConjunctList);
+            }
+
+
             if (selectedPartitionIds == null) {
                 selectedPartitionIds = scanOperatorPredicates.getIdToPartitionKey().keySet();
             }
@@ -417,7 +448,7 @@ public class OptExternalPartitionPruner {
             }
 
             scanOperatorPredicates.setSelectedPartitionIds(selectedPartitionIds);
-            scanOperatorPredicates.getNoEvalPartitionConjuncts().addAll(partitionPruner.getNoEvalConjuncts());
+            scanOperatorPredicates.getNoEvalPartitionConjuncts().addAll(noEvalConjunctList);
         } else if (table instanceof IcebergTable) {
             IcebergTable icebergTable = (IcebergTable) table;
             if (!icebergTable.getSnapshot().isPresent()) {

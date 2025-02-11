@@ -36,6 +36,8 @@ public class ScanOperatorPredicates {
     private Map<Long, PartitionKey> idToPartitionKey = Maps.newHashMap();
     private Collection<Long> selectedPartitionIds = Lists.newArrayList();
 
+    private Map<Long, String> idToPartitionPath = Maps.newHashMap();
+
     // partitionConjuncts contains partition filters.
     private List<ScalarOperator> partitionConjuncts = Lists.newArrayList();
     // After partition pruner prune, conjuncts that are not evaled will be sent to backend.
@@ -57,6 +59,10 @@ public class ScanOperatorPredicates {
         return selectedPartitionIds;
     }
 
+    public void setPartitionConjuncts(List<ScalarOperator> partitionConjuncts) {
+        this.partitionConjuncts = partitionConjuncts;
+    }
+
     public List<PartitionKey> getSelectedPartitionKeys() {
         List<PartitionKey> partitions = Lists.newArrayList();
         for (long partitionId : selectedPartitionIds) {
@@ -73,6 +79,15 @@ public class ScanOperatorPredicates {
     public List<ScalarOperator> getPartitionConjuncts() {
         return partitionConjuncts;
     }
+
+    public Map<Long, String> getIdToPartitionPath() {
+        return idToPartitionPath;
+    }
+
+    public void setIdToPartitionPath(Map<Long, String> idToPartitionPath) {
+        this.idToPartitionPath = idToPartitionPath;
+    }
+
 
     public List<ScalarOperator> getNoEvalPartitionConjuncts() {
         return noEvalPartitionConjuncts;
@@ -111,6 +126,7 @@ public class ScanOperatorPredicates {
         nonPartitionConjuncts.clear();
         minMaxConjuncts.clear();
         minMaxColumnRefMap.clear();
+        idToPartitionPath.clear();
     }
 
     @Override
@@ -124,6 +140,7 @@ public class ScanOperatorPredicates {
         other.minMaxConjuncts.addAll(this.minMaxConjuncts);
         other.minMaxColumnRefMap.putAll(this.minMaxColumnRefMap);
         other.hasPrunedPartition = this.hasPrunedPartition;
+        other.idToPartitionPath.putAll(this.idToPartitionPath);
 
         return other;
     }
@@ -143,13 +160,16 @@ public class ScanOperatorPredicates {
                 Objects.equals(noEvalPartitionConjuncts, that.noEvalPartitionConjuncts) &&
                 Objects.equals(nonPartitionConjuncts, that.nonPartitionConjuncts) &&
                 Objects.equals(minMaxConjuncts, that.minMaxConjuncts) &&
-                Objects.equals(minMaxColumnRefMap, that.minMaxColumnRefMap);
+                Objects.equals(minMaxColumnRefMap, that.minMaxColumnRefMap) &&
+                Objects.equals(getMinMaxColumnRefMap(), that.getMinMaxColumnRefMap()) &&
+                Objects.equals(getIdToPartitionPath(), that.getIdToPartitionPath());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(idToPartitionKey, selectedPartitionIds, partitionConjuncts, noEvalPartitionConjuncts,
-                nonPartitionConjuncts, minMaxConjuncts, minMaxColumnRefMap);
+        return Objects.hash(idToPartitionKey, selectedPartitionIds, partitionConjuncts,
+                noEvalPartitionConjuncts, nonPartitionConjuncts, minMaxConjuncts, minMaxColumnRefMap, idToPartitionPath);
+
     }
 
     @Override
