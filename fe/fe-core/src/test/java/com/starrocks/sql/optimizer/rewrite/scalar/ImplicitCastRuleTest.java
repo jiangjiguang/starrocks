@@ -296,7 +296,7 @@ public class ImplicitCastRuleTest {
         ConstantOperator constantColumnElse =  new ConstantOperator("0", Type.TINYINT);
         CaseWhenOperator caseWhenOperator = new CaseWhenOperator(Type.VARCHAR, null, constantColumnElse, whenClause);
         result = rule.apply(caseWhenOperator, context);
-        assertEquals(PrimitiveType.BOOLEAN, result.getChild(0).getType().getPrimitiveType());
+        assertEquals(PrimitiveType.DOUBLE, result.getChild(0).getChild(0).getType().getPrimitiveType());
         // ==== test case for CASE WHEN xx IN (6, 7) THEN yy ELSE 0 END === end
 
 
@@ -308,7 +308,20 @@ public class ImplicitCastRuleTest {
         List<ScalarOperator> caseColumnWhenClause = Lists.newArrayList(when1, then2);
         CaseWhenOperator caseColumnWhenOperator = new CaseWhenOperator(Type.TINYINT, aa, else3, caseColumnWhenClause);
         result = rule.apply(caseColumnWhenOperator, context);
-        assertEquals(PrimitiveType.BIGINT, result.getChild(0).getType().getPrimitiveType());
+        assertEquals(PrimitiveType.BIGINT, result.getChild(1).getType().getPrimitiveType());
         // ==== test case for CASE xx WHEN 1 THEN 2 ELSE 0 END === end
+
+        // ==== test case for CASE WHEN xx > 6 THEN yy END === begin
+        ColumnRefOperator colX = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        ConstantOperator gt6 =  new ConstantOperator("6", Type.TINYINT);
+        BinaryPredicateOperator whenBinaryCase = new BinaryPredicateOperator(BinaryType.GT, colX, gt6);
+        ColumnRefOperator colY = new ColumnRefOperator(1, Type.VARCHAR, "yy", false);
+        List<ScalarOperator> whenDiffClause = Lists.newArrayList(whenBinaryCase, colY);
+        CaseWhenOperator doubleOperator = new CaseWhenOperator(Type.VARCHAR, null, null, whenDiffClause);
+        result = rule.apply(doubleOperator, context);
+        assertEquals(PrimitiveType.DOUBLE, result.getChild(0).getChild(0).getType().getPrimitiveType());
+        // ==== test case for CASE WHEN xx > 20 THEN yy END === end
+
+
     }
 }

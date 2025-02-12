@@ -346,39 +346,60 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
             }
         }
 
-        boolean enablePrestoTranslation = false;
-        if (context != null && context.getSession() != null) {
-            enablePrestoTranslation = context.getSession().getSessionVariable().isEnablePrestoTranslation();
-        }
-
         for (int i = 0; i < operator.getWhenClauseSize(); i++) {
             if (!compatibleType.matchesType(operator.getWhenClause(i).getType())) {
                 operator.setWhenClause(i, new CastOperator(compatibleType, operator.getWhenClause(i)));
             }
-            // CASE WHEN xx IN (6, 7) THEN yy ELSE 0 END
-            // variable column xx's type is varchar
-            // constant column type is int
-            // we should cast constant type to variable type
-            // else in VectorizedInPredicate, we will meet the exception [VectorizedInPredicate type not same]
-            if (enablePrestoTranslation) {
-                ScalarOperator whenOperator = operator.getWhenClause(i);
-                if (whenOperator.getChildren() == null || whenOperator.getChildren().isEmpty()) {
-                    continue;
-                }
-                ScalarOperator firstOperator = whenOperator.getChild(0);
-                Type firstType = firstOperator.getType();
-                for (int index = 1; index < whenOperator.getChildren().size(); index++) {
-                    ScalarOperator currentOperator = whenOperator.getChild(index);
-                    Type currentType = currentOperator.getType();
-                    if (!firstType.matchesType(currentType)) {
-                        ScalarOperator newChildOperator = new CastOperator(firstType, currentOperator);
-                        whenOperator.setChild(index, newChildOperator);
-                    }
-                }
-                operator.setWhenClause(i, whenOperator);
-            }
         }
 
+        return castToDoubleInCompareCaseWhen(operator, context);
+    }
+
+    /**
+     * CASE WHEN xx IN (6, 7) THEN yy ELSE 0 END
+     * variable column xx's type is varchar
+     * constant column type is int
+     * we should cast constant type and variable type to double type
+     * else in VectorizedInPredicate, we will meet the exception [VectorizedInPredicate type not same]
+     * @param operator
+     * @param context
+     * @return
+     */
+    private CaseWhenOperator castToDoubleInCompareCaseWhen(CaseWhenOperator operator, ScalarOperatorRewriteContext context) {
+        boolean enablePrestoTranslation = false;
+        if (context != null && context.getSession() != null) {
+            enablePrestoTranslation = context.getSession().getSessionVariable().isEnablePrestoTranslation();
+        }
+        if (!enablePrestoTranslation) {
+            return operator;
+        }
+        if (operator.getWhenClauseSize() == 0) {
+            return operator;
+        }
+        for (int i = 0; i < operator.getWhenClauseSize(); i++) {
+            ScalarOperator whenOperator = operator.getWhenClause(i);
+            if (whenOperator.getChildren() == null || whenOperator.getChildren().isEmpty()) {
+                continue;
+            }
+            ScalarOperator firstOperator = whenOperator.getChild(0);
+            Type firstType = firstOperator.getType();
+            boolean needCastToDouble = false;
+            for (int index = 1; index < whenOperator.getChildren().size(); index++) {
+                ScalarOperator currentOperator = whenOperator.getChild(index);
+                Type currentType = currentOperator.getType();
+                if (firstType.matchesType(currentType)) {
+                    continue;
+                }
+                needCastToDouble = true;
+                ScalarOperator newChildOperator = new CastOperator(Type.DOUBLE, currentOperator);
+                whenOperator.setChild(index, newChildOperator);
+            }
+            if (needCastToDouble) {
+                ScalarOperator newFirstOperator = new CastOperator(Type.DOUBLE, firstOperator);
+                whenOperator.setChild(0, newFirstOperator);
+            }
+            operator.setWhenClause(i, whenOperator);
+        }
         return operator;
     }
 
