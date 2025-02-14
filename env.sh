@@ -50,7 +50,7 @@ fi
 
 
 # set GCC HOME
-if [[ -z ${STARROCKS_GCC_HOME} ]]; then
+if [[ -z ${STARROCKS_GCC_HOME} && -z ${STARROCKS_LLVM_HOME} ]]; then
     export STARROCKS_GCC_HOME=$(dirname `which gcc`)/..
 fi
 
