@@ -263,6 +263,33 @@ public:
     static Status datetime_trunc_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status datetime_trunc_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
 
+
+
+    /*
+     * Called by datetime trunc in presto logic
+     * Truncate to the corresponding part
+     */
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_second);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_minute);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_hour);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_day);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_month);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_year);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_week);
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc_quarter);
+    /**
+     * Get truncated time
+     * @param columns @paramType columns: [TimestampColumn, BinaryColumn].
+     * @return  TimestampColumn
+     */
+    // datetime trunc for sql in presto logic.
+    DEFINE_VECTORIZED_FN(presto_datetime_trunc);
+
+    static Status presto_datetime_trunc_prepare(FunctionContext* context,
+                                         FunctionContext::FunctionStateScope scope);
+    static Status presto_datetime_trunc_close(FunctionContext* context,
+                                       FunctionContext::FunctionStateScope scope);
+
     /*
      * Called by time_slice
      * Floor to the corresponding period
@@ -335,6 +362,28 @@ public:
 
     static Status date_trunc_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
     static Status date_trunc_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
+
+    /*
+     * Called by date trunc in presto logic
+     * Truncate to the corresponding part
+     */
+    DEFINE_VECTORIZED_FN(presto_date_trunc_day);
+    DEFINE_VECTORIZED_FN(presto_date_trunc_month);
+    DEFINE_VECTORIZED_FN(presto_date_trunc_year);
+    DEFINE_VECTORIZED_FN(presto_date_trunc_week);
+    DEFINE_VECTORIZED_FN(presto_date_trunc_quarter);
+    /**
+     * Get truncated time in presto logic
+     * @param columns @paramType columns: [DateColumn, BinaryColumn].
+     * @return  DateColumn
+     */
+    // date trunc for sql in presto logic.
+    DEFINE_VECTORIZED_FN(presto_date_trunc);
+
+    static Status presto_date_trunc_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+    static Status presto_date_trunc_close(FunctionContext* context, FunctionContext::FunctionStateScope scope);
+
 
     DEFINE_VECTORIZED_FN(month_name);
     DEFINE_VECTORIZED_FN(day_name);

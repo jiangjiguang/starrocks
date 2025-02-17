@@ -16,6 +16,8 @@ package com.starrocks.sql.analyzer;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.starrocks.analysis.CastExpr;
+import com.starrocks.analysis.DateLiteral;
 import com.starrocks.analysis.DecimalLiteral;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionCallExpr;
@@ -28,11 +30,16 @@ import com.starrocks.analysis.StringLiteral;
 import com.starrocks.analysis.UserVariableExpr;
 import com.starrocks.catalog.AggregateFunction;
 import com.starrocks.catalog.ArrayType;
+import com.starrocks.catalog.Function;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.Type;
+import com.starrocks.common.AnalysisException;
 import com.starrocks.common.FeConstants;
+import com.starrocks.common.util.DateUtils;
 import com.starrocks.qe.ConnectContext;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Optional;
 
 public class FunctionAnalyzer {
@@ -118,7 +125,103 @@ public class FunctionAnalyzer {
                         functionCallExpr.getPos());
             }
         }
+
+        // deal with trunc function
+        analyzeTruncFunction(functionCallExpr);
     }
+
+    private static void analyzeTruncFunction(FunctionCallExpr functionCallExpr) {
+        FunctionName fnName = functionCallExpr.getFnName();
+        if (!fnName.getFunction().equals(FunctionSet.TRUNC)) {
+            return;
+        }
+        if (functionCallExpr.getChildren().size() != 2) {
+            throw new SemanticException("trunc requires 2 parameters");
+        }
+
+        if (!(functionCallExpr.getFn().getArgs()[1].isStringType())) {
+            throw new SemanticException("trunc requires second parameter must be a string constant");
+        }
+
+        if (!functionCallExpr.getChild(1).isConstant() || !(functionCallExpr.getChild(1) instanceof StringLiteral)) {
+            throw new SemanticException("trunc requires second parameter for format must be a string constant");
+        }
+
+        String formatParam = ((StringLiteral) functionCallExpr.getChild(1)).getValue().trim();
+        if (formatParam.equals("MONTH") || formatParam.equals("MON") || formatParam.equals("MM")) {
+            formatParam = "month";
+        }
+        if (formatParam.equals("YEAR") || formatParam.equals("YYYY")
+                || formatParam.equals("YY") || formatParam.equals("yyyy")) {
+            formatParam = "year";
+        }
+        formatParam = formatParam.toLowerCase();
+        functionCallExpr.setChild(1, new StringLiteral(formatParam));
+
+        // just check constant column
+        if (functionCallExpr.getChild(0).isConstant()) {
+            if (!(functionCallExpr.getChild(0) instanceof StringLiteral)) {
+                if (functionCallExpr.getChild(0).getType().isDate()) {
+                    if (Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+                        throw new SemanticException("If the second parameter of trunc is " + formatParam + ", " +
+                                "the first parameter must be of type datetime");
+                    }
+                }
+                return;
+            }
+            Type[] argTypes = functionCallExpr.getFn().getArgs();
+            String dtParams = ((StringLiteral) functionCallExpr.getChild(0)).getValue();
+            try {
+                LocalDateTime lt = DateUtils.parseStringWithDefaultHSM(dtParams, DateUtils.probeFormat(dtParams));
+                LocalTime time = lt.toLocalTime();
+                if (time.equals(LocalTime.MIDNIGHT) ||
+                        !Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+                    if (!Lists.newArrayList("year", "quarter", "month", "week", "day")
+                            .contains(formatParam)) {
+                        throw new SemanticException("trunc function can't support argument other than " +
+                                "year|quarter|month|week|day");
+                    }
+                    functionCallExpr.setChild(0, new DateLiteral(lt, Type.DATE));
+                    functionCallExpr.getFn().setRetType(Type.DATE);
+                    argTypes[0] = Type.DATE;
+                    functionCallExpr.setType(Type.DATE);
+                } else {
+                    if (!Lists.newArrayList("year", "yyyy", "yy", "quarter", "month", "mon",
+                                    "mm", "week", "day", "hour", "minute", "second")
+                            .contains(formatParam)) {
+                        throw new SemanticException("trunc function can't support argument other than " +
+                                "year|quarter|month|week|day|hour|minute|second");
+                    }
+                    functionCallExpr.setChild(0, new DateLiteral(lt, Type.DATETIME));
+                    functionCallExpr.getFn().setRetType(Type.DATETIME);
+                    argTypes[0] = Type.DATETIME;
+                    functionCallExpr.setType(Type.DATETIME);
+                }
+                functionCallExpr.getFn().setArgsType(argTypes);
+            } catch (AnalysisException analysisException) {
+                throw new SemanticException("trunc requires first parameter must be a date " +
+                        "or datetime type, " + analysisException.getMessage());
+            }
+        } else {
+            if (Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+                return;
+            }
+            if (functionCallExpr.getFn().getReturnType().isDate()) {
+                return;
+            }
+            Expr first = functionCallExpr.getParams().exprs().get(0);
+            CastExpr castExpr = new CastExpr(Type.DATE, first);
+            functionCallExpr.setChild(0, castExpr);
+            Function function = functionCallExpr.getFn();
+            function.setRetType(Type.DATE);
+            Type[] argTypes = functionCallExpr.getFn().getArgs();
+            argTypes[0] = Type.DATE;
+            function.setArgsType(argTypes);
+            functionCallExpr.setFn(function);
+            functionCallExpr.setType(Type.DATE);
+        }
+    }
+
 
     private static void analyzeBuiltinAggFunction(FunctionCallExpr functionCallExpr) {
         FunctionName fnName = functionCallExpr.getFnName();

@@ -490,6 +490,11 @@ public:
                _query_options.enable_collect_table_level_scan_stats;
     }
 
+    bool enable_presto_translation() const {
+            return _query_options.__isset.enable_presto_translation &&
+                   _query_options.enable_presto_translation;
+        }
+
     bool enable_wait_dependent_event() const {
         return _query_options.__isset.enable_wait_dependent_event && _query_options.enable_wait_dependent_event;
     }

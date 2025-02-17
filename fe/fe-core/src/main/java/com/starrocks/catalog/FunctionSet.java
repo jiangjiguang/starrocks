@@ -74,6 +74,7 @@ public class FunctionSet {
     public static final String DATE_FORMAT = "date_format";
     public static final String DATE_SUB = "date_sub";
     public static final String DATE_TRUNC = "date_trunc";
+    public static final String TRUNC = "trunc";
     public static final String DAY = "day";
     public static final String DAYNAME = "dayname";
     public static final String DAYOFMONTH = "dayofmonth";

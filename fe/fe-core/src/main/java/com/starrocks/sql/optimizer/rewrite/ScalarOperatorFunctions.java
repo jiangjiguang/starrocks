@@ -286,43 +286,72 @@ public class ScalarOperatorFunctions {
                 date.getDatetime().plus(quarter.getInt(), IsoFields.QUARTER_YEARS));
     }
 
-    @ConstantFunction(name = "trunc", argTypes = {VARCHAR, DATETIME}, returnType = DATETIME, isMonotonic = true)
-    public static ConstantOperator trunc(ConstantOperator fmt, ConstantOperator date) {
-        switch (fmt.getVarchar()) {
-            case "second":
-                return ConstantOperator.createDatetime(date.getDatetime().truncatedTo(ChronoUnit.SECONDS));
-            case "minute":
-                return ConstantOperator.createDatetime(date.getDatetime().truncatedTo(ChronoUnit.MINUTES));
-            case "hour":
-                return ConstantOperator.createDatetime(date.getDatetime().truncatedTo(ChronoUnit.HOURS));
-            case "day":
-                return ConstantOperator.createDatetime(date.getDatetime().truncatedTo(ChronoUnit.DAYS));
-            case "month":
-            case "MONTH":
-            case "MON":
-            case "MM":
-                return ConstantOperator.createDatetime(
-                        date.getDatetime().with(TemporalAdjusters.firstDayOfMonth()).truncatedTo(ChronoUnit.DAYS));
-            case "year":
-            case "YEAR":
-            case "YYYY":
-            case "YY":
-            case "yyyy":
-                return ConstantOperator.createDatetime(
-                        date.getDatetime().with(TemporalAdjusters.firstDayOfYear()).truncatedTo(ChronoUnit.DAYS));
-            case "week":
-                return ConstantOperator.createDatetime(
-                        date.getDatetime().with(DayOfWeek.MONDAY).truncatedTo(ChronoUnit.DAYS));
-            case "quarter":
-                int year = date.getDatetime().getYear();
-                int month = date.getDatetime().getMonthValue();
-                int quarterMonth = (month - 1) / 3 * 3 + 1;
-                LocalDateTime quarterDate = LocalDateTime.of(year, quarterMonth, 1, 0, 0);
-                return ConstantOperator.createDatetime(quarterDate);
-            default:
-                throw new IllegalArgumentException(fmt + " not supported in trunc format string");
+    @ConstantFunction.List(list = {
+            @ConstantFunction(name = "trunc", argTypes = {DATETIME, VARCHAR}, returnType = DATETIME),
+            @ConstantFunction(name = "trunc", argTypes = {DATE, VARCHAR}, returnType = DATE),
+    })
+    public static ConstantOperator trunc(ConstantOperator date, ConstantOperator fmt) {
+        boolean enablePrestoTranslation = false;
+        ConnectContext context = ConnectContext.get();
+        if (context != null && context.getSessionVariable() != null) {
+            enablePrestoTranslation = context.getSessionVariable().isEnablePrestoTranslation();
+        }
+        if (!enablePrestoTranslation) {
+            throw new IllegalArgumentException("trunc function not supported");
+        }
+        if (date.getType().isDate()) {
+            switch (fmt.getVarchar()) {
+                case "day":
+                    return ConstantOperator.createDateOrNull(date.getDate().truncatedTo(ChronoUnit.DAYS));
+                case "month":
+                    return ConstantOperator.createDateOrNull(
+                            date.getDate().with(TemporalAdjusters.firstDayOfMonth()).truncatedTo(ChronoUnit.DAYS));
+                case "year":
+                    return ConstantOperator.createDateOrNull(
+                            date.getDate().with(TemporalAdjusters.firstDayOfYear()).truncatedTo(ChronoUnit.DAYS));
+                case "week":
+                    return ConstantOperator.createDateOrNull(
+                            date.getDate().with(DayOfWeek.MONDAY).truncatedTo(ChronoUnit.DAYS));
+                case "quarter":
+                    int year = date.getDate().getYear();
+                    int month = date.getDate().getMonthValue();
+                    int quarterMonth = (month - 1) / 3 * 3 + 1;
+                    LocalDateTime quarterDate = LocalDateTime.of(year, quarterMonth, 1, 0, 0);
+                    return ConstantOperator.createDateOrNull(quarterDate);
+                default:
+                    throw new IllegalArgumentException(fmt + " not supported in trunc format string");
+            }
+        } else {
+            switch (fmt.getVarchar()) {
+                case "second":
+                    return ConstantOperator.createDatetimeOrNull(date.getDatetime().truncatedTo(ChronoUnit.SECONDS));
+                case "minute":
+                    return ConstantOperator.createDatetimeOrNull(date.getDatetime().truncatedTo(ChronoUnit.MINUTES));
+                case "hour":
+                    return ConstantOperator.createDatetimeOrNull(date.getDatetime().truncatedTo(ChronoUnit.HOURS));
+                case "day":
+                    return ConstantOperator.createDatetimeOrNull(date.getDatetime().truncatedTo(ChronoUnit.DAYS));
+                case "month":
+                    return ConstantOperator.createDatetimeOrNull(
+                            date.getDatetime().with(TemporalAdjusters.firstDayOfMonth()).truncatedTo(ChronoUnit.DAYS));
+                case "year":
+                    return ConstantOperator.createDatetimeOrNull(
+                            date.getDatetime().with(TemporalAdjusters.firstDayOfYear()).truncatedTo(ChronoUnit.DAYS));
+                case "week":
+                    return ConstantOperator.createDatetimeOrNull(
+                            date.getDatetime().with(DayOfWeek.MONDAY).truncatedTo(ChronoUnit.DAYS));
+                case "quarter":
+                    int year = date.getDatetime().getYear();
+                    int month = date.getDatetime().getMonthValue();
+                    int quarterMonth = (month - 1) / 3 * 3 + 1;
+                    LocalDateTime quarterDate = LocalDateTime.of(year, quarterMonth, 1, 0, 0);
+                    return ConstantOperator.createDatetimeOrNull(quarterDate);
+                default:
+                    throw new IllegalArgumentException(fmt + " not supported in trunc format string");
+            }
         }
     }
+
 
     @ConstantFunction.List(list = {
             @ConstantFunction(name = "months_add", argTypes = {DATETIME,

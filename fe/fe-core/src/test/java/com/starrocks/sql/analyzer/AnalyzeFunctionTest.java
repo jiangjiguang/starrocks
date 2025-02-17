@@ -15,6 +15,7 @@
 package com.starrocks.sql.analyzer;
 
 import com.starrocks.analysis.StringLiteral;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.utframe.StarRocksAssert;
 import com.starrocks.utframe.UtFrameUtils;
@@ -90,6 +91,11 @@ public class AnalyzeFunctionTest {
 
     @Test
     public void testTrunc() {
+        // open presto translate
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        session.setThreadLocalInfo();
+
         analyzeSuccess("select trunc(\"year\", ti) from tall");
         analyzeSuccess("select trunc(\"YEAR\", ti) from tall");
         analyzeSuccess("select trunc(\"YYYY\", ti) from tall");

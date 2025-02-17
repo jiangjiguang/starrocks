@@ -22,6 +22,7 @@ import com.starrocks.analysis.AnalyticExpr;
 import com.starrocks.analysis.CastExpr;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionCallExpr;
+import com.starrocks.analysis.FunctionName;
 import com.starrocks.analysis.GroupByClause;
 import com.starrocks.analysis.GroupingFunctionCallExpr;
 import com.starrocks.analysis.IntLiteral;
@@ -29,6 +30,7 @@ import com.starrocks.analysis.LimitElement;
 import com.starrocks.analysis.OrderByElement;
 import com.starrocks.analysis.ParseNode;
 import com.starrocks.analysis.SlotRef;
+import com.starrocks.analysis.StringLiteral;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.Type;
@@ -243,6 +245,37 @@ public class SelectAnalyzer {
                 } else {
                     name = item.getAlias() == null ?
                             AstToStringBuilder.getAliasName(item.getExpr(), false, false) : item.getAlias();
+                }
+
+                if (session.getSessionVariable().isEnablePrestoTranslation()) {
+                    if (item.getExpr() instanceof FunctionCallExpr) {
+                        FunctionCallExpr node = (FunctionCallExpr) item.getExpr();
+                        String fnName = node.getFnName().getFunction();
+                        if (fnName.equals(FunctionSet.TRUNC)) {
+                            if (node.getChildren().size() == 2) {
+                                Expr dt = node.getChild(0);
+                                Expr fmt = node.getChild(1);
+                                if (fmt instanceof StringLiteral && fmt.isConstant()) {
+                                    String formatParam = ((StringLiteral) fmt).getValue().trim();
+                                    FunctionName convertFunctionName;
+                                    if (!Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+                                        // if fmt not in (hour, minute, second)
+                                        // trunc('20250101', 'month') -> trunc(to_date('20250101'), 'month')
+                                        convertFunctionName = new FunctionName(FunctionSet.TO_DATE);
+                                    } else {
+                                        // if fmt in (hour, minute, second)
+                                        // trunc('20250101', 'month') -> trunc(timestamp('20250101'), 'month')
+                                        convertFunctionName = new FunctionName(FunctionSet.TIMESTAMP);
+                                    }
+                                    List<Expr> toDateFunctionParams = ImmutableList.of(dt);
+                                    FunctionCallExpr toDateFunctionExpr = new FunctionCallExpr(convertFunctionName,
+                                            toDateFunctionParams);
+                                    node.setChild(0, toDateFunctionExpr);
+                                    item.setExpr(node);
+                                }
+                            }
+                        }
+                    }
                 }
 
                 analyzeExpression(item.getExpr(), analyzeState, scope);

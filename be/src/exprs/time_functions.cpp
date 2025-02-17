@@ -2662,6 +2662,248 @@ StatusOr<ColumnPtr> TimeFunctions::datetime_trunc(FunctionContext* context, cons
     return ctc->function(context, columns);
 }
 
+
+// ===== begin trunc for date in presto logic ===== //
+Status TimeFunctions::presto_date_trunc_prepare(FunctionContext* context,
+                                         FunctionContext::FunctionStateScope scope) {
+    // Check if Presto translation is enabled
+    bool enablePrestoTranslation = context->state()->enable_presto_translation();
+    if (!enablePrestoTranslation) {
+        return Status::InternalError("date trunc just support by [enable_presto_translation = true] in session");
+    }
+
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+
+    if (!context->is_constant_column(1)) {
+        return Status::InternalError("trunc for date just support const format value");
+    }
+
+    ColumnPtr column = context->get_constant_column(1);
+
+    if (column->only_null()) {
+        return Status::InternalError("format value can't be null in function of trunc for date");
+    }
+
+    Slice slice = ColumnHelper::get_const_value<TYPE_VARCHAR>(column);
+    auto format_value = slice.to_string();
+
+    ScalarFunction function;
+    if (format_value == "day") {
+        function = &TimeFunctions::presto_date_trunc_day;
+    } else if (format_value == "month") {
+        function = &TimeFunctions::presto_date_trunc_month;
+    } else if (format_value == "year") {
+        function = &TimeFunctions::presto_date_trunc_year;
+    } else if (format_value == "week") {
+        function = &TimeFunctions::presto_date_trunc_week;
+    } else if (format_value == "quarter") {
+        function = &TimeFunctions::presto_date_trunc_quarter;
+    } else {
+        return Status::InternalError("format value of presto trunc for date must in {day, month, "
+                "year, week, quarter}, but you pass " + format_value);
+    }
+
+    auto fc = new DateTruncCtx();
+    fc->function = function;
+    context->set_function_state(scope, fc);
+    return Status::OK();
+}
+
+StatusOr<ColumnPtr> TimeFunctions::presto_date_trunc_day(FunctionContext* context, const Columns& columns) {
+    return columns[0];
+}
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_date_trunc_monthImpl, v) {
+    DateValue result = v;
+    result.trunc_to_month();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_date_trunc_month, TYPE_DATE, TYPE_DATE, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_date_trunc_yearImpl, v) {
+    DateValue result = v;
+    result.trunc_to_year();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_date_trunc_year, TYPE_DATE, TYPE_DATE, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_date_trunc_weekImpl, v) {
+    DateValue result = v;
+    result.trunc_to_week();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_date_trunc_week, TYPE_DATE, TYPE_DATE, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_date_trunc_quarterImpl, v) {
+    DateValue result = v;
+    result.trunc_to_quarter();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_date_trunc_quarter, TYPE_DATE, TYPE_DATE, 0);
+
+StatusOr<ColumnPtr> TimeFunctions::presto_date_trunc(FunctionContext* context, const Columns& columns) {
+    // Check if Presto translation is enabled
+    bool enablePrestoTranslation = context->state()->enable_presto_translation();
+    if (!enablePrestoTranslation) {
+        return Status::InternalError("date trunc just support by [enable_presto_translation = true] in session");
+    }
+    auto ctc = reinterpret_cast<DateTruncCtx*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return ctc->function(context, columns);
+}
+
+Status TimeFunctions::presto_date_trunc_close(FunctionContext* context,FunctionContext::FunctionStateScope scope) {
+    // Check if Presto translation is enabled
+    bool enablePrestoTranslation = context->state()->enable_presto_translation();
+    if (!enablePrestoTranslation) {
+        return Status::InternalError("date trunc just support by [enable_presto_translation = true] in session");
+    }
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        auto fc = reinterpret_cast<DateTruncCtx*>(context->get_function_state(scope));
+        delete fc;
+    }
+
+    return Status::OK();
+}
+// ===== end trunc for date in presto logic ===== //
+
+
+
+
+// ===== begin trunc for datetime in presto logic ===== //
+Status TimeFunctions::presto_datetime_trunc_prepare(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
+    // Check if Presto translation is enabled
+    bool enablePrestoTranslation = context->state()->enable_presto_translation();
+    if (!enablePrestoTranslation) {
+        return Status::InternalError("datetime trunc just support by [enable_presto_translation = true] in session");
+    }
+
+    if (scope != FunctionContext::FRAGMENT_LOCAL) {
+        return Status::OK();
+    }
+
+    if (!context->is_notnull_constant_column(1)) {
+        return Status::InternalError("datetime trunc just support const format value");
+    }
+
+    ColumnPtr column = context->get_constant_column(1);
+    Slice slice = ColumnHelper::get_const_value<TYPE_VARCHAR>(column);
+    auto format_value = slice.to_string();
+
+    ScalarFunction function;
+    if (format_value == "second") {
+        function = &TimeFunctions::presto_datetime_trunc_second;
+    } else if (format_value == "minute") {
+        function = &TimeFunctions::presto_datetime_trunc_minute;
+    } else if (format_value == "hour") {
+        function = &TimeFunctions::presto_datetime_trunc_hour;
+    } else if (format_value == "day") {
+        function = &TimeFunctions::presto_datetime_trunc_day;
+    } else if (format_value == "month") {
+        function = &TimeFunctions::presto_datetime_trunc_month;
+    } else if (format_value == "year") {
+        function = &TimeFunctions::presto_datetime_trunc_year;
+    } else if (format_value == "week") {
+        function = &TimeFunctions::presto_datetime_trunc_week;
+    } else if (format_value == "quarter") {
+        function = &TimeFunctions::presto_datetime_trunc_quarter;
+    } else {
+        return Status::InternalError("format value of presto trunc datetime must in {second, minute, hour, "
+                "day, month, year, week, quarter}, but you pass " + format_value);
+    }
+
+    auto fc = new DateTruncCtx();
+    fc->function = function;
+    context->set_function_state(scope, fc);
+    return Status::OK();
+}
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_secondImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_second();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_second, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_minuteImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_minute();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_minute, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_hourImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_hour();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_hour, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_dayImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_day();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_day, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_monthImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_month();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_month, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_yearImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_year();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_year, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_weekImpl, v) {
+    int day_of_week = ((DateValue)v).weekday() + 1;
+    TimestampValue result = v;
+    result.trunc_to_week(-day_to_first[day_of_week]);
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_week, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+DEFINE_UNARY_FN_WITH_IMPL(presto_datetime_trunc_quarterImpl, v) {
+    TimestampValue result = v;
+    result.trunc_to_quarter();
+    return result;
+}
+DEFINE_TIME_UNARY_FN_EXTEND(presto_datetime_trunc_quarter, TYPE_DATETIME, TYPE_DATETIME, 0);
+
+StatusOr<ColumnPtr> TimeFunctions::presto_datetime_trunc(FunctionContext* context, const Columns& columns) {
+    // Check if Presto translation is enabled
+    bool enablePrestoTranslation = context->state()->enable_presto_translation();
+    if (!enablePrestoTranslation) {
+        return Status::InternalError("datetime trunc just support by [enable_presto_translation = true] in session");
+    }
+    auto ctc = reinterpret_cast<DateTruncCtx*>(context->get_function_state(FunctionContext::FRAGMENT_LOCAL));
+    return ctc->function(context, columns);
+}
+
+Status TimeFunctions::presto_datetime_trunc_close(FunctionContext* context,
+                                           FunctionContext::FunctionStateScope scope) {
+    // Check if Presto translation is enabled
+    bool enablePrestoTranslation = context->state()->enable_presto_translation();
+    if (!enablePrestoTranslation) {
+        return Status::InternalError("datetime trunc just support by [enable_presto_translation = true] in session");
+    }
+    if (scope == FunctionContext::FRAGMENT_LOCAL) {
+        auto fc = reinterpret_cast<DateTruncCtx*>(context->get_function_state(scope));
+        delete fc;
+    }
+
+    return Status::OK();
+}
+// ===== end trunc for datetime in presto logic ===== //
+
+
+
 Status TimeFunctions::datetime_trunc_close(FunctionContext* context, FunctionContext::FunctionStateScope scope) {
     if (scope == FunctionContext::FRAGMENT_LOCAL) {
         auto fc = reinterpret_cast<DateTruncCtx*>(context->get_function_state(scope));

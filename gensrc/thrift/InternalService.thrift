@@ -320,6 +320,8 @@ struct TQueryOptions {
   140: optional string catalog;
 
   141: optional i32 datacache_evict_probability;
+
+  999: optional bool enable_presto_translation = false;
 }
 
 

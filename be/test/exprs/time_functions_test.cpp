@@ -2846,7 +2846,6 @@ TEST_F(TimeFunctionsTest, datetimeTruncTest) {
         }
     }
 
-
     //YYYY
     {
         auto text = BinaryColumn::create();
@@ -2945,6 +2944,50 @@ TEST_F(TimeFunctionsTest, datetimeTruncTest) {
             ASSERT_EQ(check_result[i], datetimes->get_data()[i]);
         }
     }
+
+
+    //trunc('yyyy-MM-dd HH:mm:ss', 'MONTH') for presto
+    {
+        // enable_presto_translation = true
+        auto runtime_state = _utils->get_fn_ctx()->impl()->state();
+        auto query_options = runtime_state->query_options();
+        query_options.__set_enable_presto_translation(true);
+        starrocks::RuntimeState state(runtime_state->fragment_instance_id(), query_options, TQueryGlobals(), nullptr);
+        starrocks::FunctionUtils futils(&state);
+        FunctionContext* ctx = futils.get_fn_ctx();
+
+        // set format column parameter
+        auto text = BinaryColumn::create();
+        text->append("month");
+        auto format_column = ConstColumn::create(text, 1);
+
+        Columns columns;
+        columns.emplace_back(tc);
+        columns.emplace_back(format_column);
+        ctx->set_constant_columns(columns);
+
+        ASSERT_TRUE(TimeFunctions::presto_datetime_trunc_prepare(ctx,
+                                                          FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        ColumnPtr result = TimeFunctions::presto_datetime_trunc(ctx, columns).value();
+
+        ASSERT_TRUE(TimeFunctions::presto_datetime_trunc_close(
+                            ctx, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        auto datetimes = ColumnHelper::cast_to<TYPE_DATETIME>(result);
+
+        TimestampValue check_result[6] = {
+                TimestampValue::create(2020, 1, 1, 0, 0, 0), TimestampValue::create(2020, 2, 1, 0, 0, 0),
+                TimestampValue::create(2020, 3, 1, 0, 0, 0), TimestampValue::create(2020, 4, 1, 0, 0, 0),
+                TimestampValue::create(2020, 5, 1, 0, 0, 0), TimestampValue::create(2020, 11, 1, 0, 0, 0)};
+
+        for (size_t i = 0; i < 6; ++i) {
+            ASSERT_EQ(check_result[i], datetimes->get_data()[i]);
+        }
+    }
+
 }
 
 TEST_F(TimeFunctionsTest, dateTruncTest) {
@@ -3011,6 +3054,47 @@ TEST_F(TimeFunctionsTest, dateTruncTest) {
             ASSERT_EQ(check_result[i], datetimes->get_data()[i]);
         }
     }
+
+    //trunc('yyyy-MM-dd', 'day') for presto
+    {
+        // enable_presto_translation = true
+        auto runtime_state = _utils->get_fn_ctx()->impl()->state();
+        auto query_options = runtime_state->query_options();
+        query_options.__set_enable_presto_translation(true);
+        starrocks::RuntimeState state(runtime_state->fragment_instance_id(), query_options, TQueryGlobals(), nullptr);
+        starrocks::FunctionUtils futils(&state);
+        FunctionContext* ctx = futils.get_fn_ctx();
+
+        auto text = BinaryColumn::create();
+        text->append("day");
+        auto format = ConstColumn::create(text, 1);
+
+        Columns columns;
+        columns.emplace_back(tc);
+        columns.emplace_back(format);
+        ctx->set_constant_columns(columns);
+
+        ASSERT_TRUE(TimeFunctions::presto_date_trunc_prepare(ctx,
+                                                      FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        ColumnPtr result = TimeFunctions::presto_date_trunc(ctx, columns).value();
+
+        ASSERT_TRUE(TimeFunctions::presto_date_trunc_close(
+                            ctx, FunctionContext::FunctionContext::FunctionStateScope::FRAGMENT_LOCAL)
+                            .ok());
+
+        auto datetimes = ColumnHelper::cast_to<TYPE_DATE>(result);
+
+        DateValue check_result[6] = {DateValue::create(2020, 1, 1), DateValue::create(2020, 2, 2),
+                                     DateValue::create(2020, 3, 6), DateValue::create(2020, 4, 8),
+                                     DateValue::create(2020, 5, 9), DateValue::create(2020, 11, 3)};
+
+        for (size_t i = 0; i < sizeof(check_result) / sizeof(check_result[0]); ++i) {
+            ASSERT_EQ(check_result[i], datetimes->get_data()[i]);
+        }
+    }
+
 }
 
 TEST_F(TimeFunctionsTest, str2date) {
