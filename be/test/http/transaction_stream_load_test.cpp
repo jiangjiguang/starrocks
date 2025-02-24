@@ -421,12 +421,19 @@ TEST_F(TransactionStreamLoadActionTest, txn_put_fail) {
         request._headers.emplace(HTTP_LABEL_KEY, "123");
         Status status = Status::InternalError("TestFail");
         status.to_thrift(&k_stream_load_put_result.status);
-        action.on_header(&request);
-        action.handle(&request);
 
-        rapidjson::Document doc;
-        doc.Parse(k_response_str.c_str());
-        ASSERT_STREQ("INTERNAL_ERROR", doc["Status"].GetString());
+        {
+            action.on_header(&request);
+            rapidjson::Document doc;
+            doc.Parse(k_response_str.c_str());
+            ASSERT_STREQ("INTERNAL_ERROR", doc["Status"].GetString());
+        }
+        {
+            action.handle(&request);
+            rapidjson::Document doc;
+            doc.Parse(k_response_str.c_str());
+            ASSERT_STREQ("TXN_NOT_EXISTS", doc["Status"].GetString());
+        }
     }
 
     {

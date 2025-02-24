@@ -153,6 +153,8 @@ void TransactionStreamLoadAction::handle(HttpRequest* req) {
         ctx = _exec_env->stream_context_mgr()->get(label);
     }
     if (ctx == nullptr) {
+        const Status err_st = Status::TransactionNotExists(fmt::format("Label not exist {}", label));
+        _send_error_reply(req, err_st);
         return;
     }
     DeferOp defer([&] {

@@ -133,7 +133,8 @@ void AsyncDeltaWriter::write(const AsyncDeltaWriterRequest& req, AsyncDeltaWrite
     if (r != 0) {
         LOG(WARNING) << "Fail to execution_queue_execute: " << r;
         FailedRowsetInfo failed_info{.tablet_id = _writer->tablet()->tablet_id(), .replicate_token = nullptr};
-        task.write_cb->run(Status::InternalError("fail to call execution_queue_execute"), nullptr, &failed_info);
+        const auto st = Status::InternalError("fail to call execution_queue_execute");
+        task.write_cb->run(st, nullptr, &failed_info);
     }
 }
 

@@ -163,12 +163,12 @@ public:
             auto& label_channel_map = it->second;
             auto it2 = label_channel_map.find(channel_id);
             if (it2 != std::end(label_channel_map)) {
+                VLOG(3) << "remove channel stream load context: " << label
+                        << ", channel_id: " << std::to_string(channel_id);
                 if (it2->second->unref()) {
                     delete it2->second;
                 }
                 label_channel_map.erase(it2);
-                VLOG(3) << "remove channel stream load context: " << label
-                        << ", channel_id: " << std::to_string(channel_id);
             }
             if (label_channel_map.size() == 0) {
                 _channel_stream_map.erase(it);
