@@ -14,6 +14,7 @@
 
 package com.starrocks.sql.analyzer;
 
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.QueryRelation;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.utframe.UtFrameUtils;
@@ -79,6 +80,17 @@ public class AnalyzeAggregateTest {
                 "No matching function with signature: min_by(bigint(20), bigint(20), bigint(20)).");
         analyzeFail("select min_by(v1,1) from t0", "min_by function args must be column");
         analyzeFail("select min_by(1,v1) from t0", "min_by function args must be column");
+    }
+
+    @Test
+    public void testApproxPercentile() {
+        analyzeFail("select approx_percentile(tj, 0.5) from tall group by tb",
+                "No matching function with signature: approx_percentile(decimal64(9, 3), decimal32(1, 1)).");
+        // open presto translate
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        session.setThreadLocalInfo();
+        analyzeSuccess("select approx_percentile(tj, 0.5) from tall group by tb");
     }
 
     @Test

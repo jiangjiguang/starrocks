@@ -251,6 +251,7 @@ public class SelectAnalyzer {
                     if (item.getExpr() instanceof FunctionCallExpr) {
                         FunctionCallExpr node = (FunctionCallExpr) item.getExpr();
                         String fnName = node.getFnName().getFunction();
+                        // special deal with trunc for compatible presto
                         if (fnName.equals(FunctionSet.TRUNC)) {
                             if (node.getChildren().size() == 2) {
                                 Expr dt = node.getChild(0);
@@ -273,6 +274,18 @@ public class SelectAnalyzer {
                                     node.setChild(0, toDateFunctionExpr);
                                     item.setExpr(node);
                                 }
+                            }
+                        }
+                        // if open the presto translation,we need to check approx_percentile function
+                        if (fnName.equalsIgnoreCase(FunctionSet.APPROX_PERCENTILE)) {
+                            fnName = FunctionSet.PERCENTILE_APPROX;
+                            FunctionName newFnName = new FunctionName(fnName);
+                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+                            if (node.getChildren().size() > 0) {
+                                for (int i = 0; i < node.getChildren().size(); i++) {
+                                    newNode.setChild(i, node.getChild(i));
+                                }
+                                item.setExpr(newNode);
                             }
                         }
                     }
