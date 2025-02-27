@@ -32,6 +32,7 @@ import com.starrocks.sql.parser.SqlParser;
 import com.starrocks.sql.plan.ExecPlan;
 import com.starrocks.sql.plan.PlanTestBase;
 import com.starrocks.thrift.TExprNodeType;
+import com.starrocks.utframe.UtFrameUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -225,5 +226,31 @@ public class ExpressionAnalyzerTest extends PlanTestBase {
         userVariableExpr.setValue(expr);
         UserVariableExpr copy = (UserVariableExpr) userVariableExpr.clone();
         Assert.assertEquals(userVariableExpr, copy);
+    }
+
+    @Test
+    public void testArraySubscriptAnalyzerForPresto() {
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+
+        ExpressionAnalyzer.Visitor visitor = new ExpressionAnalyzer.Visitor(new AnalyzeState(), session);
+        SlotRef slot = new SlotRef(null, "col", "col");
+        Type elementType = ScalarType.createCharType(10);
+        Type arrayType = new ArrayType(elementType);
+        slot.setType(arrayType);
+
+        IntLiteral sub = new IntLiteral(10);
+
+        CollectionElementExpr collectionElementExpr = new CollectionElementExpr(slot, sub, false);
+        try {
+            visitor.visitCollectionElementExpr(collectionElementExpr,
+                    new Scope(RelationId.anonymous(), new RelationFields()));
+            IntLiteral newSubscript = (IntLiteral) collectionElementExpr.getChild(1);
+            Assert.assertEquals(11, newSubscript.getValue());
+        } catch (Exception e) {
+            Assert.fail();
+        }
     }
 }

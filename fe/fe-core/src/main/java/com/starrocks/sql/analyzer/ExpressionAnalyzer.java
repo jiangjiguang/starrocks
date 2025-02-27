@@ -523,6 +523,19 @@ public class ExpressionAnalyzer {
                 if (!subscript.getType().isNumericType()) {
                     throw new SemanticException("array subscript must have type integer", subscript.getPos());
                 }
+                if (session.getSessionVariable().isEnablePrestoTranslation()) {
+                    if (subscript instanceof IntLiteral) {
+                        IntLiteral newSubscript = (IntLiteral) subscript;
+                        long idx = newSubscript.getValue();
+                        if (idx < 0) {
+                            throw new SemanticException("The array subscript must be greater than or equal to 1");
+                        }
+                        idx = idx + 1;
+                        IntLiteral fitPrestoSubscript = new IntLiteral(idx);
+                        node.setChild(1, fitPrestoSubscript);
+                        subscript = node.getChild(1);
+                    }
+                }
                 try {
                     if (subscript.getType().getPrimitiveType() != PrimitiveType.INT) {
                         node.castChild(Type.INT, 1);
@@ -1155,6 +1168,27 @@ public class ExpressionAnalyzer {
                     sf.add(new StructField(literal.getStringValue(), node.getChild(i + 1).getType()));
                 }
                 fn.setRetType(new StructType(sf));
+            } else if (fnName.equals(FunctionSet.TRUNC)) {
+                // trunc(dt, format), dt may be date or datetime
+                // we just deal dt is variable type
+                // if dt is constant type, it will be folded
+                if (!node.getChild(0).isConstant()) {
+                    Expr second = node.getChild(1);
+                    if (!second.isConstant()) {
+                        throw new SemanticException("The second input of " + fnName +
+                                " should be constant parameter.");
+                    }
+                    // we must check format is not hour and minute and second
+                    // because the 3 types mean the dt should be datetime
+                    String formatParam = ((StringLiteral) second).getValue().trim();
+                    if (!Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+                        Expr first = node.getChild(0);
+                        CastExpr castExpr = new CastExpr(Type.DATE, first);
+                        node.setChild(0, castExpr);
+                    }
+                }
+                argumentTypes = node.getChildren().stream().map(Expr::getType).toArray(Type[]::new);
+                fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
             } else if (DecimalV3FunctionAnalyzer.argumentTypeContainDecimalV3(fnName, argumentTypes)) {
                 // Since the priority of decimal version is higher than double version (according functionId),
                 // and in `Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF` mode, `Expr.getBuiltinFunction` always
