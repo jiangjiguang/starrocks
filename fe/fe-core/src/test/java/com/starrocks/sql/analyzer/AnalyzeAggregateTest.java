@@ -90,7 +90,7 @@ public class AnalyzeAggregateTest {
         ConnectContext session = AnalyzeTestUtil.getConnectContext();
         session.getSessionVariable().setEnablePrestoTranslation(true);
         session.setThreadLocalInfo();
-        analyzeSuccess("select approx_percentile(tj, 0.5) from tall group by tb");
+        analyzeSuccess("select approx_percentile(tj, 0.5) / 1000 from tall group by tb");
     }
 
     @Test

@@ -1040,6 +1040,13 @@ public class ExpressionAnalyzer {
 
             Function fn = null;
             String fnName = node.getFnName().getFunction();
+            if (session.getSessionVariable().isEnablePrestoTranslation()) {
+                if (FunctionSet.APPROX_PERCENTILE.equals(fnName)) {
+                    fnName = FunctionSet.PERCENTILE_APPROX;
+                    FunctionName newFnName = new FunctionName(fnName);
+                    node.setFnName(newFnName);
+                }
+            }
 
             // throw exception direct
             checkFunction(fnName, node, argumentTypes);
