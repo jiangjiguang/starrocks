@@ -381,24 +381,50 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
             if (whenOperator.getChildren() == null || whenOperator.getChildren().isEmpty()) {
                 continue;
             }
-            ScalarOperator firstOperator = whenOperator.getChild(0);
-            Type firstType = firstOperator.getType();
-            boolean needCastToDouble = false;
-            for (int index = 1; index < whenOperator.getChildren().size(); index++) {
-                ScalarOperator currentOperator = whenOperator.getChild(index);
-                Type currentType = currentOperator.getType();
-                if (firstType.matchesType(currentType)) {
-                    continue;
+
+            // CASE WHEN to_date(xx) BETWEEN '2025-02-24' AND '2025-03-02' THEN 1 ELSE 0 END
+            // CASE WHEN xx > date_sub(current_date(), 7) THEN 1 ELSE 0 END
+            boolean isDateColumn = whenOperator.getChildren().stream().anyMatch(item -> item.getType().isDate());
+            if (isDateColumn) {
+                for (int index = 0; index < whenOperator.getChildren().size(); index++) {
+                    ScalarOperator currentOperator = whenOperator.getChild(index);
+                    if (!currentOperator.getType().isDate()) {
+                        ScalarOperator newChildOperator = new CastOperator(Type.DATE, currentOperator);
+                        whenOperator.setChild(index, newChildOperator);
+                    }
                 }
-                needCastToDouble = true;
-                ScalarOperator newChildOperator = new CastOperator(Type.DOUBLE, currentOperator);
-                whenOperator.setChild(index, newChildOperator);
+                operator.setWhenClause(i, whenOperator);
+                continue;
             }
+
+            // CASE WHEN xx > now() THEN 1 ELSE 0 END
+            boolean isDateTimeColumn = whenOperator.getChildren().stream().anyMatch(item -> item.getType().isDatetime());
+            if (isDateTimeColumn) {
+                for (int index = 0; index < whenOperator.getChildren().size(); index++) {
+                    ScalarOperator currentOperator = whenOperator.getChild(index);
+                    if (!currentOperator.getType().isDatetime()) {
+                        ScalarOperator newChildOperator = new CastOperator(Type.DATETIME, currentOperator);
+                        whenOperator.setChild(index, newChildOperator);
+                    }
+                }
+                operator.setWhenClause(i, whenOperator);
+                continue;
+            }
+
+            // CASE WHEN xx in (1, 2) THEN 1 ELSE 0 END
+            ScalarOperator firstOperator = whenOperator.getChild(0);
+            boolean needCastToDouble = whenOperator.getChildren().stream().skip(1)
+                    .anyMatch(child -> !firstOperator.getType().matchesType(child.getType()));
             if (needCastToDouble) {
-                ScalarOperator newFirstOperator = new CastOperator(Type.DOUBLE, firstOperator);
-                whenOperator.setChild(0, newFirstOperator);
+                for (int index = 0; index < whenOperator.getChildren().size(); index++) {
+                    ScalarOperator currentOperator = whenOperator.getChild(index);
+                    if (!currentOperator.getType().isDouble()) {
+                        ScalarOperator newChildOperator = new CastOperator(Type.DOUBLE, currentOperator);
+                        whenOperator.setChild(index, newChildOperator);
+                    }
+                }
+                operator.setWhenClause(i, whenOperator);
             }
-            operator.setWhenClause(i, whenOperator);
         }
         return operator;
     }
@@ -419,13 +445,15 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
         if (predicate.getChild(0).isVariable() && predicate.getChildren().stream().skip(1)
                 .allMatch(ScalarOperator::isConstantRef)) {
             if (enablePrestoTranslation) {
-                // xx between 1 and 1000
-                // xx is varchar and constant column is integer or double
-                // will not cast constant column to variable column
-                // and then in binary predicate, will cast xx to double
+                // CASE WHEN xx = 'a' OR yy IN (1, 2) THEN 'abc' END
+                // yy IN (1, 2) will go into visitInPredicate
+                // variable of yy is varchar, so we need cast all columns to double type for compare
                 if (firstType.isVarchar()) {
                     if (types.stream().skip(1).anyMatch(
                             t -> t.isIntegerType() || t.isDouble() || t.isDecimalOfAnyVersion())) {
+                        for (int i = 0; i < predicate.getChildren().size(); i++) {
+                            addCastChild(Type.DOUBLE, predicate, i);
+                        }
                         return predicate;
                     }
                 }

@@ -19,6 +19,7 @@ import com.google.common.collect.Lists;
 import com.starrocks.analysis.BinaryType;
 import com.starrocks.analysis.FunctionName;
 import com.starrocks.catalog.Function;
+import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.Type;
 import com.starrocks.qe.ConnectContext;
@@ -40,6 +41,7 @@ import org.junit.Test;
 
 import java.time.LocalDateTime;
 import java.time.Month;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -262,7 +264,7 @@ public class ImplicitCastRuleTest {
                 variableColumnBetween, constant1ColumnBetween, constant2ColumnBetween);
 
         result = rule.apply(opBetween, context);
-        assertEquals(PrimitiveType.VARCHAR, result.getChild(0).getType().getPrimitiveType());
+        assertEquals(PrimitiveType.DOUBLE, result.getChild(0).getType().getPrimitiveType());
         // ==== test case for xx between 1 and 1000 === end
 
 
@@ -322,6 +324,36 @@ public class ImplicitCastRuleTest {
         assertEquals(PrimitiveType.DOUBLE, result.getChild(0).getChild(0).getType().getPrimitiveType());
         // ==== test case for CASE WHEN xx > 20 THEN yy END === end
 
+        // ==== test case for CASE WHEN (to_date(xx) BETWEEN '2025-02-24' AND '2025-03-02') THEN 'a' END === begin
+        ColumnRefOperator dateX = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        List<ScalarOperator> argumentList = new ArrayList<>();
+        argumentList.add(dateX);
+        CallOperator toDateOperator = new CallOperator(FunctionSet.TO_DATE, Type.DATE, argumentList);
+        ConstantOperator constBegin =  new ConstantOperator("2025-02-24", Type.VARCHAR);
+        ConstantOperator constEnd =  new ConstantOperator("2025-03-02", Type.VARCHAR);
+        BetweenPredicateOperator opDateBetween = new BetweenPredicateOperator(false,
+                toDateOperator, constBegin, constEnd);
+        result = rule.apply(opDateBetween, context);
+        assertEquals(PrimitiveType.DATE, result.getChild(1).getType().getPrimitiveType());
+        assertEquals(PrimitiveType.DATE, result.getChild(2).getType().getPrimitiveType());
+        // ==== test case for CASE WHEN (to_date(xx) BETWEEN '2025-02-24' AND '2025-03-02') THEN 'a' END === end
 
+
+        // ==== test case for CASE WHEN x > date_sub(current_date(), 7) THEN 1 ELSE 0 END === begin
+        ColumnRefOperator varX = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        CallOperator currentDate = new CallOperator(FunctionSet.CURDATE, Type.DATE, new ArrayList<>());
+        List<ScalarOperator> argList = new ArrayList<>();
+        argList.add(currentDate);
+        argList.add(new ConstantOperator(7, Type.TINYINT));
+        CallOperator dateSubOperator = new CallOperator(FunctionSet.DATE_SUB, Type.DATE, argList);
+        BinaryPredicateOperator whenDateBinaryCase = new BinaryPredicateOperator(BinaryType.GT,
+                varX, dateSubOperator);
+        ConstantOperator const1Then = new ConstantOperator(1, Type.TINYINT);
+        List<ScalarOperator> whenDateClause = Lists.newArrayList(whenDateBinaryCase, const1Then);
+        ConstantOperator const0Else = new ConstantOperator(0, Type.TINYINT);
+        CaseWhenOperator caseWhenOperator1 = new CaseWhenOperator(Type.TINYINT, null, const0Else, whenDateClause);
+        result = rule.apply(caseWhenOperator1, context);
+        assertEquals(PrimitiveType.DATE, result.getChild(0).getChild(0).getType().getPrimitiveType());
+        // ==== test case for CASE WHEN x > date_sub(current_date(), 7) THEN 1 ELSE 0 END === end
     }
 }
