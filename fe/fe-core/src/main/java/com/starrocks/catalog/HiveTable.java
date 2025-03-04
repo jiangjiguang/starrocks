@@ -114,11 +114,6 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
 
     public static final String HIVE_TABLE_COLUMN_TYPES = "hive.table.column.types";
 
-    public static final String HDFS_USER_NAME = "hdfs_username";
-
-    public static final String HDFS_USER_PASSWORD = "hdfs_password";
-
-
     private String catalogName;
     @SerializedName(value = "dn")
     private String hiveDbName;
@@ -267,8 +262,6 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
         if (resource != null) {
             HiveResource hiveResource = (HiveResource) resource;
             hiveProperties.put(HIVE_METASTORE_URIS, hiveResource.getHiveMetastoreURIs());
-            hiveProperties.put("hdfs_username", hiveResource.getProperties().get("hdfs.username"));
-            hiveProperties.put("hdfs_password", hiveResource.getProperties().get("hdfs.password"));
         }
         return hiveProperties == null ? new HashMap<>() : hiveProperties;
     }
@@ -385,8 +378,6 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
         tHdfsTable.setHive_column_types(hiveProperties.get(HIVE_TABLE_COLUMN_TYPES));
         tHdfsTable.setSerde_properties(serdeProperties);
         tHdfsTable.setTime_zone(TimeUtils.getSessionTimeZone());
-        tHdfsTable.setHdfs_username(hiveProperties.get(HDFS_USER_NAME));
-        tHdfsTable.setHdfs_password(hiveProperties.get(HDFS_USER_PASSWORD));
 
         TTableDescriptor tTableDescriptor = new TTableDescriptor(id, TTableType.HDFS_TABLE, fullSchema.size(),
                 0, hiveTableName, hiveDbName);

@@ -132,9 +132,8 @@ public class HiveConnectorInternalMgr {
 
     public RemoteFileIO createRemoteFileIO() {
         // TODO(stephen): Abstract the creator class to construct RemoteFiloIO
-        String hdfsUsername = properties.getOrDefault("hdfs.username", "");
-        String hdfsPassword = properties.getOrDefault("hdfs.password", "");
-        RemoteFileIO remoteFileIO = new HiveRemoteFileIO(hdfsEnvironment.getConfiguration(), hdfsUsername, hdfsPassword);
+
+        RemoteFileIO remoteFileIO = new HiveRemoteFileIO(hdfsEnvironment.getConfiguration());
 
         RemoteFileIO baseRemoteFileIO;
         if (!enableRemoteFileCache) {

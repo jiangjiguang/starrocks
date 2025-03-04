@@ -101,14 +101,6 @@ under the License.
                     <artifactId>stream</artifactId>
                     <groupId>com.clearspring.analytics</groupId>
                 </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client-api</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-client-runtime</artifactId>
-                </exclusion>
             </exclusions>
         </dependency>
 
