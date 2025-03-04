@@ -231,6 +231,8 @@ private:
     RuntimeProfile::Counter* _jit_timer = nullptr;
 
     bool _report_when_finish{};
+
+    std::atomic<bool> _load_ctx_cancelled{false};
 };
 
 class FragmentContextManager {

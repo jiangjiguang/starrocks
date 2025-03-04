@@ -235,10 +235,11 @@ void FragmentContext::cancel(const Status& status) {
         ExecEnv::GetInstance()->profile_report_worker()->unregister_pipeline_load(_query_id, _fragment_instance_id);
     }
 
-    if (_stream_load_contexts.size() > 0) {
+    bool expected = false;
+    if (_load_ctx_cancelled.compare_exchange_strong(expected, true) && _stream_load_contexts.size() > 0) {
         for (const auto& stream_load_context : _stream_load_contexts) {
             if (stream_load_context->body_sink) {
-                Status st;
+                Status st = Status::Cancelled("cancelled");
                 stream_load_context->body_sink->cancel(st);
             }
             if (_channel_stream_load) {
@@ -316,7 +317,7 @@ void FragmentContextManager::unregister(const TUniqueId& fragment_id) {
         if (stream_load_contexts.size() > 0) {
             for (const auto& stream_load_context : stream_load_contexts) {
                 if (stream_load_context->body_sink) {
-                    Status st;
+                    Status st = Status::Cancelled("cancelled");
                     stream_load_context->body_sink->cancel(st);
                 }
                 if (it->second->_channel_stream_load) {
