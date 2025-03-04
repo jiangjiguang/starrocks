@@ -253,28 +253,8 @@ public class SelectAnalyzer {
                         String fnName = node.getFnName().getFunction();
                         // special deal with trunc for compatible presto
                         if (fnName.equals(FunctionSet.TRUNC)) {
-                            if (node.getChildren().size() == 2) {
-                                Expr dt = node.getChild(0);
-                                Expr fmt = node.getChild(1);
-                                if (fmt instanceof StringLiteral && fmt.isConstant()) {
-                                    String formatParam = ((StringLiteral) fmt).getValue().trim();
-                                    FunctionName convertFunctionName;
-                                    if (!Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
-                                        // if fmt not in (hour, minute, second)
-                                        // trunc('20250101', 'month') -> trunc(to_date('20250101'), 'month')
-                                        convertFunctionName = new FunctionName(FunctionSet.TO_DATE);
-                                    } else {
-                                        // if fmt in (hour, minute, second)
-                                        // trunc('20250101', 'month') -> trunc(timestamp('20250101'), 'month')
-                                        convertFunctionName = new FunctionName(FunctionSet.TIMESTAMP);
-                                    }
-                                    List<Expr> toDateFunctionParams = ImmutableList.of(dt);
-                                    FunctionCallExpr toDateFunctionExpr = new FunctionCallExpr(convertFunctionName,
-                                            toDateFunctionParams);
-                                    node.setChild(0, toDateFunctionExpr);
-                                    item.setExpr(node);
-                                }
-                            }
+                            rewriteTruncForPresto(node);
+                            item.setExpr(node);
                         }
                         // if open the presto translation,we need to check approx_percentile function
                         if (fnName.equalsIgnoreCase(FunctionSet.APPROX_PERCENTILE)) {
@@ -355,6 +335,44 @@ public class SelectAnalyzer {
         analyzeState.setOutputExprInOrderByScope(outputExprInOrderByScope);
         analyzeState.setOutputScope(new Scope(RelationId.anonymous(), new RelationFields(outputFields.build())));
         return outputExpressions;
+    }
+
+    public void rewriteTruncForPresto(FunctionCallExpr node) {
+        // Special processing is done only when presto dialect translation is enabled
+        if (!session.getSessionVariable().isEnablePrestoTranslation()) {
+            return;
+        }
+        String fnName = node.getFnName().getFunction();
+        // special deal with trunc for compatible presto
+        if (!fnName.equalsIgnoreCase(FunctionSet.TRUNC)) {
+            return;
+        }
+        if (node.getChildren().size() != 2) {
+            return;
+        }
+        Expr dt = node.getChild(0);
+        Expr fmt = node.getChild(1);
+        if (!(fmt instanceof StringLiteral)) {
+            return;
+        }
+        if (!fmt.isConstant()) {
+            return;
+        }
+        String formatParam = ((StringLiteral) fmt).getValue().trim().toLowerCase();
+        FunctionName convertFunctionName;
+        if (!Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+            // if fmt not in (hour, minute, second)
+            // trunc('20250101', 'month') -> trunc(to_date('20250101'), 'month')
+            convertFunctionName = new FunctionName(FunctionSet.TO_DATE);
+        } else {
+            // if fmt in (hour, minute, second)
+            // trunc('20250101', 'month') -> trunc(timestamp('20250101'), 'month')
+            convertFunctionName = new FunctionName(FunctionSet.TIMESTAMP);
+        }
+        List<Expr> toDateFunctionParams = ImmutableList.of(dt);
+        FunctionCallExpr toDateFunctionExpr = new FunctionCallExpr(convertFunctionName,
+                toDateFunctionParams);
+        node.setChild(0, toDateFunctionExpr);
     }
 
     private List<OrderByElement> analyzeOrderBy(List<OrderByElement> orderByElements, AnalyzeState analyzeState,
@@ -509,6 +527,9 @@ public class SelectAnalyzer {
             if (groupByClause.getGroupingType() == GroupByClause.GroupingType.GROUP_BY) {
                 List<Expr> groupingExprs = groupByClause.getGroupingExprs();
                 for (Expr groupingExpr : groupingExprs) {
+                    if (groupingExpr instanceof FunctionCallExpr) {
+                        rewriteTruncForPresto((FunctionCallExpr) groupingExpr);
+                    }
                     if (groupingExpr instanceof IntLiteral) {
                         long ordinal = ((IntLiteral) groupingExpr).getLongValue();
                         if (ordinal < 1 || ordinal > outputExpressions.size()) {
