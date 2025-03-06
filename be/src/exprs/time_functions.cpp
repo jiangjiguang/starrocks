@@ -1434,7 +1434,8 @@ StatusOr<ColumnPtr> TimeFunctions::_t_to_unix_from_datetime_with_format(Function
             continue;
         }
         DateTimeValue tv;
-        if (!tv.from_date_format_str(format.data, format.size, date.data, date.size)) {
+        std::string new_fmt = convert_format(format);
+        if (!tv.from_date_format_str((const char*)new_fmt.c_str(), new_fmt.size(), date.data, date.size)) {
             result.append_null();
             continue;
         }
