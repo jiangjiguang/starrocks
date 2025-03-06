@@ -48,6 +48,7 @@ public class StreamLoadParam {
     private static final String PARTIAL_UPDATE_MODE = "partial_update_mode";
     private static final String PARTITION_WRITE_START = "partition_write_start";
     private static final String PARTITION_WRITE_END = "partition_write_end";
+    private static final String ENABLE_RESOURCE_GROUP = "enable_resource_group";
 
     public TFileFormatType formatType = TFileFormatType.FORMAT_CSV_PLAIN;
     public TFileType fileType = TFileType.FILE_STREAM;
@@ -77,6 +78,7 @@ public class StreamLoadParam {
     public String partialUpdateMode = "row";
     public Integer partitionWriteStart = null;
     public Integer partitionWriteEnd = null;
+    public boolean enableResourceGroup = true;
 
     public TFileFormatType parseStreamLoadFormat(String formatKey) {
         if (formatKey.equalsIgnoreCase("csv")) {
@@ -193,6 +195,9 @@ public class StreamLoadParam {
         }
         if (headers.contains(PARTITION_WRITE_END)) {
             context.partitionWriteEnd = Integer.parseInt(headers.get(PARTITION_WRITE_END));
+        }
+        if (headers.contains(ENABLE_RESOURCE_GROUP)) {
+            context.enableResourceGroup = Boolean.parseBoolean(headers.get(ENABLE_RESOURCE_GROUP));
         }
         return context;
     }

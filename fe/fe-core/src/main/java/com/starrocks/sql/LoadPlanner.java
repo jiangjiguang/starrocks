@@ -210,7 +210,7 @@ public class LoadPlanner {
         if (context != null) {
             this.context = context;
         } else {
-            this.context = new ConnectContext();
+            this.context = streamLoadInfo.createConnectContext(dbId);
         }
         this.loadMemLimit = loadMemLimit;
         this.execMemLimit = execMemLimit;
@@ -238,6 +238,9 @@ public class LoadPlanner {
         this.timeoutS = timeoutS;
         this.etlJobType = EtlJobType.STREAM_LOAD;
         this.context.getSessionVariable().setEnablePipelineEngine(true);
+        if (Config.enable_pipeline_load) {
+            this.context.getSessionVariable().setEnablePipelineEngine(true);
+        }
     }
 
     public void setWarehouseId(long warehouseId) {
@@ -535,7 +538,7 @@ public class LoadPlanner {
                             "only support dynamic partition table.");
                 }
                 RangePartitionInfo rangePartitionInfo = (RangePartitionInfo) olapDestTable.getPartitionInfo();
-                Column partitionColumn = rangePartitionInfo.getPartitionColumns().get(0);
+                Column partitionColumn = rangePartitionInfo.getPartitionColumns(olapDestTable.getIdToColumn()).get(0);
                 if (partitionColumn.getType().isDateType()) {
                     Integer start = streamLoadInfo.getPartitionWriteStart();
                     Integer end = streamLoadInfo.getPartitionWriteEnd();

@@ -23,6 +23,7 @@ import com.starrocks.common.UserException;
 import com.starrocks.common.util.CompressionUtils;
 import com.starrocks.common.util.TimeUtils;
 import com.starrocks.load.routineload.RoutineLoadJob;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.qe.SqlModeHelper;
 import com.starrocks.server.GlobalStateMgr;
@@ -45,6 +46,7 @@ import com.starrocks.warehouse.Warehouse;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.Collections;
 import java.util.List;
 
 public class StreamLoadInfo {
@@ -90,6 +92,7 @@ public class StreamLoadInfo {
     private TCompressionType payloadCompressionType = TCompressionType.NO_COMPRESSION;
     private Integer partitionWriteStart = null;
     private Integer partitionWriteEnd = null;
+    private boolean enableResourceGroup = true;
 
     public StreamLoadInfo(TUniqueId id, long txnId, TFileType fileType, TFileFormatType formatType) {
         this.id = id;
@@ -278,6 +281,10 @@ public class StreamLoadInfo {
         return partitionWriteEnd;
     }
 
+    public boolean isEnableResourceGroup() {
+        return enableResourceGroup;
+    }
+
     public static StreamLoadInfo fromStreamLoadContext(TUniqueId id, long txnId, int timeout, StreamLoadParam context)
             throws UserException {
         StreamLoadInfo streamLoadInfo = new StreamLoadInfo(id, txnId, timeout);
@@ -364,6 +371,7 @@ public class StreamLoadInfo {
         if (context.partitionWriteEnd != null) {
             partitionWriteEnd = context.partitionWriteEnd;
         }
+        enableResourceGroup = context.enableResourceGroup;
     }
 
     public static StreamLoadInfo fromTStreamLoadPutRequest(TStreamLoadPutRequest request, Database db)
@@ -592,5 +600,14 @@ public class StreamLoadInfo {
 
     public long getExecMemLimit() {
         return execMemLimit;
+    }
+
+    public ConnectContext createConnectContext(long dbId) {
+        ConnectContext ctx = ConnectContext.get();
+        if (ctx == null) {
+            ctx = new ConnectContext();
+        }
+        ctx.setCurrentSqlDbIds(Collections.singleton(dbId));
+        return ctx;
     }
 }
