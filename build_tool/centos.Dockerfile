@@ -7,6 +7,10 @@ RUN echo "include=http://didiyum.sys.xiaojukeji.com/didiyum/repo.php" > /etc/yum
 RUN yum install -y openssh-server
 RUN ssh-keygen -A
 
+# starcache is from 3.4.1
+RUN mv /var/local/thirdparty/installed/starcache /var/local/thirdparty/installed/starcache_v33
+COPY starcache /var/local/thirdparty/installed/starcache
+
 ENV STARROCKS_THIRDPARTY /var/local/thirdparty
 ENV JAVA_HOME /usr/lib/jvm/java
 ENV STARROCKS_GCC_HOME /opt/rh/gcc-toolset-10/root/usr
