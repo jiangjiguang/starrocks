@@ -415,11 +415,13 @@ ColumnPtr substr_const_not_null(const Columns& columns, BinaryColumn* src, Subst
 
     const size_t size = src->size();
     // return a vector of NULL if off or len is trivial or invalid
-    if (off == INT_MIN || off == 0 || len <= 0) {
+    if (off == INT_MIN || len <= 0) {
         offsets.resize(size + 1, 0);
         return result;
     }
-
+    if (off == 0) {
+        off = 1;
+    }
     if (len > 0) {
         // the size of substr result never exceeds the counterpart of the source column.
         size_t reserved = src->get_bytes().size();
