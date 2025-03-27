@@ -2233,7 +2233,9 @@ bool DateTimeValue::from_date_format_str(const char* format, int format_len, con
             _type = TIME_TIME;
         }
     }
-
+    if (_day == 0) {
+        _day = 1;
+    }
     if (check_range() || check_date()) {
         return false;
     }
