@@ -2047,6 +2047,8 @@ Status TimeFunctions::format_prepare(FunctionContext* context, FunctionContext::
         fc->fmt_type = TimeFunctions::yyyyMMdd;
     } else if (fc->fmt == "%Y-%m-%d" || fc->fmt == "yyyy-MM-dd") {
         fc->fmt_type = TimeFunctions::yyyy_MM_dd;
+    } else if (fc->fmt == "yyyy-MM-dd HH") {
+        fc->fmt_type = TimeFunctions::yyyy_MM_dd_HH;
     } else if (fc->fmt == "%Y-%m-%d %H:%i:%s" || fc->fmt == "yyyy-MM-dd HH:mm:ss") {
         fc->fmt_type = TimeFunctions::yyyy_MM_dd_HH_mm_ss;
     } else if (fc->fmt == "%Y-%m") {
@@ -2157,6 +2159,15 @@ std::string format_for_yyyy_MMImpl(const DateValue& date_value) {
     return {to, 7};
 }
 
+std::string format_for_yyyyMMddHH_Impl(const TimestampValue& date_value) {
+    std::string date = date_value.to_string();
+    return date.substr(0, 13);
+}
+
+DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyyMMddHHImpl, v) {
+    return format_for_yyyyMMddHH_Impl((TimestampValue)v);
+}
+
 DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyy_MMImpl, v) {
     return format_for_yyyy_MMImpl((DateValue)v);
 }
@@ -2247,6 +2258,8 @@ StatusOr<ColumnPtr> do_format(const TimeFunctions::FormatCtx* ctx, const Columns
         return date_format_func<yyyyMMddImpl, Type>(cols, 8);
     } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_dd) {
         return date_format_func<yyyy_MM_dd_Impl, Type>(cols, 10);
+    } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_dd_HH) {
+        return date_format_func<yyyyMMddHHImpl, Type>(cols, 28);
     } else if (ctx->fmt_type == TimeFunctions::yyyy_MM_dd_HH_mm_ss) {
         return date_format_func<yyyyMMddHHmmssImpl, Type>(cols, 28);
     } else if (ctx->fmt_type == TimeFunctions::yyyy_MM) {

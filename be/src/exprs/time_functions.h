@@ -889,6 +889,7 @@ public:
     enum FormatType {
         yyyyMMdd,
         yyyy_MM_dd,
+        yyyy_MM_dd_HH,
         yyyy_MM_dd_HH_mm_ss,
         yyyy_MM,
         yyyyMM,
