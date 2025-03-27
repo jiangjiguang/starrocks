@@ -384,6 +384,9 @@ public class ScalarOperatorFunctionsTest {
         assertEquals("2001-01-09 13:04:05",
                 ScalarOperatorFunctions.dateFormat(testDate, ConstantOperator.createVarchar("yyyy-MM-dd HH:mm:ss"))
                         .getVarchar());
+        assertEquals("2",
+                ScalarOperatorFunctions.dateFormat(testDate, ConstantOperator.createVarchar("u"))
+                        .getVarchar());
 
         assertEquals("2001-01-09",
                 ScalarOperatorFunctions.dateFormat(ConstantOperator.createDate(LocalDateTime.of(2001, 1, 9, 13, 4, 5)),

@@ -381,6 +381,8 @@ public class DateUtils {
                 escaped = false;
             } else if (character == '%') {
                 escaped = true;
+            } else if (character == 'u') {
+                builder.appendValue(ChronoField.DAY_OF_WEEK, 1);
             } else {
                 builder.appendLiteral(character);
             }
