@@ -897,6 +897,8 @@ public:
         yyyycMMcdd,
         // for string format like "%Y-%m-%d %H:%i:%s"
         yyyycMMcddcHHcmmcss,
+        // day of week
+        u,
         None
     };
 

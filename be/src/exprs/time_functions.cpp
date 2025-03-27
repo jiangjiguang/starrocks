@@ -2055,6 +2055,8 @@ Status TimeFunctions::format_prepare(FunctionContext* context, FunctionContext::
         fc->fmt_type = TimeFunctions::yyyyMM;
     } else if (fc->fmt == "%Y") {
         fc->fmt_type = TimeFunctions::yyyy;
+    } else if (fc->fmt == "u") {
+        fc->fmt_type = TimeFunctions::u;
     } else {
         fc->fmt_type = TimeFunctions::None;
     }
@@ -2159,6 +2161,11 @@ DEFINE_STRING_UNARY_FN_WITH_IMPL(yyyy_MMImpl, v) {
     return format_for_yyyy_MMImpl((DateValue)v);
 }
 
+DEFINE_STRING_UNARY_FN_WITH_IMPL(uImpl, v) {
+    int day = ((DateValue)v).weekday_start_from_monday();
+    return std::to_string(day);
+}
+
 std::string format_for_yyyyMMImpl(const DateValue& date_value) {
     int y, m, d, t;
     date_value.to_date(&y, &m, &d);
@@ -2248,6 +2255,8 @@ StatusOr<ColumnPtr> do_format(const TimeFunctions::FormatCtx* ctx, const Columns
         return date_format_func<yyyyMMImpl, Type>(cols, 6);
     } else if (ctx->fmt_type == TimeFunctions::yyyy) {
         return date_format_func<yyyyImpl, Type>(cols, 4);
+    } else if (ctx->fmt_type == TimeFunctions::u) {
+        return date_format_func<uImpl, Type>(cols, 10);
     } else {
         return standard_format<Type>(ctx->fmt, 128, cols);
     }

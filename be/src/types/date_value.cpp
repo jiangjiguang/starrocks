@@ -116,6 +116,16 @@ int DateValue::weekday() const {
     return (_julian + 1) % 7;
 }
 
+int DateValue::weekday_start_from_monday() const {
+    //  @info: _julian < 0 is impossible
+    //    int w = (_julian) % 7 + 1;
+    //
+    //    if (w < 0) {
+    //        w += 7;
+    //    }
+    return (_julian) % 7 + 1;
+}
+
 void DateValue::trunc_to_day() {}
 
 void DateValue::trunc_to_month() {

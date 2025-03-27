@@ -72,6 +72,19 @@ public:
      */
     int weekday() const;
 
+    /**
+     * Get day of week start from monday.
+     * @return
+     *  - 1: Monday
+     *  - 2: Tuesday
+     *  - 3: Wednesday
+     *  - 4: Thursday
+     *  - 5: Friday
+     *  - 6: Saturday
+     *  - 7: Sunday
+     */
+    int weekday_start_from_monday() const;
+
     void trunc_to_day();
     void trunc_to_month();
     void trunc_to_year();
