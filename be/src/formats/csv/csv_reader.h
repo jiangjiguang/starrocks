@@ -182,7 +182,7 @@ public:
 
     void set_limit(size_t limit) { _limit = limit; }
 
-    void split_record(const Record& record, Fields* fields) const;
+    virtual void split_record(const Record& record, Fields* fields) const;
 
     bool is_row_delimiter(bool expandBuffer);
 

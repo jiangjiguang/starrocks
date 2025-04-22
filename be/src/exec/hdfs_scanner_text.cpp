@@ -29,7 +29,7 @@ class HdfsScannerCSVReader : public CSVReader {
 public:
     // |file| must outlive HdfsScannerCSVReader
     HdfsScannerCSVReader(RandomAccessFile* file, const std::string& row_delimiter, bool need_probe_line_delimiter,
-                         const std::string& column_separator, size_t file_length)
+                         const std::string& column_separator, size_t file_length, RuntimeState* runtime_state)
             : CSVReader(CSVParseOptions(row_delimiter, column_separator)) {
         _file = file;
         _offset = 0;
@@ -38,9 +38,88 @@ public:
         _row_delimiter_length = row_delimiter.size();
         _column_delimiter_length = column_separator.size();
         _need_probe_line_delimiter = need_probe_line_delimiter;
+        _state = runtime_state;
     }
 
     Status reset(size_t offset, size_t remain_length);
+
+    static std::pair<const char*, size_t> trim(const char* value, size_t len) {
+        size_t begin = 0;
+
+        while (begin < len && value[begin] == ' ') {
+            ++begin;
+        }
+
+        size_t end = len - 1;
+
+        while (end > begin && value[end] == ' ') {
+            --end;
+        }
+
+        return std::make_pair(value + begin, end - begin + 1);
+    }
+
+    void split_record(const Record& record, Fields* columns) const override{
+        DCHECK(_column_delimiter_length > 0);
+
+        const char* value = record.data;
+        const char* ptr = record.data;
+        const size_t size = record.size;
+
+        if (_column_delimiter_length == 1) {
+            for (size_t i = 0; i < size; ++i, ++ptr) {
+                if (*ptr == _parse_options.column_delimiter[0]) {
+                    auto offset = ptr - value;
+                    if (_state->query_options().enable_presto_translation
+                        && offset >= 2 && value[0] == '"' && value[offset - 1] == '"') {
+                        // remove pair quote
+                        size_t start = 1;
+                        size_t end = offset - 1;
+                        const char* trimmed_value = value + 1;
+                        columns->emplace_back(trimmed_value, end - start);
+                    } else if (_parse_options.trim_space) {
+                        std::pair<const char*, size_t> newPos = trim(value, ptr - value);
+                        columns->emplace_back(newPos.first, newPos.second);
+                    } else {
+                        columns->emplace_back(value, ptr - value);
+                    }
+                    value = ptr + 1;
+                }
+            }
+        } else {
+            const auto* const base = ptr;
+
+            do {
+                ptr = static_cast<char*>(memmem(value, size - (value - base), _parse_options.column_delimiter.data(),
+                                                _column_delimiter_length));
+                if (ptr != nullptr) {
+                    if (_parse_options.trim_space) {
+                        std::pair<const char*, size_t> newPos = trim(value, ptr - value);
+                        columns->emplace_back(newPos.first, newPos.second);
+                    } else {
+                        columns->emplace_back(value, ptr - value);
+                    }
+                    value = ptr + _column_delimiter_length;
+                }
+            } while (ptr != nullptr);
+
+            ptr = record.data + size;
+        }
+        auto offset = ptr - value;
+        if (_state->query_options().enable_presto_translation
+            && offset >= 2 && value[0] == '"' && value[offset - 1] == '"') {
+            // remove pair quote
+            size_t start = 1;
+            size_t end = offset - 1;
+            const char* trimmed_value = value + 1;
+            columns->emplace_back(trimmed_value, end - start);
+        } else if (_parse_options.trim_space) {
+            std::pair<const char*, size_t> newPos = trim(value, ptr - value);
+            columns->emplace_back(newPos.first, newPos.second);
+        } else {
+            columns->emplace_back(value, ptr - value);
+        }
+    }
 
     Status next_record(Record* record);
 
@@ -60,6 +139,7 @@ private:
     bool _should_stop_next = false;
     // Hive TextFile's line delimiter maybe \n, \r or \r\n, we need to probe it
     bool _need_probe_line_delimiter = false;
+    RuntimeState* _state;
 };
 
 Status HdfsScannerCSVReader::reset(size_t offset, size_t remain_length) {
@@ -170,6 +250,7 @@ char* HdfsScannerCSVReader::_find_line_delimiter(starrocks::CSVBuffer& buffer, s
 
 Status HdfsTextScanner::do_init(RuntimeState* runtime_state, const HdfsScannerParams& scanner_params) {
     const TTextFileDesc& text_file_desc = _scanner_params.scan_range->text_file_desc;
+    _state = runtime_state;
     RETURN_IF_ERROR(_setup_delimiter(text_file_desc));
     RETURN_IF_ERROR(_setup_compression_type(text_file_desc));
 
@@ -408,11 +489,11 @@ Status HdfsTextScanner::_create_csv_reader() {
         // we don't know real stream size in adavance, so we set a very large stream size
         auto file_size = static_cast<size_t>(-1);
         _reader = std::make_shared<HdfsScannerCSVReader>(_file.get(), _line_delimiter, _need_probe_line_delimiter,
-                                                         _field_delimiter, file_size);
+                                                         _field_delimiter, file_size, _state);
     } else {
         // no compressed file, splittable.
         _reader = std::make_shared<HdfsScannerCSVReader>(_file.get(), _line_delimiter, _need_probe_line_delimiter,
-                                                         _field_delimiter, scan_range->file_length);
+                                                         _field_delimiter, scan_range->file_length, _state);
     }
     auto* reader = down_cast<HdfsScannerCSVReader*>(_reader.get());
 

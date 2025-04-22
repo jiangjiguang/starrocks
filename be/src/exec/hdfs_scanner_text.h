@@ -72,5 +72,6 @@ private:
     std::vector<size_t> _materialize_slots_index_2_csv_column_index;
     // (TODO) move compressed file don't split logic to FE, _no_data is prone to bugs
     bool _no_data = false;
+    RuntimeState* _state;
 };
 } // namespace starrocks
