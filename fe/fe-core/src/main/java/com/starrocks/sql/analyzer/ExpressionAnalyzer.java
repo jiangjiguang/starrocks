@@ -1046,6 +1046,11 @@ public class ExpressionAnalyzer {
                     FunctionName newFnName = new FunctionName(fnName);
                     node.setFnName(newFnName);
                 }
+                if (FunctionSet.NVL.equals(fnName)) {
+                    fnName = FunctionSet.IFNULL;
+                    FunctionName newFnName = new FunctionName(fnName);
+                    node.setFnName(newFnName);
+                }
             }
 
             // throw exception direct

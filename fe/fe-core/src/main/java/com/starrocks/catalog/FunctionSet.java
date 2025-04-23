@@ -369,6 +369,7 @@ public class FunctionSet {
     public static final String COALESCE = "coalesce";
     public static final String IF = "if";
     public static final String IFNULL = "ifnull";
+    public static final String NVL = "nvl";
     public static final String NULLIF = "nullif";
 
     // Math functions:
