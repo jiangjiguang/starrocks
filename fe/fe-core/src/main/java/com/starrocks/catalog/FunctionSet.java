@@ -336,6 +336,7 @@ public class FunctionSet {
     public static final String ARRAY_MIN = "array_min";
     public static final String ARRAY_POSITION = "array_position";
     public static final String ARRAY_SORT = "array_sort";
+    public static final String SORT_ARRAY = "sort_array";
     public static final String ARRAY_SUM = "array_sum";
     public static final String ARRAY_REMOVE = "array_remove";
     public static final String ARRAY_FILTER = "array_filter";

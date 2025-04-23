@@ -1051,6 +1051,11 @@ public class ExpressionAnalyzer {
                     FunctionName newFnName = new FunctionName(fnName);
                     node.setFnName(newFnName);
                 }
+                if (FunctionSet.SORT_ARRAY.equals(fnName)) {
+                    fnName = FunctionSet.ARRAY_SORT;
+                    FunctionName newFnName = new FunctionName(fnName);
+                    node.setFnName(newFnName);
+                }
             }
 
             // throw exception direct
