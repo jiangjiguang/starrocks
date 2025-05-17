@@ -489,14 +489,14 @@ public class HdfsFsManager {
                 conf.set(FS_HDFS_IMPL_DISABLE_CACHE, disableCache);
                 UserGroupInformation ugi = null;
                 if (!Strings.isNullOrEmpty(username) && conf.get("hadoop.security.authentication").equals("simple")) {
-                    ugi = UserGroupInformation.createRemoteUser(username);
+                    ugi = UserGroupInformation.createRemoteUser(username, password);
                 }
                 FileSystem dfsFileSystem = null;
                 if (ugi != null) {
                     dfsFileSystem = ugi.doAs(
                             (PrivilegedExceptionAction<FileSystem>) () -> FileSystem.get(pathUri.getUri(), conf));
                 } else {
-                    dfsFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                    dfsFileSystem = FileSystem.get(pathUri.getUri(), conf, username, password);
                 }
                 fileSystem.setFileSystem(dfsFileSystem);
                 fileSystem.setConfiguration(conf);

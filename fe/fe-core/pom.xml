@@ -684,6 +684,12 @@ under the License.
                 </exclusion>
             </exclusions>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-client-api</artifactId>
+        </dependency>
+
         <!--Fix CVF from hadoop-aliyun-->
         <dependency>
             <groupId>org.jdom</groupId>

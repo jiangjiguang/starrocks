@@ -722,6 +722,12 @@ under the License.
                 <version>${hadoop.version}</version>
             </dependency>
 
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client-api</artifactId>
+                <version>${hadoop.version}</version>
+            </dependency>
+
             <!-- https://mvnrepository.com/artifact/com.google.cloud.bigdataoss/gcs-connector -->
             <dependency>
                 <groupId>com.google.cloud.bigdataoss</groupId>
