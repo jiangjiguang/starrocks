@@ -438,7 +438,7 @@ public class OptExternalPartitionPruner {
             if (selectedPartitionIds == null) {
                 // no eval conjuncts are not empty, it means that the partition pruning is not successful
                 // partition conjuncts are empty, it means that the partition pruning is successful
-                if (!noEvalConjunctList.isEmpty() || scanOperatorPredicates.getPartitionConjuncts().isEmpty()) {
+                if (scanOperatorPredicates.getPartitionConjuncts().isEmpty()) {
                     selectedPartitionIds = scanOperatorPredicates.getIdToPartitionKey().keySet();
                 } else {
                     selectedPartitionIds = Sets.newHashSet();
