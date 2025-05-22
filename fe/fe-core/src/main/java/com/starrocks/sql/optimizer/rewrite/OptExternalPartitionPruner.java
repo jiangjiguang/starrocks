@@ -434,15 +434,9 @@ public class OptExternalPartitionPruner {
                 noEvalConjunctList.retainAll(multiNoEvalConjunctList);
             }
 
-            // no selected partition ids, it means that maybe all partitions are pruned
+
             if (selectedPartitionIds == null) {
-                // no eval conjuncts are not empty, it means that the partition pruning is not successful
-                // partition conjuncts are empty, it means that the partition pruning is successful
-                if (scanOperatorPredicates.getPartitionConjuncts().isEmpty()) {
-                    selectedPartitionIds = scanOperatorPredicates.getIdToPartitionKey().keySet();
-                } else {
-                    selectedPartitionIds = Sets.newHashSet();
-                }
+                selectedPartitionIds = scanOperatorPredicates.getIdToPartitionKey().keySet();
             }
 
             int scanHivePartitionNumLimit = context.getSessionVariable().getScanHivePartitionNumLimit();
