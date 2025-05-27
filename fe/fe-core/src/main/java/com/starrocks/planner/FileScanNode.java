@@ -67,6 +67,8 @@ import com.starrocks.common.ErrorReport;
 import com.starrocks.common.Pair;
 import com.starrocks.common.UserException;
 import com.starrocks.common.util.BrokerUtil;
+import com.starrocks.credential.CloudConfiguration;
+import com.starrocks.credential.CloudConfigurationFactory;
 import com.starrocks.fs.HdfsUtil;
 import com.starrocks.load.BrokerFileGroup;
 import com.starrocks.load.Load;
@@ -79,6 +81,8 @@ import com.starrocks.thrift.TBrokerFileStatus;
 import com.starrocks.thrift.TBrokerRangeDesc;
 import com.starrocks.thrift.TBrokerScanRange;
 import com.starrocks.thrift.TBrokerScanRangeParams;
+import com.starrocks.thrift.TCloudConfiguration;
+import com.starrocks.thrift.TCloudType;
 import com.starrocks.thrift.TExplainLevel;
 import com.starrocks.thrift.TFileFormatType;
 import com.starrocks.thrift.TFileScanNode;
@@ -285,6 +289,14 @@ public class FileScanNode extends LoadScanNode {
             }
             THdfsProperties hdfsProperties = new THdfsProperties();
             HdfsUtil.getTProperties(filePaths.get(0), brokerDesc, hdfsProperties);
+
+            Map<String, String> properties = brokerDesc.getProperties();
+            CloudConfiguration cloudConfiguration = CloudConfigurationFactory.buildCloudConfigurationForStorage(properties);
+            TCloudConfiguration tCloudConfiguration = new TCloudConfiguration();
+            cloudConfiguration.toThrift(tCloudConfiguration);
+            tCloudConfiguration.setCloud_type(TCloudType.HDFS);
+            hdfsProperties.setCloud_configuration(tCloudConfiguration);
+
             params.setHdfs_properties(hdfsProperties);
         }
         byte[] column_separator = fileGroup.getColumnSeparator().getBytes(StandardCharsets.UTF_8);

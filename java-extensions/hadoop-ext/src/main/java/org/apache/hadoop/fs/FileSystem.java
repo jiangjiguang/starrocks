@@ -314,6 +314,77 @@ public abstract class FileSystem extends Configured
     }
 
     /**
+     * Get a filesystem instance based on the uri, the passed
+     * configuration and the user
+     * @param uri of the filesystem
+     * @param conf the configuration to use
+     * @param user to perform the get as
+     * @param passwd to perform the get as
+     *
+     * @return the filesystem instance
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public static FileSystem get(final URI uri, final Configuration conf,
+                                 final String user, final String passwd, final String userHint)
+            throws IOException {
+        String ticketCachePath =
+                conf.get(CommonConfigurationKeys.KERBEROS_TICKET_CACHE_PATH);
+        if(user == null || passwd == null || userHint == null) {
+            throw new IOException(String.format(
+                    "The user name or password or userhint is empty.USER=%S PASSWD=%s"
+                            + "USERHINT=%s", user, passwd, userHint));
+        }
+        UserGroupInformation ugi = UserGroupInformation
+                .getBestUGI(ticketCachePath, user, passwd, userHint);
+        try {
+            return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+                @Override
+                public FileSystem run() throws IOException {
+                    return get(uri, conf);
+                }
+            });
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
+    }
+
+    /**
+     * Get a filesystem instance based on the uri, the passed
+     * configuration and the user
+     * @param uri of the filesystem
+     * @param conf the configuration to use
+     * @param user to perform the get as
+     * @param passwd to perform the get as
+     * @return the filesystem instance
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public static FileSystem get(final URI uri, final Configuration conf,
+                                 final String user, final String passwd)
+            throws IOException {
+        String ticketCachePath =
+                conf.get(CommonConfigurationKeys.KERBEROS_TICKET_CACHE_PATH);
+        if(user == null || passwd == null) {
+            throw new IOException(
+                    String.format("The user name or password is empty.USER=%S PASSWD=%s",
+                            user,passwd));
+        }
+        UserGroupInformation ugi = UserGroupInformation
+                .getBestUGI(ticketCachePath, user, passwd);
+        try {
+            return ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+                @Override
+                public FileSystem run() throws IOException {
+                    return get(uri, conf);
+                }
+            });
+        } catch (InterruptedException e) {
+            throw new IOException(e);
+        }
+    }
+
+    /**
      * Returns the configured FileSystem implementation.
      *
      * @param conf the configuration to use

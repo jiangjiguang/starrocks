@@ -50,23 +50,62 @@ static Status create_hdfs_fs_handle(const std::string& namenode, const std::shar
         if (properties->__isset.hdfs_username) {
             hdfsBuilderSetUserName(hdfs_builder, properties->hdfs_username.data());
         }
+        if (properties->__isset.disable_cache && properties->disable_cache) {
+            hdfsBuilderSetForceNewInstance(hdfs_builder);
+        }
     }
-    LOG(INFO) << "Starrocks on hive enabled....";
-    hdfsBuilderSetUserName(hdfs_builder, "datae-manager");
-    hdfsBuilderSetPassword(hdfs_builder, "b558307fc89c3a3ce046ff40f369f760");
-
-    LOG(INFO) << "Starrocks on hive enabled....";
-    hdfsBuilderSetUserName(hdfs_builder, "datae-manager");
-    hdfsBuilderSetPassword(hdfs_builder, "b558307fc89c3a3ce046ff40f369f760");
-
-    hdfsBuilderSetForceNewInstance(hdfs_builder);
 
     // Insert cloud properties(key-value paired) into Hadoop configuration
     // TODO(SmithCruise): Should remove when using cpp sdk
     const std::map<std::string, std::string> cloud_properties = get_cloud_properties(options);
+
+    bool username_set = false;
+    bool password_set = false;
     if (!cloud_properties.empty()) {
+        // special set hadoop.username into hdfs_builder
+        if (auto it = cloud_properties.find("hadoop.username"); it != cloud_properties.end()) {
+            if (!it->second.empty()) {
+                LOG(INFO) << "get hdfs name from cloud_properties " << it->second;
+                hdfsBuilderSetUserName(hdfs_builder, it->second.c_str());
+                username_set = true;
+            } else {
+                LOG(INFO) << "Empty hadoop.username found in cloud_properties";
+            }
+        }
+
+        // special set hadoop.password into hdfs_builder
+        if (auto it = cloud_properties.find("hadoop.password"); it != cloud_properties.end()) {
+            if (!it->second.empty()) {
+                LOG(INFO) << "get hdfs password from cloud_properties " << it->second;
+                hdfsBuilderSetPassword(hdfs_builder, it->second.c_str());
+                password_set = true;
+            } else {
+                LOG(INFO) << "Empty hadoop.password found in cloud_properties";
+            }
+        }
+
         for (const auto& cloud_property : cloud_properties) {
             hdfsBuilderConfSetStr(hdfs_builder, cloud_property.first.data(), cloud_property.second.data());
+        }
+    }
+
+    if (!username_set) {
+        const char* env_username = std::getenv("HADOOP_USER_NAME");
+        if (env_username != nullptr) {
+            LOG(INFO) << "get hdfs name from env " << env_username;
+            hdfsBuilderSetUserName(hdfs_builder, env_username);
+        } else {
+            LOG(INFO) << "get empty hdfs name from env, datanode connection maybe fail, please set env HADOOP_USER_NAME";
+        }
+    }
+
+    if (!password_set) {
+        const char* env_password = std::getenv("HADOOP_USER_PASSWORD");
+        if (env_password != nullptr) {
+            LOG(INFO) << "get hdfs password from env " << env_password;
+            hdfsBuilderSetPassword(hdfs_builder, env_password);
+        } else {
+            LOG(INFO) << "get empty hdfs password from env, datanode connection maybe fail, please set env HADOOP_USER_PASSWORD";
         }
     }
 
@@ -100,19 +139,26 @@ Status HdfsFsCache::get_connection(const std::string& namenode, std::shared_ptr<
     const std::map<std::string, std::string> cloud_properties = get_cloud_properties(options);
     if (!cloud_properties.empty()) {
         for (const auto& cloud_property : cloud_properties) {
-            cache_key += cloud_property.first;
-            cache_key += cloud_property.second;
+            if (!cloud_property.first.empty() && !cloud_property.second.empty()) {
+                cache_key += cloud_property.first;
+                cache_key += cloud_property.second;
+            }
         }
     }
+
+    LOG(INFO) << "current datanode cache key is: " << cache_key;
 
     std::lock_guard<std::mutex> l(_lock);
 
     auto it = _cache_clients.find(cache_key);
     if (it != _cache_clients.end()) {
+        LOG(INFO) << "get datanode client by cache key is: " << cache_key;
         hdfs_client = it->second;
         // Found a cache client, return directly
         return Status::OK();
     }
+
+    LOG(INFO) << "didn't get datanode client by cache key is: " << cache_key;
 
     const uint32_t max_cache_clients = config::hdfs_client_max_cache_size;
     // Not found a cached client, create a new one

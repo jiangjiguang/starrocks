@@ -111,4 +111,12 @@ public class HDFSCloudCredential implements CloudCredential {
         fileStore.setHdfsFsInfo(hdfsFileStoreInfo.build());
         return fileStore.build();
     }
+
+    public String getUserName() {
+        return userName;
+    }
+
+    public String getPassword() {
+        return password;
+    }
 }

@@ -326,7 +326,7 @@ public class RemoteFileOperations {
             List<String> fileNames) {
         FileSystem fileSystem;
         try {
-            fileSystem = FileSystem.get(writePath.toUri(), conf);
+            fileSystem = HdfsEnvironment.getFileSystem(conf, writePath.toUri());
         } catch (Exception e) {
             Log.error("Failed to get fileSystem", e);
             throw new StarRocksConnectorException("Failed to move data files to target location. " +
@@ -372,7 +372,7 @@ public class RemoteFileOperations {
         runWhenPathNotExist.run();
 
         try {
-            if (!FileSystem.get(source.toUri(), conf).rename(source, target)) {
+            if (!HdfsEnvironment.getFileSystem(conf, source.toUri()).rename(source, target)) {
                 throw new StarRocksConnectorException("Failed to rename %s to %s: rename returned false", source, target);
             }
         } catch (IOException e) {
@@ -382,7 +382,7 @@ public class RemoteFileOperations {
 
     public void removeNotCurrentQueryFiles(Path partitionPath, String queryId) {
         try {
-            FileSystem fileSystem = FileSystem.get(partitionPath.toUri(), conf);
+            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, partitionPath.toUri());
             RemoteIterator<LocatedFileStatus> iterator = fileSystem.listFiles(partitionPath, false);
             while (iterator.hasNext()) {
                 Path file = iterator.next().getPath();
@@ -407,7 +407,7 @@ public class RemoteFileOperations {
 
     public FileStatus[] listStatus(Path path) {
         try {
-            FileSystem fileSystem = FileSystem.get(path.toUri(), conf);
+            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
             return fileSystem.listStatus(path);
         } catch (Exception e) {
             LOG.error("Failed to list path {}", path, e);

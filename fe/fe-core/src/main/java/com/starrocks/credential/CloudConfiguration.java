@@ -32,6 +32,8 @@ public class CloudConfiguration {
     private String runtimeJars;
     private String hadoopUsername;
 
+    private String hadoopUserPassword;
+
     public void toThrift(TCloudConfiguration tCloudConfiguration) {
         tCloudConfiguration.cloud_type = TCloudType.DEFAULT;
         Map<String, String> properties = new HashMap<>();
@@ -39,6 +41,7 @@ public class CloudConfiguration {
         properties.put(HadoopExt.HADOOP_RUNTIME_JARS, runtimeJars);
         properties.put(HadoopExt.HADOOP_CLOUD_CONFIGURATION_STRING, toConfString());
         properties.put(HadoopExt.HADOOP_USERNAME, hadoopUsername);
+        properties.put(HadoopExt.HADOOP_PASSWORD, hadoopUserPassword);
         tCloudConfiguration.setCloud_properties(properties);
     }
 
@@ -51,6 +54,9 @@ public class CloudConfiguration {
         }
         if (hadoopUsername != null) {
             configuration.set(HadoopExt.HADOOP_USERNAME, hadoopUsername);
+        }
+        if (hadoopUserPassword != null) {
+            configuration.set(HadoopExt.HADOOP_PASSWORD, hadoopUserPassword);
         }
         configuration.set(HadoopExt.HADOOP_CLOUD_CONFIGURATION_STRING, toConfString());
         HadoopExt.getInstance().rewriteConfiguration(configuration);
@@ -77,9 +83,11 @@ public class CloudConfiguration {
         configResources = properties.getOrDefault(HadoopExt.HADOOP_CONFIG_RESOURCES, "");
         runtimeJars = properties.getOrDefault(HadoopExt.HADOOP_RUNTIME_JARS, "");
         hadoopUsername = properties.getOrDefault(HadoopExt.HADOOP_USERNAME, "");
+        hadoopUserPassword = properties.getOrDefault(HadoopExt.HADOOP_PASSWORD, "");
     }
 
     public String getCommonFieldsString() {
-        return String.format("resources='%s', jars='%s', hdpuser='%s'", configResources, runtimeJars, hadoopUsername);
+        return String.format("resources='%s', jars='%s', hdpuser='%s', hdppassowrd='%s'",
+                configResources, runtimeJars, hadoopUsername, hadoopUserPassword);
     }
 }

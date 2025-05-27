@@ -79,6 +79,8 @@ be/src/gen_cpp/opcode
 be/src/thirdparty/starcache/
 be/ut_build_ASAN/
 be/tags
+build_tool/starcache/
+
 
 #ignore vscode project file
 .vscode

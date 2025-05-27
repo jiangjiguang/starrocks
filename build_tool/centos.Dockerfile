@@ -20,7 +20,7 @@ RUN echo 'export JAVA_HOME=/usr/lib/jvm/java' >> /etc/profile
 RUN echo 'export STARROCKS_GCC_HOME=/opt/rh/gcc-toolset-10/root/usr' >> /etc/profile
 
 # update didi hadoop version lib, current version is sr-3.3.6-003
-ENV HADOOP_DIST_ADDR https://artifactory-new.intra.xiaojukeji.com/artifactory/product-dev-local/datainfra-hadoop/didi_hadoop/20241213110134_ba815562/datainfra-hadoop_didi_hadoop_parameter_centos7.2_20241213112231.tar.gz
+ENV HADOOP_DIST_ADDR https://artifactory-new.intra.xiaojukeji.com/artifactory/product-dev-local/datainfra-hadoop/didi_hadoop/20250618130104_ba815562/datainfra-hadoop_didi_hadoop_parameter_centos7.2_20250618133525.tar.gz
 ENV TP_INSTALL_DIR /var/local/thirdparty/installed
 
 RUN mkdir /tmp/hadoop-tmp && \

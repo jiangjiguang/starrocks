@@ -32,6 +32,10 @@ public class HadoopExt {
     public static final String HADOOP_RUNTIME_JARS = "hadoop.runtime.jars";
     public static final String HADOOP_CLOUD_CONFIGURATION_STRING = "hadoop.cloud.configuration.string";
     public static final String HADOOP_USERNAME = "hadoop.username";
+    public static final String HADOOP_PASSWORD = "hadoop.password";
+    public static final String SYSTEM_ENVIRONMENT_HADOOP_USERNAME = "HADOOP_USER_NAME";
+    public static final String SYSTEM_ENVIRONMENT_HADOOP_PASSWORD = "HADOOP_USER_PASSWORD";
+
 
     public static HadoopExt getInstance() {
         return INSTANCE;

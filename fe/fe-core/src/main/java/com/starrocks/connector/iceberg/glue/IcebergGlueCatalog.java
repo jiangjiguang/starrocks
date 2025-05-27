@@ -19,6 +19,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.starrocks.catalog.Database;
 import com.starrocks.common.MetaNotFoundException;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.iceberg.IcebergCatalog;
 import com.starrocks.connector.iceberg.IcebergCatalogType;
@@ -98,7 +99,7 @@ public class IcebergGlueCatalog implements IcebergCatalog {
             if (key.equalsIgnoreCase(LOCATION_PROPERTY)) {
                 try {
                     URI uri = new Path(value).toUri();
-                    FileSystem fileSystem = FileSystem.get(uri, conf);
+                    FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri);
                     fileSystem.exists(new Path(value));
                 } catch (Exception e) {
                     LOG.error("Invalid location URI: {}", value, e);
@@ -191,7 +192,7 @@ public class IcebergGlueCatalog implements IcebergCatalog {
 
         URI uri = new Path(fileLocations.get(0)).toUri();
         try {
-            FileSystem fileSystem = FileSystem.get(uri, conf);
+            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri);
             for (String location : fileLocations) {
                 Path path = new Path(location);
                 fileSystem.delete(path, false);

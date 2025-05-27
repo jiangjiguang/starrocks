@@ -28,6 +28,8 @@ import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
 import com.starrocks.common.UserException;
 import com.starrocks.common.util.CompressionUtils;
+import com.starrocks.credential.CloudConfiguration;
+import com.starrocks.credential.CloudConfigurationFactory;
 import com.starrocks.fs.HdfsUtil;
 import com.starrocks.load.Load;
 import com.starrocks.proto.PGetFileSchemaResult;
@@ -44,6 +46,8 @@ import com.starrocks.thrift.TBrokerFileStatus;
 import com.starrocks.thrift.TBrokerRangeDesc;
 import com.starrocks.thrift.TBrokerScanRange;
 import com.starrocks.thrift.TBrokerScanRangeParams;
+import com.starrocks.thrift.TCloudConfiguration;
+import com.starrocks.thrift.TCloudType;
 import com.starrocks.thrift.TColumn;
 import com.starrocks.thrift.TFileType;
 import com.starrocks.thrift.TGetFileSchemaRequest;
@@ -382,6 +386,13 @@ public class TableFunctionTable extends Table {
         try {
             THdfsProperties hdfsProperties = new THdfsProperties();
             HdfsUtil.getTProperties(filelist.get(0).path, new BrokerDesc(properties), hdfsProperties);
+
+            CloudConfiguration cloudConfiguration = CloudConfigurationFactory.buildCloudConfigurationForStorage(properties);
+            TCloudConfiguration tCloudConfiguration = new TCloudConfiguration();
+            cloudConfiguration.toThrift(tCloudConfiguration);
+            tCloudConfiguration.setCloud_type(TCloudType.HDFS);
+            hdfsProperties.setCloud_configuration(tCloudConfiguration);
+
             params.setHdfs_properties(hdfsProperties);
         } catch (UserException e) {
             throw new TException("failed to parse files: " + e.getMessage());

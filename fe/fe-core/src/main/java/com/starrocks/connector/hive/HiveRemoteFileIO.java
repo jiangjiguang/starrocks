@@ -20,6 +20,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.starrocks.common.FeConstants;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.PartitionUtil;
 import com.starrocks.connector.RemoteFileBlockDesc;
 import com.starrocks.connector.RemoteFileDesc;
@@ -76,7 +77,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
             URI uri = new Path(path).toUri();
             FileSystem fileSystem;
             if (!FeConstants.runningUnitTest) {
-                fileSystem = FileSystem.get(uri, configuration);
+                fileSystem = HdfsEnvironment.getFileSystem(configuration, uri);
             } else {
                 fileSystem = this.fileSystem;
             }

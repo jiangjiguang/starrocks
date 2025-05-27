@@ -35,6 +35,7 @@
 package org.apache.hadoop.hive.metastore;
 
 import com.google.common.collect.Lists;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.hadoop.HadoopExt;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.ValidTxnList;
@@ -439,7 +440,7 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
     }
 
     private void open() throws MetaException {
-        UserGroupInformation ugi = HadoopExt.getInstance().getHMSUGI(conf);
+        UserGroupInformation ugi = HdfsEnvironment.getUserGroupInformation(conf);
         HadoopExt.getInstance().doAs(ugi, () -> {
             openInternal();
             return null;
@@ -555,20 +556,22 @@ public class HiveMetaStoreClient implements IMetaStoreClient, AutoCloseable {
                     if (isConnected && !useSasl && MetastoreConf.getBoolVar(conf, ConfVars.EXECUTE_SET_UGI)) {
                         // Call set_ugi, only in unsecure mode.
                         try {
-                            UserGroupInformation ugi = HadoopExt.getInstance().getHMSUGI(conf);
+                            UserGroupInformation ugi = HdfsEnvironment.getUserGroupInformation(conf);
                             if (ugi == null) {
                                 ugi = SecurityUtils.getUGI();
                             }
-                            client.set_ugi(ugi.getUserName(), Arrays.asList(ugi.getGroupNames()));
-                        } catch (LoginException e) {
-                            LOG.warn("Failed to do login. set_ugi() is not successful, " +
-                                    "Continuing without it.", e);
+                            List<String> passwordWrapList = new ArrayList<>(1);
+                            String passwordNullable = ugi.getUserPassword();
+                            passwordWrapList.add("#" + (passwordNullable == null ? "" : passwordNullable));
+                            client.set_ugi(ugi.getUserName(), passwordWrapList);
                         } catch (IOException e) {
                             LOG.warn("Failed to find ugi of client set_ugi() is not successful, " +
                                     "Continuing without it.", e);
                         } catch (TException e) {
                             LOG.warn("set_ugi() not successful, Likely cause: new client talking to old server. "
                                     + "Continuing without it.", e);
+                        } catch (LoginException e) {
+                            LOG.warn("login didi hive metastore fail.", e);
                         }
                     }
                 } catch (MetaException | TTransportException e) {

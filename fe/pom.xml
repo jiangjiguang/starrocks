@@ -528,7 +528,23 @@ under the License.
                         <groupId>org.apache.logging.log4j</groupId>
                         <artifactId>log4j-slf4j2-impl</artifactId>
                     </exclusion>
-                </exclusions>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-runtime</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client-api</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>org.apache.hadoop</groupId>
+                        <artifactId>hadoop-client</artifactId>
+                    </exclusion>
+                    <exclusion>
+                        <groupId>com.google.protobuf</groupId>
+                        <artifactId>protobuf-java</artifactId>
+                    </exclusion>
+            </exclusions>
             </dependency>
 
             <!-- https://mvnrepository.com/artifact/org.apache.spark/spark-launcher_2.12 -->

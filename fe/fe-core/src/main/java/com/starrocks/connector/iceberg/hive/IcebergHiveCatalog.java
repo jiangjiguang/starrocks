@@ -22,6 +22,7 @@ import com.starrocks.catalog.Database;
 import com.starrocks.common.Config;
 import com.starrocks.common.MetaNotFoundException;
 import com.starrocks.common.util.Util;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.iceberg.IcebergCatalog;
 import com.starrocks.connector.iceberg.IcebergCatalogType;
@@ -32,6 +33,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.PartitionSpec;
@@ -91,6 +93,9 @@ public class IcebergHiveCatalog implements IcebergCatalog {
         copiedProperties.putIfAbsent(HiveCatalog.LIST_ALL_TABLES, "true");
 
         delegate = (HiveCatalog) CatalogUtil.loadCatalog(HiveCatalog.class.getName(), name, copiedProperties, conf);
+
+        UserGroupInformation ugi = HdfsEnvironment.getUserGroupInformation(conf);
+        UserGroupInformation.setLoginUser(ugi);
     }
 
     @Override
@@ -124,7 +129,7 @@ public class IcebergHiveCatalog implements IcebergCatalog {
             if (key.equalsIgnoreCase(LOCATION_PROPERTY)) {
                 try {
                     URI uri = new Path(value).toUri();
-                    FileSystem fileSystem = FileSystem.get(uri, conf);
+                    FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri);
                     fileSystem.exists(new Path(value));
                 } catch (Exception e) {
                     LOG.error("Invalid location URI: {}", value, e);
@@ -209,7 +214,7 @@ public class IcebergHiveCatalog implements IcebergCatalog {
 
         URI uri = new Path(fileLocations.get(0)).toUri();
         try {
-            FileSystem fileSystem = FileSystem.get(uri, conf);
+            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri);
             for (String location : fileLocations) {
                 Path path = new Path(location);
                 fileSystem.delete(path, false);

@@ -26,6 +26,7 @@ import com.starrocks.catalog.Table;
 import com.starrocks.common.DdlException;
 import com.starrocks.common.MetaNotFoundException;
 import com.starrocks.connector.ConnectorTableId;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.MetastoreType;
 import com.starrocks.connector.PartitionUtil;
 import com.starrocks.connector.exception.StarRocksConnectorException;
@@ -92,7 +93,7 @@ public class HiveMetastoreOperations {
             if (key.equalsIgnoreCase(LOCATION_PROPERTY)) {
                 try {
                     URI uri = new Path(value).toUri();
-                    FileSystem fileSystem = FileSystem.get(uri, hadoopConf);
+                    FileSystem fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, uri);
                     fileSystem.exists(new Path(value));
                 } catch (Exception e) {
                     LOG.error("Invalid location URI: {}", value, e);
@@ -125,7 +126,7 @@ public class HiveMetastoreOperations {
         }
         boolean deleteData = false;
         try {
-            deleteData = !FileSystem.get(URI.create(dbLocation), hadoopConf)
+            deleteData = !HdfsEnvironment.getFileSystem(hadoopConf, URI.create(dbLocation))
                     .listLocatedStatus(new Path(dbLocation)).hasNext();
         } catch (Exception e) {
             LOG.error("Failed to check database directory", e);
@@ -205,7 +206,7 @@ public class HiveMetastoreOperations {
                             dbName, table, e);
                     return true;
                 }
-                FileSystem fileSystem = FileSystem.get(URI.create(tablePath.toString()), hadoopConf);
+                FileSystem fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, URI.create(tablePath.toString()));
                 shouldDelete = !fileSystem.listLocatedStatus(tablePath).hasNext() && !tableLocationExists;
                 if (shouldDelete) {
                     fileSystem.delete(tablePath);

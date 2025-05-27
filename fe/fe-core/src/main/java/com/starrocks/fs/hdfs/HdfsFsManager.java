@@ -23,6 +23,8 @@ import com.google.common.collect.Lists;
 import com.starrocks.common.Config;
 import com.starrocks.common.NotImplementedException;
 import com.starrocks.common.UserException;
+import com.starrocks.connector.HdfsEnvironment;
+import com.starrocks.connector.hadoop.HadoopExt;
 import com.starrocks.connector.share.credential.CloudConfigurationConstants;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.credential.CloudConfigurationFactory;
@@ -33,6 +35,7 @@ import com.starrocks.thrift.TBrokerFileStatus;
 import com.starrocks.thrift.TCloudConfiguration;
 import com.starrocks.thrift.THdfsProperties;
 import com.starrocks.thrift.TObjectStoreType;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -443,11 +446,17 @@ public class HdfsFsManager {
             }
         }
         String username = loadProperties.getOrDefault(USER_NAME_KEY, "");
+        if (StringUtils.isBlank(username)) {
+            username = loadProperties.get(HadoopExt.HADOOP_USERNAME);
+        }
         String password = loadProperties.getOrDefault(PASSWORD_KEY, "");
+        if (StringUtils.isBlank(password)) {
+            password = loadProperties.get(HadoopExt.HADOOP_PASSWORD);
+        }
         String dfsNameServices = loadProperties.getOrDefault(DFS_NAMESERVICES_KEY, "");
         String authentication = loadProperties.getOrDefault(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
                 "");
-        String disableCache = loadProperties.getOrDefault(FS_HDFS_IMPL_DISABLE_CACHE, "true");
+        String disableCache = loadProperties.getOrDefault(FS_HDFS_IMPL_DISABLE_CACHE, "false");
         String disableCacheLowerCase = disableCache.toLowerCase();
         if (!(disableCacheLowerCase.equals("true") || disableCacheLowerCase.equals("false"))) {
             LOG.warn("invalid disable cache: " + disableCache);
@@ -487,6 +496,8 @@ public class HdfsFsManager {
                 // create a new filesystem
                 Configuration conf = new HDFSConfigurationWrap();
                 conf.set(FS_HDFS_IMPL_DISABLE_CACHE, disableCache);
+                conf.set(HadoopExt.HADOOP_USERNAME, username);
+                conf.set(HadoopExt.HADOOP_PASSWORD, password);
                 UserGroupInformation ugi = null;
                 if (!Strings.isNullOrEmpty(username) && conf.get("hadoop.security.authentication").equals("simple")) {
                     ugi = UserGroupInformation.createRemoteUser(username, password);
@@ -494,9 +505,9 @@ public class HdfsFsManager {
                 FileSystem dfsFileSystem = null;
                 if (ugi != null) {
                     dfsFileSystem = ugi.doAs(
-                            (PrivilegedExceptionAction<FileSystem>) () -> FileSystem.get(pathUri.getUri(), conf));
+                            (PrivilegedExceptionAction<FileSystem>) () -> HdfsEnvironment.getFileSystem(conf, pathUri.getUri()));
                 } else {
-                    dfsFileSystem = FileSystem.get(pathUri.getUri(), conf, username, password);
+                    dfsFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 }
                 fileSystem.setFileSystem(dfsFileSystem);
                 fileSystem.setConfiguration(conf);
@@ -590,7 +601,7 @@ public class HdfsFsManager {
                 }
 
                 conf.set(FS_S3A_IMPL_DISABLE_CACHE, disableCache);
-                FileSystem s3AFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem s3AFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(s3AFileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
@@ -704,7 +715,7 @@ public class HdfsFsManager {
                 // Set fs.s3.impl to report error explicitly.
                 conf.set("fs.s3.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem");
 
-                FileSystem innerFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem innerFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(innerFileSystem);
                 fileSystem.setConfiguration(conf);
             }
@@ -779,7 +790,7 @@ public class HdfsFsManager {
                 conf.set(FS_KS3_IMPL, "com.ksyun.kmr.hadoop.fs.ks3.Ks3FileSystem");
                 conf.set(FS_KS3_IMPL_DISABLE_CACHE, disableCache);
                 conf.set(FS_KS3_CONNECTION_SSL_ENABLED, connectionSSLEnabled);
-                FileSystem ks3FileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem ks3FileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(ks3FileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
@@ -857,7 +868,7 @@ public class HdfsFsManager {
                 conf.set(FS_OBS_IMPL, "org.apache.hadoop.fs.obs.OBSFileSystem");
                 conf.set(FS_OBS_IMPL_DISABLE_CACHE, disableCache);
                 conf.set(FS_OBS_CONNECTION_SSL_ENABLED, connectionSSLEnabled);
-                FileSystem obsFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem obsFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(obsFileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
@@ -932,7 +943,7 @@ public class HdfsFsManager {
                 Configuration conf = new ConfigurationWrap();
                 conf.set(FS_S3A_IMPL_DISABLE_CACHE, disableCacheHDFS);
                 conf.set(FS_S3A_IMPL_DISABLE_CACHE, disableCacheS3);
-                FileSystem genericFileSystem = FileSystem.get(new Path(path).toUri(), conf);
+                FileSystem genericFileSystem = HdfsEnvironment.getFileSystem(conf, new Path(path).toUri());
                 fileSystem.setFileSystem(genericFileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
@@ -1011,7 +1022,7 @@ public class HdfsFsManager {
                 conf.set(FS_OSS_IMPL, "org.apache.hadoop.fs.aliyun.oss.AliyunOSSFileSystem");
                 conf.set(FS_OSS_IMPL_DISABLE_CACHE, disableCache);
                 conf.set(FS_OSS_CONNECTION_SSL_ENABLED, connectionSSLEnabled);
-                FileSystem ossFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem ossFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(ossFileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
@@ -1087,7 +1098,7 @@ public class HdfsFsManager {
                 conf.set(FS_COS_IMPL, "org.apache.hadoop.fs.CosFileSystem");
                 conf.set(FS_COS_IMPL_DISABLE_CACHE, disableCache);
                 conf.set(FS_COS_CONNECTION_SSL_ENABLED, connectionSSLEnabled);
-                FileSystem cosFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem cosFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(cosFileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
@@ -1172,7 +1183,7 @@ public class HdfsFsManager {
                 conf.set(FS_TOS_CONNECTION_SSL_ENABLED, connectionSSLEnabled);
                 conf.set(FS_S3A_CONNECTION_SSL_ENABLED, connectionSSLEnabled);
                 conf.set(FS_TOS_REGION, region);
-                FileSystem tosFileSystem = FileSystem.get(pathUri.getUri(), conf);
+                FileSystem tosFileSystem = HdfsEnvironment.getFileSystem(conf, pathUri.getUri());
                 fileSystem.setFileSystem(tosFileSystem);
                 fileSystem.setConfiguration(conf);
                 if (tProperties != null) {
