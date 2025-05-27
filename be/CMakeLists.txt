@@ -132,6 +132,8 @@ else()
     set(LIBEVENT event)
 endif()
 
+message("hll precision is ${HLL_PRECISION}")
+add_definitions(-DHLL_PRECISION=${HLL_PRECISION})
 
 # Compile generated source if necessary
 message(STATUS "build gensrc if necessary")

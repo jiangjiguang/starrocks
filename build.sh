@@ -400,6 +400,12 @@ if [ ${BUILD_BE} -eq 1 ] ; then
         WITH_COMPRESS=OFF
     fi
 
+    HLL_PRECISION=14
+
+    if [[ ${BUILD_HLL_PRECISION} -ge 11 && ${BUILD_HLL_PRECISION} -le 20 ]]; then
+        HLL_PRECISION=${BUILD_HLL_PRECISION}
+    fi
+
 
     ${CMAKE_CMD} -G "${CMAKE_GENERATOR}"                                \
                   -DSTARROCKS_THIRDPARTY=${STARROCKS_THIRDPARTY}        \
@@ -418,6 +424,7 @@ if [ ${BUILD_BE} -eq 1 ] ; then
                   -DUSE_STAROS=${USE_STAROS}                            \
                   -DENABLE_FAULT_INJECTION=${ENABLE_FAULT_INJECTION}    \
                   -DWITH_RELATIVE_SRC_PATH=${WITH_RELATIVE_SRC_PATH}    \
+                  -DHLL_PRECISION=${HLL_PRECISION}                      \
                   -DCMAKE_EXPORT_COMPILE_COMMANDS=ON  ..
 
     time ${BUILD_SYSTEM} -j${PARALLEL}
