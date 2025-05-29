@@ -3779,6 +3779,15 @@ When this value is set to less than `0`, the system uses the product of its abso
 - Introduced in: -
 -->
 
+##### graceful_exit_wait_for_frontend_heartbeat
+
+- Default: false
+- Type: Boolean
+- Unit: -
+- Is mutable: Yes
+- Description: Determines whether to await at least one frontend heartbeat response indicating SHUTDOWN status before completing graceful exit. When enabled, the graceful shutdown process remains active until a SHUTDOWN confirmation is responded via heartbeat RPC, ensuring the frontend has sufficient time to detect the termination state between two regular heartbeat intervals.
+- Introduced in: v3.4.5
+
 ### Data Lake
 
 ##### jdbc_connection_pool_size
