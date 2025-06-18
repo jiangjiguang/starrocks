@@ -16,12 +16,17 @@ package com.starrocks.connector;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.starrocks.common.Config;
 import com.starrocks.common.profile.Timer;
 import com.starrocks.common.profile.Tracers;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.hive.HiveWriteUtils;
 import com.starrocks.connector.hive.Partition;
+import com.starrocks.sql.common.ErrorType;
+import com.starrocks.sql.common.StarRocksPlannerException;
 import jline.internal.Log;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -40,7 +45,11 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -52,6 +61,15 @@ import static com.starrocks.connector.hive.HiveWriteUtils.fileCreatedByQuery;
 public class RemoteFileOperations {
     private static final Logger LOG = LogManager.getLogger(RemoteFileOperations.class);
     public static final String HMS_PARTITIONS_REMOTE_FILES = "HMS.PARTITIONS.LIST_FS_PARTITIONS";
+
+    public static final String PREFIX_HDFS_LOCATION = "hdfs://";
+    public static final String PREFIX_HAR_LOCATION = "har://";
+
+
+    // Map<NameNode, ExecutorService>
+    private static Map<String, ExecutorService> MULTIPLE_EXECUTOR_MAP = Maps.newConcurrentMap();
+
+
     protected CachingRemoteFileIO remoteFileIO;
     private final ExecutorService pullRemoteFileExecutor;
     private final Executor updateRemoteFilesExecutor;
@@ -71,6 +89,10 @@ public class RemoteFileOperations {
         this.isRecursive = isRecursive;
         this.enableCatalogLevelCache = enableCatalogLevelCache;
         this.conf = conf;
+    }
+
+    public CachingRemoteFileIO getRemoteFileIO() {
+        return remoteFileIO;
     }
 
     public List<RemoteFileInfo> getRemoteFiles(List<Partition> partitions) {
@@ -108,17 +130,31 @@ public class RemoteFileOperations {
         try (Timer ignored = Tracers.watchScope(Tracers.Module.EXTERNAL, HMS_PARTITIONS_REMOTE_FILES)) {
             for (Partition partition : partitions) {
                 RemotePathKey pathKey = RemotePathKey.of(partition.getFullPath(), isRecursive, hudiTableLocation);
+                ExecutorService realExecutor = pullRemoteFileExecutor;
+                if (Config.enable_remote_file_with_multi_thread_pool) {
+                    realExecutor = getPullRemoteFileExecutor(pathKey.getPath());
+                }
                 pathKey.setHudiContext(hudiContext);
-                Future<Map<RemotePathKey, List<RemoteFileDesc>>> future = pullRemoteFileExecutor.submit(() ->
+                Future<Map<RemotePathKey, List<RemoteFileDesc>>> future = realExecutor.submit(() ->
                         remoteFileIO.getRemoteFiles(pathKey, useCache));
                 futures.add(future);
             }
 
+            int hiveScanTimeout = Config.remote_file_timeout_second;
             for (Future<Map<RemotePathKey, List<RemoteFileDesc>>> future : futures) {
                 try {
-                    result.add(future.get());
+                    if (Config.enable_remote_file_with_multi_thread_pool) {
+                        result.add(future.get(hiveScanTimeout, TimeUnit.SECONDS));
+                    } else {
+                        result.add(future.get());
+                    }
                 } catch (InterruptedException | ExecutionException e) {
                     throw new StarRocksConnectorException("Failed to get remote files, msg: %s", e.getMessage());
+                } catch (TimeoutException e) {
+                    future.cancel(true);
+                    String err = String.format("get remote file infos timed out after %s seconds", hiveScanTimeout);
+                    LOG.warn(err, e);
+                    throw new StarRocksPlannerException(err, ErrorType.INTERNAL_ERROR);
                 }
             }
         }
@@ -129,6 +165,94 @@ public class RemoteFileOperations {
 
         return resultRemoteFiles;
     }
+
+    /**
+     * Obtain the thread pool based on namenode information in the pathKey
+     * @param pathKey HDFS path, format, such as: HDFS://namenode1:8020/path/to/file
+     * @return ExecutorService
+     */
+    public ExecutorService getPullRemoteFileExecutor(String pathKey) {
+        // 1. Extract namenode information from the pathKey
+        String namenode = extractNameNodeFromPath(pathKey).orElse(null);
+
+        // 2. If namenode cannot be extracted or is empty, the default thread pool is returned
+        if (StringUtils.isBlank(namenode)) {
+            return getDefaultThreadPool();
+        }
+
+        // 3. Check whether the thread pool corresponding to the namenode exists
+        if (!MULTIPLE_EXECUTOR_MAP.containsKey(namenode)) {
+            synchronized (this) {
+                // Double check locks to prevent duplicate creation
+                if (!MULTIPLE_EXECUTOR_MAP.containsKey(namenode)) {
+                    // 4. Create a new thread pool and put it in map
+                    ExecutorService newPool = createNewThreadPoolForNameNode(namenode);
+                    MULTIPLE_EXECUTOR_MAP.put(namenode, newPool);
+                }
+            }
+        }
+
+        // 5. Returns the corresponding thread pool
+        return MULTIPLE_EXECUTOR_MAP.get(namenode);
+    }
+
+    /**
+     * Extracts namenode hostname or cluster name from HDFS or HAR path.
+     * Supports formats:
+     * - hdfs://DClusterNmg2/path/to/file → returns "DClusterNmg2"
+     * - har://hdfs-DClusterNmg4/path/to/file → returns "DClusterNmg4"
+     *
+     * @param path The HDFS or HAR path string
+     * @return namenode hostname or cluster name, or null if invalid format
+     */
+    private Optional<String> extractNameNodeFromPath(String path) {
+        if (StringUtils.isBlank(path)) {
+            return Optional.empty();
+        }
+        int start = 0;
+        if (path.startsWith(PREFIX_HDFS_LOCATION)) {
+            // Extract namenode hostname (between "hdfs://" and "/")
+            start = PREFIX_HDFS_LOCATION.length();
+        } else if (path.startsWith(PREFIX_HAR_LOCATION)) {
+            // Handle HAR path format: har://hdfs-DClusterNmg4/...
+            start = PREFIX_HAR_LOCATION.length();
+        }
+        if (start == 0) {
+            // Invalid format, return null
+            return Optional.empty();
+        }
+        int end = path.indexOf('/', start);
+        if (end == -1) {
+            end = path.length();
+        }
+        String prefix = path.substring(start, end);
+        // remove "hdfs-" prefix
+        String flag = "hdfs-";
+        String result = prefix.startsWith(flag)
+                ? prefix.substring(flag.length())
+                : prefix;
+        return Optional.of(result);
+    }
+
+    // Helper: Create a new thread pool for the specified namenode
+    private ExecutorService createNewThreadPoolForNameNode(String namenode) {
+        String threadPoolName = String.format("%s-pull-hive-remote-files", namenode);
+        if (!(pullRemoteFileExecutor instanceof ThreadPoolExecutor)) {
+            throw new StarRocksConnectorException("Executor must be an instance of ThreadPoolExecutor " +
+                    "to create a named thread pool");
+        }
+        ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) pullRemoteFileExecutor;
+        int corePoolSize = threadPoolExecutor.getCorePoolSize();
+        return Executors.newFixedThreadPool(corePoolSize,
+                new ThreadFactoryBuilder().setNameFormat(threadPoolName + "-%d").build());
+    }
+
+    // Helper: Get the default thread pool
+    public ExecutorService getDefaultThreadPool() {
+        // return the default thread pool
+        return pullRemoteFileExecutor;
+    }
+
 
     public List<RemoteFileInfo> getPresentFilesInCache(Collection<Partition> partitions) {
         return getPresentFilesInCache(partitions, Optional.empty());

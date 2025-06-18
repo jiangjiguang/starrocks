@@ -196,6 +196,8 @@ public final class MetricRepo {
 
     public static List<GaugeMetricImpl<Long>> GAUGE_ROUTINE_LOAD_LAGS;
 
+    public static GaugeMetricImpl<Long> GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY;
+
     public static List<GaugeMetricImpl<Long>> GAUGE_MEMORY_USAGE_STATS;
     public static List<GaugeMetricImpl<Long>> GAUGE_OBJECT_COUNT_STATS;
 
@@ -411,6 +413,12 @@ public final class MetricRepo {
         GAUGE_QUERY_LATENCY_P999.addLabel(new MetricLabel("type", "999_quantile"));
         GAUGE_QUERY_LATENCY_P999.setValue(0.0);
         STARROCKS_METRIC_REGISTER.addMetric(GAUGE_QUERY_LATENCY_P999);
+
+        GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY = new GaugeMetricImpl<>("list_located_status_query_latency",
+                MetricUnit.MILLISECONDS, "namenode fileSystem.listLocatedStatus query latency ms");
+        GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY.addLabel(new MetricLabel("type", "mean"));
+        GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY.setValue(0L);
+        STARROCKS_METRIC_REGISTER.addMetric(GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY);
 
         GAUGE_SAFE_MODE = new GaugeMetricImpl<>("safe_mode", MetricUnit.NOUNIT, "safe mode flag");
         GAUGE_SAFE_MODE.addLabel(new MetricLabel("type", "safe_mode"));

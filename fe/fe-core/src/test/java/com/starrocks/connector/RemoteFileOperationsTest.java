@@ -40,16 +40,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.starrocks.connector.hive.MockedRemoteFileSystem.HDFS_HIVE_TABLE;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 
 public class RemoteFileOperationsTest {
-    @Test
-    public void testGetHiveRemoteFiles() {
+
+    private RemoteFileOperations createRemoteFileOperations() {
         HiveRemoteFileIO hiveRemoteFileIO = new HiveRemoteFileIO(new Configuration());
         FileSystem fs = new MockedRemoteFileSystem(HDFS_HIVE_TABLE);
         hiveRemoteFileIO.setFileSystem(fs);
@@ -58,8 +61,15 @@ public class RemoteFileOperationsTest {
         ExecutorService executorToLoad = Executors.newFixedThreadPool(5);
 
         CachingRemoteFileIO cachingFileIO = new CachingRemoteFileIO(hiveRemoteFileIO, executorToRefresh, 10, 10, 10);
-        RemoteFileOperations ops = new RemoteFileOperations(cachingFileIO, executorToLoad, executorToLoad,
+        return new RemoteFileOperations(cachingFileIO, executorToLoad, executorToLoad,
                 false, true, new Configuration());
+    }
+
+    @Test
+    public void testGetHiveRemoteFiles() {
+        // initializing RemoteFileOperations with mocked file system
+        RemoteFileOperations ops = createRemoteFileOperations();
+
 
         String tableLocation = "hdfs://127.0.0.1:10000/hive.db/hive_tbl";
         RemotePathKey pathKey = RemotePathKey.of(tableLocation, false);
@@ -95,11 +105,11 @@ public class RemoteFileOperationsTest {
         Assert.assertEquals(20, blockDesc.getLength());
         Assert.assertEquals(2, blockDesc.getReplicaHostIds().length);
 
-        CachingRemoteFileIO queryLevelCache = CachingRemoteFileIO.createQueryLevelInstance(cachingFileIO, 5);
+        CachingRemoteFileIO queryLevelCache = CachingRemoteFileIO.createQueryLevelInstance(ops.getRemoteFileIO(), 5);
         Assert.assertEquals(1, queryLevelCache.getRemoteFiles(pathKey).size());
 
         Map<RemotePathKey, List<RemoteFileDesc>> presentRemoteFileInfos =
-                cachingFileIO.getPresentRemoteFiles(Lists.newArrayList(pathKey));
+                ops.getRemoteFileIO().getPresentRemoteFiles(Lists.newArrayList(pathKey));
         Assert.assertEquals(1, presentRemoteFileInfos.size());
 
         Assert.assertEquals(2, ops.getPresentFilesInCache(partitions.values()).size());
@@ -273,4 +283,155 @@ public class RemoteFileOperationsTest {
                 "file name or query id is invalid",
                 () -> ops.removeNotCurrentQueryFiles(targetPath, "aaa"));
     }
+
+    @Test
+    public void testGetExecutorForDifferentNameNodes() {
+        // initializing RemoteFileOperations with mocked file system
+        RemoteFileOperations operations = createRemoteFileOperations();
+
+        // mock two different namenode paths
+        String path1 = "hdfs://namenode1/path/to/file";
+        String path2 = "hdfs://namenode2/path/to/file";
+        String path3 = "har://hdfs-DClusterNmg4/path/to/file";
+
+        // get 2 executors for different namenodes
+        ExecutorService executor1 = operations.getPullRemoteFileExecutor(path1);
+        ExecutorService executor2 = operations.getPullRemoteFileExecutor(path2);
+
+        // check that executors for different namenodes are not the same
+        Assert.assertNotEquals(executor1, executor2);
+
+        // check that executors contain the correct namenode identifiers in their toString representation
+        checkThreadPoolName(executor1, "namenode1-pull-hive-remote-files");
+        checkThreadPoolName(executor2, "namenode2-pull-hive-remote-files");
+
+
+        // request the executor for the first namenode again
+        ExecutorService executor1Again = operations.getPullRemoteFileExecutor(path1);
+        Assert.assertEquals(executor1, executor1Again);
+
+        // check har namenode executor
+        ExecutorService executor3 = operations.getPullRemoteFileExecutor(path3);
+        checkThreadPoolName(executor3, "DClusterNmg4-pull-hive-remote-files");
+    }
+
+    private void checkThreadPoolName(ExecutorService executorService, String expectedNamePrefix) {
+        try {
+            // use CountDownLatch to wait for task execution
+            CountDownLatch latch = new CountDownLatch(1);
+            AtomicReference<String> threadName = new AtomicReference<>();
+
+            executorService.submit(() -> {
+                threadName.set(Thread.currentThread().getName());
+                latch.countDown();
+            });
+
+            latch.await(1, TimeUnit.SECONDS);
+            Assert.assertTrue(threadName.get().startsWith(expectedNamePrefix));
+        } catch (Exception e) {
+
+        }
+    }
+
+    @Test
+    public void testGetDefaultExecutorWhenNoNameNode() {
+        // initializing RemoteFileOperations with mocked file system
+        RemoteFileOperations operations = createRemoteFileOperations();
+
+        // mock a local path without a namenode
+        String localPath = "/path/to/local/file";
+
+        // get the executor for a local path
+        ExecutorService defaultExecutor = operations.getPullRemoteFileExecutor(localPath);
+        ExecutorService defaultExecutorAgain = operations.getPullRemoteFileExecutor(localPath);
+
+        // check that the executors for the local path are the same
+        Assert.assertEquals(defaultExecutor, defaultExecutorAgain);
+
+        // check that the executor is the default executor
+        Assert.assertEquals(defaultExecutor, operations.getDefaultThreadPool());
+    }
+
+    @Test
+    public void testConcurrentAccess_SameNameNode() throws InterruptedException {
+        // initializing RemoteFileOperations with mocked file system
+        RemoteFileOperations operations = createRemoteFileOperations();
+        final String path = "hdfs://namenode1/path/to/file";
+        final int threadCount = 10;
+        final ExecutorService[] results = new ExecutorService[threadCount];
+
+        // use CountDownLatch to control concurrency
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(threadCount);
+
+        // starting multiple threads to call getPullRemoteFileExecutor concurrently
+        for (int i = 0; i < threadCount; i++) {
+            final int index = i;
+            new Thread(() -> {
+                try {
+                    // wait all thread ready
+                    startLatch.await();
+                    results[index] = operations.getPullRemoteFileExecutor(path);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    endLatch.countDown();
+                }
+            }).start();
+        }
+        // trigger all thread to execute
+        startLatch.countDown();
+        // wait all thread to finished
+        endLatch.await();
+
+        // check that all threads return the same ExecutorService
+        ExecutorService firstResult = results[0];
+        for (ExecutorService executor : results) {
+            Assert.assertEquals("all threads return the same ExecutorService", firstResult, executor);
+        }
+    }
+
+    @Test
+    public void testConcurrentAccess_DifferentNameNodes() throws InterruptedException {
+        // initializing RemoteFileOperations with mocked file system
+        RemoteFileOperations operations = createRemoteFileOperations();
+        final String[] paths = {
+                "hdfs://namenode1/path/to/file",
+                "hdfs://namenode2/path/to/file",
+                "hdfs://namenode3/path/to/file"
+        };
+        final int threadCount = paths.length;
+        final ExecutorService[] results = new ExecutorService[threadCount];
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            final int index = i;
+            new Thread(() -> {
+                try {
+                    startLatch.await();
+                    results[index] = operations.getPullRemoteFileExecutor(paths[index]);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    endLatch.countDown();
+                }
+            }).start();
+        }
+
+        startLatch.countDown();
+        endLatch.await();
+
+        // check that different namenodes return different ExecutorService
+        for (int i = 0; i < threadCount; i++) {
+            for (int j = i + 1; j < threadCount; j++) {
+                Assert.assertNotEquals(
+                        "different namenodes return different ExecutorService",
+                        results[i], results[j]
+                );
+            }
+        }
+    }
+
 }

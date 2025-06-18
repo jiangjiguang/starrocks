@@ -26,6 +26,7 @@ import com.starrocks.connector.RemoteFileDesc;
 import com.starrocks.connector.RemoteFileIO;
 import com.starrocks.connector.RemotePathKey;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import com.starrocks.metric.MetricRepo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
@@ -67,6 +68,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
     }
 
     public Map<RemotePathKey, List<RemoteFileDesc>> getRemoteFiles(RemotePathKey pathKey, boolean expandWildCards) {
+        long start = System.nanoTime();
         ImmutableMap.Builder<RemotePathKey, List<RemoteFileDesc>> resultPartitions = ImmutableMap.builder();
         String path = pathKey.getPath();
         List<RemoteFileDesc> fileDescs = Lists.newArrayList();
@@ -118,6 +120,13 @@ public class HiveRemoteFileIO implements RemoteFileIO {
             LOG.error("Failed to get hive remote file's metadata on path: {}", path, e);
             throw new StarRocksConnectorException("Failed to get hive remote file's metadata on path: %s. msg: %s",
                     pathKey, e.getMessage());
+        } finally {
+            long elapsed = System.nanoTime() - start;
+            long elapsedMs = elapsed / 1_000_000;
+            LOG.debug("Get hive remote files on path: {}, elapsed: {} ms", pathKey, elapsedMs);
+            if (MetricRepo.hasInit) {
+                MetricRepo.GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY.setValue(elapsedMs);
+            }
         }
 
         return resultPartitions.put(pathKey, fileDescs).build();

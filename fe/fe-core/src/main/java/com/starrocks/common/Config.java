@@ -3285,4 +3285,12 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = false)
     public static int lake_remove_table_thread_num = 4;
+
+    // The max of hive table scan partition timeout
+    @ConfField(mutable = true)
+    public static int remote_file_timeout_second = 60;
+
+    @ConfField(mutable = true)
+    public static boolean enable_remote_file_with_multi_thread_pool = false;
+
 }
