@@ -15,9 +15,14 @@
 
 package com.starrocks.connector.hive;
 
+import com.starrocks.common.Config;
 import com.starrocks.thrift.TTextFileDesc;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public class TextFileFormatDesc {
+    private static final Logger LOG = LogManager.getLogger(TextFileFormatDesc.class);
 
     private final String fieldDelim;
 
@@ -38,7 +43,7 @@ public class TextFileFormatDesc {
 
     public TextFileFormatDesc(String fieldDelim, String lineDelim, String collectionDelim, String mapkeyDelim,
                               int skipHeaderLineCount) {
-        this.fieldDelim = fieldDelim;
+        this.fieldDelim = parseFieldDelim(fieldDelim);
         this.lineDelim = lineDelim;
         this.collectionDelim = collectionDelim;
         this.mapkeyDelim = mapkeyDelim;
@@ -81,6 +86,34 @@ public class TextFileFormatDesc {
         }
         desc.setSkip_header_line_count(skipHeaderLineCount);
         return desc;
+    }
+
+    public String parseFieldDelim(String fieldDelim) {
+        if (!Config.enable_presto_field_delim) {
+            return fieldDelim;
+        }
+        if (StringUtils.isBlank(fieldDelim)) {
+            return fieldDelim;
+        }
+        try {
+            Integer fieldDelimInt = Integer.parseInt(fieldDelim);
+            if (fieldDelimInt != null && fieldDelimInt.equals(9)) {
+                LOG.info("text file format desc fieldDelim: {} parse after value", fieldDelim);
+                return "\t";
+            }
+            LOG.info("text file format desc fieldDelim: {} parse is null: ", fieldDelim);
+            return fieldDelim;
+        } catch (NumberFormatException e) {
+            LOG.info("text file format desc fieldDelim: {} parse exception. ", fieldDelim, e);
+            if (fieldDelim.startsWith("\\x")) {
+                return "x";
+            }
+            if (fieldDelim.length() > 1) {
+                return String.valueOf(fieldDelim.charAt(0));
+            }
+            LOG.info("text file format desc fieldDelim: {} parse after value", fieldDelim);
+            return fieldDelim;
+        }
     }
 
     @Override

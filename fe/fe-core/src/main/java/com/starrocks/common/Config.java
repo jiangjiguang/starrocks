@@ -3293,4 +3293,7 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true)
     public static boolean enable_remote_file_with_multi_thread_pool = false;
 
+    @ConfField(mutable = true)
+    public static boolean enable_presto_field_delim = false;
+
 }
