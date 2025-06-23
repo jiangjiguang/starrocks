@@ -16,12 +16,8 @@
 package com.starrocks.connector.hive;
 
 import com.starrocks.thrift.TTextFileDesc;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public class TextFileFormatDesc {
-    private static final Logger LOG = LogManager.getLogger(TextFileFormatDesc.class);
 
     private final String fieldDelim;
 
@@ -42,28 +38,6 @@ public class TextFileFormatDesc {
 
     public TextFileFormatDesc(String fieldDelim, String lineDelim, String collectionDelim, String mapkeyDelim,
                               int skipHeaderLineCount) {
-        try {
-            Integer fieldDelimInt = Integer.parseInt(fieldDelim);
-            if (fieldDelimInt != null) {
-                if (fieldDelimInt.equals(9)) {
-                    fieldDelim = "\t";
-                    LOG.info("text file format desc fieldDelim: {} parse after value", fieldDelim);
-                }
-            } else {
-                LOG.info("text file format desc fieldDelim: {} parse is null: ", fieldDelim);
-            }
-        } catch (Exception e) {
-            LOG.info("text file format desc fieldDelim: {} parse exception. ", fieldDelim, e);
-        }
-        if (!StringUtils.isBlank(fieldDelim)) {
-            if (!fieldDelim.startsWith("\\")) {
-                fieldDelim = String.valueOf(fieldDelim.charAt(0));
-            }
-            if (fieldDelim.startsWith("\\x")) {
-                fieldDelim = "x";
-            }
-            LOG.info("text file format desc fieldDelim: {} parse after value", fieldDelim);
-        }
         this.fieldDelim = fieldDelim;
         this.lineDelim = lineDelim;
         this.collectionDelim = collectionDelim;
