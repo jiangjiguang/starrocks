@@ -226,15 +226,21 @@ public class HiveMultiPartitionPruner implements PartitionPruner {
         List<ConstantOperator> sortedPartitionValues = new ArrayList<>();
         Map<String, String> partitionMap = parseLocation(location);
         for (int i = 0; i < predictArgs.size(); i++) {
-            ColumnRefOperator columnRefOperator = (ColumnRefOperator) predictArgs.get(i);
-            String column = columnRefOperator.getName();
-            String value = partitionMap.get(column);
-            if (value == null || value.length() == 0) {
-                throw new StarRocksPlannerException("hdfs partition location [" + location + "] abnormal",
-                        ErrorType.INTERNAL_ERROR);
+            if (predictArgs.get(i) instanceof ColumnRefOperator) {
+                ColumnRefOperator columnRefOperator = (ColumnRefOperator) predictArgs.get(i);
+                String column = columnRefOperator.getName();
+                String value = partitionMap.get(column);
+                if (value == null || value.length() == 0) {
+                    throw new StarRocksPlannerException("hdfs partition location [" + location + "] abnormal",
+                            ErrorType.INTERNAL_ERROR);
+                }
+                ConstantOperator paramOperator = new ConstantOperator(value, columnRefOperator.getType());
+                sortedPartitionValues.add(paramOperator);
             }
-            ConstantOperator paramOperator = new ConstantOperator(value, columnRefOperator.getType());
-            sortedPartitionValues.add(paramOperator);
+            if (predictArgs.get(i) instanceof ConstantOperator) {
+                ConstantOperator splitOperator = (ConstantOperator) predictArgs.get(i);
+                sortedPartitionValues.add(splitOperator);
+            }
         }
         return sortedPartitionValues;
     }

@@ -53,6 +53,15 @@ public class HiveMultiPartitionPrunerTest {
     private final CallOperator dateColumn = new CallOperator(FunctionSet.CONCAT_WS, Type.STRING,
             Lists.newArrayList(ConstantOperator.createVarchar("-"), yearColumn, monthColumn, dayColumn));
 
+    private final CallOperator concatDateColumn = new CallOperator(FunctionSet.CONCAT, Type.STRING,
+            Lists.newArrayList(
+                    yearColumn,
+                    ConstantOperator.createVarchar("-"),
+                    monthColumn,
+                    ConstantOperator.createVarchar("-"),
+                    dayColumn)
+    );
+
     // year=2021/month=01/day=01/int_col=0   0
     // year=2021/month=01/day=02/int_col=1   1
     // year=2021/month=01/day=03/int_col=2   2
@@ -360,5 +369,100 @@ public class HiveMultiPartitionPrunerTest {
         conjuncts = listPartitionPruner.getNoEvalConjuncts();
         pruner = initPruner(conjuncts);
         Assert.assertNull(pruner.prune());
+    }
+
+
+
+    @Test
+    public void testConcatBinaryPredicate() throws AnalysisException {
+        // concat(year, '-', month, '-', day) = "2021-01-01"
+        List<ScalarOperator> conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.EQ, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 1, 0, 0, 0))));
+        HiveMultiPartitionPruner pruner = initPruner(conjuncts);
+        Assert.assertEquals(Lists.newArrayList(0L), pruner.prune());
+
+        // concat(year, '-', month, '-', day) < "2021-01-02"
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.LT, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 2, 0, 0, 0))));
+        pruner = initPruner(conjuncts);
+        Assert.assertEquals(Lists.newArrayList(0L), pruner.prune());
+
+        // concat(year, '-', month, '-', day) >= "2021-01-03" and concat(year, '-', month, '-', day) <= "2021-01-03"
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.GE, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 3, 0, 0, 0))));
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.LE, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 3, 0, 0, 0))));
+        pruner = initPruner(conjuncts);
+        Assert.assertEquals(Lists.newArrayList(2L), pruner.prune());
+
+        // concat(year, '-', month, '-', day) > "2021-01-03"
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.GT, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 3, 0, 0, 0))));
+        pruner = initPruner(conjuncts);
+        Assert.assertEquals(Lists.newArrayList(3L, 4L, 5L), pruner.prune());
+
+        // concat(year, '-', month, '-', day) <= "2020-12-31"
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.LE, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2020, 12, 31, 0, 0, 0))));
+        pruner = initPruner(conjuncts);
+        Assert.assertNull(pruner.prune());
+
+        // int_col = 0
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.EQ, intColumn,
+                ConstantOperator.createInt(0)));
+        pruner = initPruner(conjuncts);
+        Assert.assertNull(pruner.prune());
+        ListPartitionPruner listPartitionPruner = initListPruner(pruner);
+        List<Long> partIds = listPartitionPruner.prune();
+        Assert.assertEquals(Lists.newArrayList(0L, 3L), partIds);
+
+        // int_col >= 1
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.GE, intColumn,
+                ConstantOperator.createInt(1)));
+        pruner = initPruner(conjuncts);
+        listPartitionPruner = initListPruner(pruner);
+        Assert.assertEquals(Lists.newArrayList(1L, 2L, 4L, 5L), listPartitionPruner.prune());
+
+        // concat(year, '-', month, '-', day) >= "2021-01-02" and int_col < 2
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.GE, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 2, 0, 0, 0))));
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.LT, intColumn,
+                ConstantOperator.createInt(2)));
+        pruner = initPruner(conjuncts);
+        listPartitionPruner = initListPruner(pruner);
+        partIds = listPartitionPruner.prune();
+        Assert.assertEquals(Lists.newArrayList(0L, 1L, 3L, 4L), partIds);
+
+        conjuncts = listPartitionPruner.getNoEvalConjuncts();
+        pruner = initPruner(conjuncts);
+        List<Long> prunedPartIds = pruner.prune();
+        Assert.assertEquals(Lists.newArrayList(1L, 2L, 3L, 4L, 5L), prunedPartIds);
+        partIds.retainAll(prunedPartIds);
+        Assert.assertEquals(Lists.newArrayList(1L, 3L, 4L), partIds);
+
+
+        // concat(year, '-', month, '-', day) >= "2021-01-02" and concat(year, '-', month, '-', day) <= "2021-01-05"
+        conjuncts = new ArrayList<>();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.GE, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 2, 0, 0, 0))));
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.LE, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 5, 0, 0, 0))));
+        pruner = initPruner(conjuncts);
+        listPartitionPruner = initListPruner(pruner);
+        partIds = listPartitionPruner.prune();
+        Assert.assertNull(partIds);
+
+        conjuncts = listPartitionPruner.getNoEvalConjuncts();
+        pruner = initPruner(conjuncts);
+        prunedPartIds = pruner.prune();
+        Assert.assertEquals(Lists.newArrayList(1L, 2L, 3L, 4L), prunedPartIds);
     }
 }
