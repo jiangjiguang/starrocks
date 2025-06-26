@@ -1045,6 +1045,11 @@ public class ExpressionAnalyzer {
                     fnName = FunctionSet.PERCENTILE_APPROX;
                     FunctionName newFnName = new FunctionName(fnName);
                     node.setFnName(newFnName);
+                    if (!node.getChildren().isEmpty() && !node.getChild(0).getType().isNumericType()) {
+                        Expr first = node.getChild(0);
+                        CastExpr castExpr = new CastExpr(Type.DOUBLE, first);
+                        node.setChild(0, castExpr);
+                    }
                 }
                 if (FunctionSet.NVL.equals(fnName)) {
                     fnName = FunctionSet.IFNULL;

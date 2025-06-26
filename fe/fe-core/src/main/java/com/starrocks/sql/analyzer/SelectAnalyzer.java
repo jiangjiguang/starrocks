@@ -263,6 +263,11 @@ public class SelectAnalyzer {
                             FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
                             if (node.getChildren().size() > 0) {
                                 for (int i = 0; i < node.getChildren().size(); i++) {
+                                    if (!node.getChild(i).getType().isNumericType()) {
+                                        Expr first = node.getChild(i);
+                                        CastExpr castExpr = new CastExpr(Type.DOUBLE, first);
+                                        node.setChild(i, castExpr);
+                                    }
                                     newNode.setChild(i, node.getChild(i));
                                 }
                                 item.setExpr(newNode);
