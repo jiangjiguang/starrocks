@@ -26,7 +26,6 @@ import com.starrocks.analysis.DescriptorTable;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.LiteralExpr;
 import com.starrocks.common.util.Util;
-import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.iceberg.IcebergApiConverter;
 import com.starrocks.connector.iceberg.IcebergCatalogType;
@@ -40,7 +39,6 @@ import com.starrocks.thrift.TIcebergTable;
 import com.starrocks.thrift.TPartitionMap;
 import com.starrocks.thrift.TTableDescriptor;
 import com.starrocks.thrift.TTableType;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
@@ -287,8 +285,6 @@ public class IcebergTable extends Table {
 
     @Override
     public String getTableIdentifier() {
-        UserGroupInformation ugi = HdfsEnvironment.getUserGroupInformation(catalogName);
-        UserGroupInformation.setLoginUser(ugi);
         String uuid = ((BaseTable) getNativeTable()).operations().current().uuid();
         return Joiner.on(":").join(name, uuid == null ? "" : uuid);
     }

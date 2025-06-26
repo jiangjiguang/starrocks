@@ -114,8 +114,9 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
             if (key.equalsIgnoreCase(LOCATION_PROPERTY)) {
                 try {
                     URI uri = new Path(value).toUri();
-                    FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri);
-                    fileSystem.exists(new Path(value));
+                    try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri)) {
+                        fileSystem.exists(new Path(value));
+                    }
                 } catch (Exception e) {
                     LOG.error("Invalid location URI: {}", value, e);
                     throw new StarRocksConnectorException("Invalid location URI: %s. msg: %s", value, e.getMessage());
@@ -196,12 +197,13 @@ public class IcebergHadoopCatalog implements IcebergCatalog {
             return;
         }
 
-        URI uri = new Path(fileLocations.get(0)).toUri();
         try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri);
-            for (String location : fileLocations) {
-                Path path = new Path(location);
-                fileSystem.delete(path, false);
+            URI uri = new Path(fileLocations.get(0)).toUri();
+            try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, uri)) {
+                for (String location : fileLocations) {
+                    Path path = new Path(location);
+                    fileSystem.delete(path, false);
+                }
             }
         } catch (Exception e) {
             LOG.error("Failed to delete uncommitted files", e);

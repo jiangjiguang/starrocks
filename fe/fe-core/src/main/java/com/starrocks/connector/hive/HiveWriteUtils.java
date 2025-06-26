@@ -49,8 +49,7 @@ public class HiveWriteUtils {
     }
 
     public static boolean pathExists(Path path, Configuration conf) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri())) {
             return fileSystem.exists(path);
         } catch (Exception e) {
             LOG.error("Failed to check path {}", path, e);
@@ -59,8 +58,7 @@ public class HiveWriteUtils {
     }
 
     public static boolean isDirectory(Path path, Configuration conf) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri())) {
             return fileSystem.getFileStatus(path).isDirectory();
         } catch (IOException e) {
             LOG.error("Failed checking path {}", path, e);
@@ -69,8 +67,7 @@ public class HiveWriteUtils {
     }
 
     public static boolean isEmpty(Path path, Configuration conf) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri())) {
             return !fileSystem.listFiles(path, false).hasNext();
         } catch (IOException e) {
             LOG.error("Failed checking path {}", path, e);
@@ -79,8 +76,7 @@ public class HiveWriteUtils {
     }
 
     public static void createDirectory(Path path, Configuration conf) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri())) {
             if (!fileSystem.mkdirs(path)) {
                 LOG.error("Mkdir {} returned false", path);
                 throw new IOException("mkdirs returned false");
@@ -124,8 +120,7 @@ public class HiveWriteUtils {
     }
 
     public static boolean deleteIfExists(Path path, boolean recursive, Configuration conf) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri())) {
             if (fileSystem.delete(path, recursive)) {
                 return true;
             }

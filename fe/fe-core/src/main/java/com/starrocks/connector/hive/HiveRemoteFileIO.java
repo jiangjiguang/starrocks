@@ -73,9 +73,9 @@ public class HiveRemoteFileIO implements RemoteFileIO {
         ImmutableMap.Builder<RemotePathKey, List<RemoteFileDesc>> resultPartitions = ImmutableMap.builder();
         String path = pathKey.getPath();
         List<RemoteFileDesc> fileDescs = Lists.newArrayList();
+        FileSystem fileSystem = null;
         try {
             URI uri = new Path(path).toUri();
-            FileSystem fileSystem;
             if (!FeConstants.runningUnitTest) {
                 fileSystem = HdfsEnvironment.getFileSystem(configuration, uri);
             } else {
@@ -122,6 +122,13 @@ public class HiveRemoteFileIO implements RemoteFileIO {
             throw new StarRocksConnectorException("Failed to get hive remote file's metadata on path: %s. msg: %s",
                     pathKey, e.getMessage());
         } finally {
+            if (fileSystem != null) {
+                try {
+                    fileSystem.close();
+                } catch (IOException e) {
+                    throw new StarRocksConnectorException("close FileSystem fail.", e);
+                }
+            }
             long elapsed = System.nanoTime() - start;
             long elapsedMs = elapsed / 1_000_000;
             LOG.debug("Get hive remote files on path: {}, elapsed: {} ms", pathKey, elapsedMs);

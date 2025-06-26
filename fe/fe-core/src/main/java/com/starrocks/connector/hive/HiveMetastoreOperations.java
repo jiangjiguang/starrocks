@@ -39,6 +39,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -93,8 +94,9 @@ public class HiveMetastoreOperations {
             if (key.equalsIgnoreCase(LOCATION_PROPERTY)) {
                 try {
                     URI uri = new Path(value).toUri();
-                    FileSystem fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, uri);
-                    fileSystem.exists(new Path(value));
+                    try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, uri)) {
+                        fileSystem.exists(new Path(value));
+                    }
                 } catch (Exception e) {
                     LOG.error("Invalid location URI: {}", value, e);
                     throw new StarRocksConnectorException("Invalid location URI: %s. msg: %s", value, e.getMessage());
@@ -125,11 +127,20 @@ public class HiveMetastoreOperations {
             throw new MetaNotFoundException("Database location is empty");
         }
         boolean deleteData = false;
+        FileSystem fileSystem = null;
         try {
-            deleteData = !HdfsEnvironment.getFileSystem(hadoopConf, URI.create(dbLocation))
-                    .listLocatedStatus(new Path(dbLocation)).hasNext();
+            fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, URI.create(dbLocation));
+            deleteData = !fileSystem.listLocatedStatus(new Path(dbLocation)).hasNext();
         } catch (Exception e) {
             LOG.error("Failed to check database directory", e);
+        } finally {
+            if (fileSystem != null) {
+                try {
+                    fileSystem.close();
+                } catch (IOException e) {
+                    LOG.error("Failed to close FileSystem", e);
+                }
+            }
         }
 
         metastore.dropDb(dbName, deleteData);
@@ -200,19 +211,28 @@ public class HiveMetastoreOperations {
         } catch (Exception e) {
             LOG.error("Failed to create table {}.{}", dbName, tableName);
             boolean shouldDelete;
+            FileSystem fileSystem = null;
             try {
                 if (tableExists(dbName, tableName)) {
                     LOG.warn("Table {}.{} already exists. But some error occur such as accessing meta service timeout",
                             dbName, table, e);
                     return true;
                 }
-                FileSystem fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, URI.create(tablePath.toString()));
+                fileSystem = HdfsEnvironment.getFileSystem(hadoopConf, URI.create(tablePath.toString()));
                 shouldDelete = !fileSystem.listLocatedStatus(tablePath).hasNext() && !tableLocationExists;
                 if (shouldDelete) {
                     fileSystem.delete(tablePath);
                 }
             } catch (Exception e1) {
                 LOG.error("Failed to delete table location {}", tablePath, e);
+            } finally {
+                if (fileSystem != null) {
+                    try {
+                        fileSystem.close();
+                    } catch (IOException e1) {
+                        LOG.error("close FileSystem fail.", e1);
+                    }
+                }
             }
             throw new DdlException(String.format("Failed to create table %s.%s. msg: %s", dbName, tableName, e.getMessage()));
         }

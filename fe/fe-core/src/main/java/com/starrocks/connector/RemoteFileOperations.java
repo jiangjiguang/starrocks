@@ -324,39 +324,41 @@ public class RemoteFileOperations {
             Path writePath,
             Path targetPath,
             List<String> fileNames) {
-        FileSystem fileSystem;
-        try {
-            fileSystem = HdfsEnvironment.getFileSystem(conf, writePath.toUri());
-        } catch (Exception e) {
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, writePath.toUri())) {
+            for (String fileName : fileNames) {
+                Path source = new Path(writePath, fileName);
+                Path target = new Path(targetPath, fileName);
+                renameFileFutures.add(CompletableFuture.runAsync(() -> {
+                    if (cancelled.get()) {
+                        return;
+                    }
+                    try {
+                        if (fileSystem.exists(target)) {
+                            throw new StarRocksConnectorException("Failed to move data files from %s " +
+                                    "to target location %s. msg: target location already exists",
+                                    source, target);
+                        }
+
+                        if (!fileSystem.rename(source, target)) {
+                            throw new StarRocksConnectorException("Failed to move data files from %s " +
+                                    "to target location %s. msg: rename operation failed",
+                                    source, target);
+                        }
+                    } catch (IOException e) {
+                        LOG.error("Failed to rename data files", e);
+                        throw new StarRocksConnectorException("Failed to move data files from %s " +
+                                "to final location %s. msg: %s",
+                                source, target, e.getMessage());
+                    }
+                }, updateRemoteFilesExecutor));
+            }
+        } catch (IOException e) {
             Log.error("Failed to get fileSystem", e);
             throw new StarRocksConnectorException("Failed to move data files to target location. " +
                     "Failed to get file system on path %s. msg: %s", writePath, e.getMessage());
         }
 
-        for (String fileName : fileNames) {
-            Path source = new Path(writePath, fileName);
-            Path target = new Path(targetPath, fileName);
-            renameFileFutures.add(CompletableFuture.runAsync(() -> {
-                if (cancelled.get()) {
-                    return;
-                }
-                try {
-                    if (fileSystem.exists(target)) {
-                        throw new StarRocksConnectorException("Failed to move data files from %s to target location %s. msg:" +
-                                " target location already exists", source, target);
-                    }
 
-                    if (!fileSystem.rename(source, target)) {
-                        throw new StarRocksConnectorException("Failed to move data files from %s to target location %s. msg:" +
-                                " rename operation failed", source, target);
-                    }
-                } catch (IOException e) {
-                    LOG.error("Failed to rename data files", e);
-                    throw new StarRocksConnectorException("Failed to move data files from %s to final location %s. msg: %s",
-                            source, target, e.getMessage());
-                }
-            }, updateRemoteFilesExecutor));
-        }
     }
 
     public void renameDirectory(Path source, Path target, Runnable runWhenPathNotExist) {
@@ -371,8 +373,8 @@ public class RemoteFileOperations {
 
         runWhenPathNotExist.run();
 
-        try {
-            if (!HdfsEnvironment.getFileSystem(conf, source.toUri()).rename(source, target)) {
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, source.toUri())) {
+            if (!fileSystem.rename(source, target)) {
                 throw new StarRocksConnectorException("Failed to rename %s to %s: rename returned false", source, target);
             }
         } catch (IOException e) {
@@ -381,8 +383,7 @@ public class RemoteFileOperations {
     }
 
     public void removeNotCurrentQueryFiles(Path partitionPath, String queryId) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, partitionPath.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, partitionPath.toUri())) {
             RemoteIterator<LocatedFileStatus> iterator = fileSystem.listFiles(partitionPath, false);
             while (iterator.hasNext()) {
                 Path file = iterator.next().getPath();
@@ -406,8 +407,7 @@ public class RemoteFileOperations {
     }
 
     public FileStatus[] listStatus(Path path) {
-        try {
-            FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri());
+        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, path.toUri())) {
             return fileSystem.listStatus(path);
         } catch (Exception e) {
             LOG.error("Failed to list path {}", path, e);
