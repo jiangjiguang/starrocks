@@ -1045,11 +1045,10 @@ public class ExpressionAnalyzer {
                     fnName = FunctionSet.PERCENTILE_APPROX;
                     FunctionName newFnName = new FunctionName(fnName);
                     node.setFnName(newFnName);
-                    if (!node.getChildren().isEmpty() && !node.getChild(0).getType().isNumericType()) {
-                        Expr first = node.getChild(0);
-                        CastExpr castExpr = new CastExpr(Type.DOUBLE, first);
-                        node.setChild(0, castExpr);
-                    }
+                    castNodeToDouble(node);
+                }
+                if (FunctionSet.PERCENTILE_APPROX.equals(fnName)) {
+                    castNodeToDouble(node);
                 }
                 if (FunctionSet.NVL.equals(fnName)) {
                     fnName = FunctionSet.IFNULL;
@@ -2209,6 +2208,18 @@ public class ExpressionAnalyzer {
 
         ResolveSlotVisitor visitor = new ResolveSlotVisitor(new AnalyzeState(), ConnectContext.get(), slotRefConsumer);
         expressionAnalyzer.analyzeWithVisitor(expression, state, scope, visitor);
+    }
+
+    public static void castNodeToDouble(FunctionCallExpr node) {
+        if (node.getChildren().isEmpty()) {
+            return;
+        }
+        node.getChildren().forEach(item -> {
+            if (!item.getType().isNumericType()) {
+                CastExpr castExpr = new CastExpr(Type.DOUBLE, item);
+                node.setChild(0, castExpr);
+            }
+        });
     }
 }
 
