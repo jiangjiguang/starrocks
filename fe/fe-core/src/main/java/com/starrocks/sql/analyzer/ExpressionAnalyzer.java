@@ -359,7 +359,7 @@ public class ExpressionAnalyzer {
         scope.clearLambdaInputs();
     }
 
-    private void bottomUpAnalyze(Visitor visitor, Expr expression, Scope scope) {
+    protected void bottomUpAnalyze(Visitor visitor, Expr expression, Scope scope) {
         boolean hasLambdaFunc = false;
         try {
             hasLambdaFunc = expression.hasLambdaFunction(expression);

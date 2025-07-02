@@ -33,6 +33,7 @@ import com.starrocks.common.profile.Tracers;
 import com.starrocks.http.HttpConnectContext;
 import com.starrocks.planner.PlanFragment;
 import com.starrocks.planner.ResultSink;
+import com.starrocks.qe.AuthCheckerProcessor;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
@@ -106,6 +107,10 @@ public class StatementPlanner {
         }
 
         boolean needWholePhaseLock = true;
+
+        AuthCheckerProcessor authCheckerProcessor = GlobalStateMgr.getCurrentState().getAuthCheckerProcessor();
+        authCheckerProcessor.authCheck(stmt, session);
+
         // 1. For all queries, we need db lock when analyze phase
         PlannerMetaLocker plannerMetaLocker = new PlannerMetaLocker(session, stmt);
         try (var guard = session.bindScope()) {

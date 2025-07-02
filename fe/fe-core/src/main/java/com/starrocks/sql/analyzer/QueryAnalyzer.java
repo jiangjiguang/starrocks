@@ -125,7 +125,7 @@ public class QueryAnalyzer {
         new Visitor().process(node, parent);
     }
 
-    private class GeneratedColumnExprMappingCollector implements AstVisitor<Void, Scope> {
+    protected class GeneratedColumnExprMappingCollector implements AstVisitor<Void, Scope> {
         public GeneratedColumnExprMappingCollector() {
         }
 
@@ -280,7 +280,7 @@ public class QueryAnalyzer {
         }
     }
 
-    private class Visitor implements AstVisitor<Scope, Scope> {
+    protected class Visitor implements AstVisitor<Scope, Scope> {
         public Visitor() {
         }
 
@@ -389,7 +389,7 @@ public class QueryAnalyzer {
         }
 
         // for reduce meta initialization, only support simple query relation, like: select x1, x2 from t;
-        private void pruneScanColumns(SelectRelation selectRelation, Relation fromRelation) {
+        protected void pruneScanColumns(SelectRelation selectRelation, Relation fromRelation) {
             if (!session.getSessionVariable().isEnableAnalyzePhasePruneColumns() ||
                     !(fromRelation instanceof TableRelation) ||
                     !Objects.isNull(selectRelation.getGroupByClause()) ||
@@ -414,7 +414,7 @@ public class QueryAnalyzer {
             ((TableRelation) fromRelation).setPruneScanColumns(scanColumns);
         }
 
-        private Relation resolveTableRef(Relation relation, Scope scope, Set<TableName> aliasSet) {
+        protected Relation resolveTableRef(Relation relation, Scope scope, Set<TableName> aliasSet) {
             if (relation instanceof JoinRelation) {
                 JoinRelation join = (JoinRelation) relation;
                 join.setLeft(resolveTableRef(join.getLeft(), scope, aliasSet));

@@ -851,7 +851,7 @@ public class SelectAnalyzer {
         return orderScope;
     }
 
-    private void analyzeExpression(Expr expr, AnalyzeState analyzeState, Scope scope) {
+    protected void analyzeExpression(Expr expr, AnalyzeState analyzeState, Scope scope) {
         ExpressionAnalyzer.analyzeExpression(expr, analyzeState, scope, session);
     }
 

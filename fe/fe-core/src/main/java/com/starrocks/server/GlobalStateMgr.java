@@ -181,6 +181,7 @@ import com.starrocks.privilege.NativeAccessController;
 import com.starrocks.privilege.PrivilegeException;
 import com.starrocks.privilege.ranger.starrocks.RangerStarRocksAccessController;
 import com.starrocks.qe.AuditEventProcessor;
+import com.starrocks.qe.AuthCheckerProcessor;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.DDLStmtExecutor;
 import com.starrocks.qe.JournalObservable;
@@ -408,6 +409,8 @@ public class GlobalStateMgr {
     private final PluginMgr pluginMgr;
 
     private final AuditEventProcessor auditEventProcessor;
+
+    private final AuthCheckerProcessor authCheckerProcessor;
 
     private final StatisticsMetaManager statisticsMetaManager;
 
@@ -712,6 +715,7 @@ public class GlobalStateMgr {
 
         this.pluginMgr = new PluginMgr();
         this.auditEventProcessor = new AuditEventProcessor(this.pluginMgr);
+        this.authCheckerProcessor = new AuthCheckerProcessor(this.pluginMgr);
         this.analyzeMgr = new AnalyzeMgr();
         this.localMetastore = new LocalMetastore(this, recycleBin, colocateTableIndex);
         this.temporaryTableMgr = new TemporaryTableMgr();
@@ -892,6 +896,10 @@ public class GlobalStateMgr {
 
     public AuditEventProcessor getAuditEventProcessor() {
         return auditEventProcessor;
+    }
+
+    public AuthCheckerProcessor getAuthCheckerProcessor() {
+        return authCheckerProcessor;
     }
 
     public static int getCurrentStateStarRocksMetaVersion() {
@@ -1121,6 +1129,7 @@ public class GlobalStateMgr {
             // init plugin manager
             pluginMgr.init();
             auditEventProcessor.start();
+            authCheckerProcessor.start();
 
             // 2. get cluster id and role (Observer or Follower)
             nodeMgr.getClusterIdAndRoleOnStartup();
