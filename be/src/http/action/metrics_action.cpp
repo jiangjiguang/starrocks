@@ -69,6 +69,8 @@ private:
 
     void _visit_simple_metric(const std::string& name, const MetricLabels& labels, Metric* metric);
 
+    void _visit_histogram_metric(const std::string& name, const MetricLabels& labels, HistogramMetric* metric);
+
     // Return true iff name ends with suffix output by LatencyRecorder.
     bool _dump_latency_recorder_suffix(const butil::StringPiece& name, const butil::StringPiece& desc);
 
@@ -136,10 +138,68 @@ void PrometheusMetricsVisitor::visit(const std::string& prefix, const std::strin
             _visit_simple_metric(metric_name, it.first, (Metric*)it.second);
         }
         break;
+    case MetricType::HISTOGRAM:
+        for (auto& it : collector->metrics()) {
+            _visit_histogram_metric(metric_name, it.first, dynamic_cast<HistogramMetric*>(it.second));
+        }
+        break;
     default:
         break;
     }
 }
+
+
+void PrometheusMetricsVisitor::_visit_histogram_metric(const std::string& name,
+                                                      const MetricLabels& labels,
+                                                      HistogramMetric* metric) {
+    if (!metric) return;
+
+    // 1. get thread safe snapshot
+    auto snap = metric->precise_snapshot();
+
+    // 2. output all bucket data
+    for (size_t i = 0; i < snap.buckets.size(); ++i) {
+        _ss << name << "_bucket{";
+        // output business tag
+        if (!labels.empty()) {
+            int j = 0;
+            for (auto& label : labels.labels) {
+                _ss << (j++ > 0 ? "," : "")
+                    << label.name << "=\"" << label.value << "\"";
+            }
+            _ss << ",";  // The business label is separated from the le label
+        }
+        // Output a dedicated label for histograms
+        _ss << "le=\"" << snap.buckets[i] << "\"} " << snap.bucket_counts[i] << "\n";
+    }
+
+    // 3. Output the total sum and count
+    _ss << name << "_sum";
+    if (!labels.empty()) {
+        _ss << "{";
+        int i = 0;
+        for (auto& label : labels.labels) {
+            _ss << (i++ > 0 ? "," : "")
+                << label.name << "=\"" << label.value << "\"";
+        }
+        _ss << "}";
+    }
+    _ss << " " << snap.sum << "\n";
+
+    _ss << name << "_count";
+    if (!labels.empty()) {
+        _ss << "{";
+        int i = 0;
+        for (auto& label : labels.labels) {
+            _ss << (i++ > 0 ? "," : "")
+                << label.name << "=\"" << label.value << "\"";
+        }
+        _ss << "}";
+    }
+    _ss << " " << snap.count << "\n";
+}
+
+
 
 void PrometheusMetricsVisitor::_visit_simple_metric(const std::string& name, const MetricLabels& labels,
                                                     Metric* metric) {
@@ -284,6 +344,34 @@ public:
 
 private:
     rapidjson::Document doc{rapidjson::kArrayType};
+    void addLabelsToJson(const MetricLabels& labels,
+        rapidjson::Value& json_obj,
+        rapidjson::Document::AllocatorType& allocator);
+
+    void handleHistogramMetrics(
+        const std::string& name,
+        MetricCollector* collector,
+        rapidjson::Document::AllocatorType& allocator);
+
+    void addHistogramCountMetric(
+        const std::string& name,
+        const MetricLabels& labels,
+        const HistogramSnapshot& snapshot,
+        rapidjson::Document::AllocatorType& allocator);
+
+    void addHistogramSumMetric(
+        const std::string& name,const MetricLabels& labels,
+        const HistogramSnapshot& snapshot,
+        MetricUnit unit,
+        rapidjson::Document::AllocatorType& allocator);
+
+    void addHistogramBucketMetrics(
+        const std::string& name,
+        const MetricLabels& labels,
+        const HistogramSnapshot& snapshot,
+        MetricUnit unit,
+        rapidjson::Document::AllocatorType& allocator);
+
 };
 
 void JsonMetricsVisitor::visit(const std::string& prefix, const std::string& name, MetricCollector* collector) {
@@ -315,10 +403,116 @@ void JsonMetricsVisitor::visit(const std::string& prefix, const std::string& nam
             doc.PushBack(metric_obj, allocator);
         }
         break;
+    case MetricType::HISTOGRAM:
+        handleHistogramMetrics(name, collector, allocator);
+        break;
     default:
         break;
     }
 }
+
+
+void JsonMetricsVisitor::handleHistogramMetrics(const std::string& name,
+                                             MetricCollector* collector,
+                                             rapidjson::Document::AllocatorType& allocator) {
+    for (auto& it : collector->metrics()) {
+        const MetricLabels& labels = it.first;
+        auto* histogram = reinterpret_cast<HistogramMetric*>(it.second);
+
+        // get thread safe snapshot
+        auto snapshot = histogram->precise_snapshot();
+
+        // deal with count/sum/bucket metric
+        addHistogramCountMetric(name, labels, snapshot, allocator);
+        addHistogramSumMetric(name, labels, snapshot, histogram->unit(), allocator);
+        addHistogramBucketMetrics(name, labels, snapshot, histogram->unit(), allocator);
+    }
+}
+
+void JsonMetricsVisitor::addHistogramCountMetric(const std::string& name,
+                                              const MetricLabels& labels,
+                                              const HistogramSnapshot& snapshot,
+                                              rapidjson::Document::AllocatorType& allocator) {
+    rapidjson::Value metric_obj(rapidjson::kObjectType);
+    rapidjson::Value tags(rapidjson::kObjectType);
+
+    // make tags
+    tags.AddMember("metric", rapidjson::Value((name + "_count").c_str(), allocator), allocator);
+    addLabelsToJson(labels, tags, allocator);
+
+    // make full metric object
+    metric_obj.AddMember("tags", tags, allocator);
+    metric_obj.AddMember("unit", "count", allocator);
+    metric_obj.AddMember("value", snapshot.count, allocator);
+
+    doc.PushBack(metric_obj, allocator);
+}
+
+void JsonMetricsVisitor::addHistogramSumMetric(const std::string& name,
+                                            const MetricLabels& labels,
+                                            const HistogramSnapshot& snapshot,
+                                            MetricUnit unit,
+                                            rapidjson::Document::AllocatorType& allocator) {
+    rapidjson::Value metric_obj(rapidjson::kObjectType);
+    rapidjson::Value tags(rapidjson::kObjectType);
+
+    tags.AddMember("metric", rapidjson::Value((name + "_sum").c_str(), allocator), allocator);
+    addLabelsToJson(labels, tags, allocator);
+
+    metric_obj.AddMember("tags", tags, allocator);
+    metric_obj.AddMember("unit", rapidjson::Value(unit_name(unit), allocator), allocator);
+    metric_obj.AddMember("value", snapshot.sum, allocator);
+
+    doc.PushBack(metric_obj, allocator);
+}
+
+void JsonMetricsVisitor::addHistogramBucketMetrics(const std::string& name,
+                                                const MetricLabels& labels,
+                                                const HistogramSnapshot& snapshot,
+                                                MetricUnit unit,
+                                                rapidjson::Document::AllocatorType& allocator) {
+    // check data valid
+    if (snapshot.buckets.size() != snapshot.bucket_counts.size()) {
+        LOG(ERROR) << "Bucket data size mismatch in histogram " << name;
+        return;
+    }
+
+    // deal every bucket
+    for (size_t i = 0; i < snapshot.buckets.size(); ++i) {
+        rapidjson::Value metric_obj(rapidjson::kObjectType);
+        rapidjson::Value tags(rapidjson::kObjectType);
+
+        tags.AddMember("metric", rapidjson::Value((name + "_bucket").c_str(), allocator), allocator);
+        addLabelsToJson(labels, tags, allocator);
+
+        // add le tag
+        std::string le_value = std::isinf(snapshot.buckets[i])
+                            ? "+Inf"
+                            : std::to_string(snapshot.buckets[i]);
+        tags.AddMember("le", rapidjson::Value(le_value.c_str(), allocator), allocator);
+
+        metric_obj.AddMember("tags", tags, allocator);
+        metric_obj.AddMember("unit", rapidjson::Value(unit_name(unit), allocator), allocator);
+        metric_obj.AddMember("value", snapshot.bucket_counts[i], allocator);
+
+        doc.PushBack(metric_obj, allocator);
+    }
+}
+
+void JsonMetricsVisitor::addLabelsToJson(const MetricLabels& labels,
+                                       rapidjson::Value& json_obj,
+                                       rapidjson::Document::AllocatorType& allocator) {
+    if (labels.empty()) return;
+
+    for (auto& label : labels.labels) {
+        json_obj.AddMember(
+            rapidjson::Value(label.name.c_str(), allocator),
+            rapidjson::Value(label.value.c_str(), allocator),
+            allocator
+        );
+    }
+}
+
 
 void MetricsAction::handle(HttpRequest* req) {
     auto scoped_span = trace::Scope(Tracer::Instance().start_trace("http_handle_metrics"));

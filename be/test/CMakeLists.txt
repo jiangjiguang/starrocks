@@ -485,7 +485,11 @@ if ("${USE_STAROS}" STREQUAL "ON")
 endif ()
 
 if (USE_AVX2)
-    set(EXEC_FILES ${EXEC_FILES} ./column/avx_numeric_column_test.cpp)
+    set(EXEC_FILES ${EXEC_FILES} ./column/avx_numeric_column_test.cpp
+            util/histogram_hdfs_metrics_test.cpp
+            util/histogram_hdfs_metrics_test.cpp
+            util/histogram_hdfs_metrics_test.cpp
+    )
 endif ()
 
 add_library(starrocks_test_objs OBJECT ${EXEC_FILES})

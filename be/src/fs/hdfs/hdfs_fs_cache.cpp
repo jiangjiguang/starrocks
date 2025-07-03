@@ -20,6 +20,7 @@
 #include "gutil/strings/substitute.h"
 #include "udf/java/java_udf.h"
 #include "util/hdfs_util.h"
+#include "util/starrocks_metrics.h"
 
 namespace starrocks {
 
@@ -42,6 +43,9 @@ static const std::map<std::string, std::string> get_cloud_properties(const FSOpt
 
 static Status create_hdfs_fs_handle(const std::string& namenode, const std::shared_ptr<HdfsFsClient>& hdfs_client,
                                     const FSOptions& options) {
+    // record start time
+    auto start_time = std::chrono::steady_clock::now();
+
     RETURN_IF_ERROR(detect_java_runtime());
     auto hdfs_builder = hdfsNewBuilder();
     hdfsBuilderSetNameNode(hdfs_builder, namenode.c_str());
@@ -119,11 +123,24 @@ static Status create_hdfs_fs_handle(const std::string& namenode, const std::shar
                               hedged_read_threshold_millis.data());
     }
 
+    bool enable_report_hdfs_metrics = config::enable_report_hdfs_metrics;
+
     hdfs_client->hdfs_fs = hdfsBuilderConnect(hdfs_builder);
     if (hdfs_client->hdfs_fs == nullptr) {
+        if (enable_report_hdfs_metrics) {
+            StarRocksMetrics::instance()->hdfs_namenode_connect_error_total.increment(1);
+        }
         return Status::InternalError(strings::Substitute("fail to connect hdfs namenode, namenode=$0, err=$1", namenode,
                                                          get_hdfs_err_msg()));
     }
+
+    // record end time and calculate latency
+    if (enable_report_hdfs_metrics) {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start_time);
+        StarRocksMetrics::instance()->hdfs_namenode_connect_latency.update(duration.count());
+    }
+
     return Status::OK();
 }
 

@@ -229,8 +229,8 @@ struct MetricLabel {
     MetricLabel() = default;
     MetricLabel(std::string name_, std::string value_) : name(std::move(name_)), value(std::move(value_)) {}
 
-    bool operator==(const MetricLabel& other) const { return name == other.name && value == other.value; }
-    bool operator!=(const MetricLabel& other) const { return !(*this == other); }
+    bool operator == (const MetricLabel& other) const { return name == other.name && value == other.value; }
+    bool operator != (const MetricLabel& other) const { return !(*this == other); }
     bool operator<(const MetricLabel& other) const {
         auto res = name.compare(other.name);
         if (res == 0) {
@@ -398,6 +398,164 @@ private:
     std::map<std::string, std::function<void()>> _hooks;
 };
 
+
+struct HistogramSnapshot {
+    double sum = 0;
+    int64_t count = 0;
+    std::vector<double> buckets;
+    std::vector<int64_t> bucket_counts;
+};
+
+
+struct alignas(64) RelaxedAtomicCounter {
+    std::atomic<int64_t> count{0};
+
+    // Default constructor
+    RelaxedAtomicCounter() = default;
+
+    // Move constructor
+    RelaxedAtomicCounter(RelaxedAtomicCounter&& other) noexcept {
+        count.store(other.count.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    }
+
+    // Move assignment
+    RelaxedAtomicCounter& operator=(RelaxedAtomicCounter&& other) noexcept {
+        count.store(other.count.load(std::memory_order_relaxed), std::memory_order_relaxed);
+        return *this;
+    }
+
+    void add(int64_t n) noexcept {
+        count.store(count.load(std::memory_order_relaxed) + n,
+                   std::memory_order_relaxed);
+    }
+
+    int64_t sum() const noexcept {
+        return count.load(std::memory_order_acquire);
+    }
+};
+
+class HistogramMetric : public Metric {
+public:
+    HistogramMetric(MetricUnit unit, std::vector<double> buckets)
+        : Metric(MetricType::HISTOGRAM, unit),
+          _sum(0),
+          _count(0),
+          _max_bucket(0)
+    {
+        prepare_buckets(buckets);
+        if (_buckets.size() >= 2) {
+            _max_bucket = _buckets[_buckets.size() - 2];
+        }
+    }
+
+    void update(double value) noexcept {
+        LOG(INFO) << "Updating histogram with value: " << value;
+        _sum.fetch_add(value, std::memory_order_relaxed);
+        _count.fetch_add(1, std::memory_order_relaxed);
+
+        if (value > _max_bucket) {
+            _bucket_counts.back().add(1);
+            return;
+        }
+
+        auto it = std::lower_bound(_buckets.begin(), _buckets.end() - 1, value);
+        size_t index = std::distance(_buckets.begin(), it);
+
+        for (size_t i = index; i < _buckets.size(); ++i) {
+            _bucket_counts[i].add(1);
+        }
+        debug_print();
+    }
+
+    HistogramSnapshot precise_snapshot() const {
+        HistogramSnapshot snap;
+
+        // 1. Atomic loading base values
+        snap.sum = _sum.load(std::memory_order_acquire);
+        snap.count = _count.load(std::memory_order_acquire);
+
+        // 2. Check the validity of the bucket definition
+        if (_buckets.empty() || _bucket_counts.size() != _buckets.size()) {
+            return snap;  // Return an empty snapshot
+        }
+
+        // 3. Copy bucket definition (const operation, no need for synchronization)
+        snap.buckets = _buckets;
+        snap.bucket_counts.resize(_buckets.size());
+
+        // 4. Cumulative counting method (compliant with Prometheus specification)
+        // The first bucket is its own count
+        snap.bucket_counts[0] = _bucket_counts[0].sum();
+
+        // The subsequent buckets are cumulative counts
+        for (size_t i = 1; i < _buckets.size(); ++i) {
+            //  sum() is directly used instead of the difference to maintain the cumulative property
+            snap.bucket_counts[i] = _bucket_counts[i].sum();
+        }
+
+        return snap;
+    }
+
+    std::string to_string() const override {
+        auto snap = precise_snapshot();
+        std::ostringstream ss;
+        ss << "sum:" << snap.sum << " count:" << snap.count << " buckets:[";
+        for (size_t i = 0; i < snap.buckets.size(); ++i) {
+            if (i > 0) ss << ",";
+            ss << snap.buckets[i] << ":" << snap.bucket_counts[i];
+        }
+        ss << "]";
+        return ss.str();
+    }
+
+    void write_value(rj::Value& metric_obj, rj::Document::AllocatorType& allocator) override {
+        auto snap = precise_snapshot();
+        metric_obj.AddMember("sum", snap.sum, allocator);
+        metric_obj.AddMember("count", snap.count, allocator);
+
+        rj::Value buckets(rj::kArrayType);
+        for (size_t i = 0; i < snap.buckets.size(); ++i) {
+            rj::Value bucket(rj::kObjectType);
+            bucket.AddMember("le", snap.buckets[i], allocator);
+            bucket.AddMember("count", snap.bucket_counts[i], allocator);
+            buckets.PushBack(bucket, allocator);
+        }
+        metric_obj.AddMember("buckets", buckets, allocator);
+    }
+
+    void debug_print() {
+        auto snap = precise_snapshot();
+        LOG(INFO) << "Histogram State:";
+        LOG(INFO) << "  Sum: " << snap.sum;
+        LOG(INFO) << "  Count: " << snap.count;
+        for (size_t i = 0; i < snap.buckets.size(); ++i) {
+            LOG(INFO) << "  Bucket " << snap.buckets[i] << ": " << snap.bucket_counts[i];
+        }
+    }
+
+private:
+    void prepare_buckets(std::vector<double>& buckets) {
+        std::sort(buckets.begin(), buckets.end());
+        auto last = std::unique(buckets.begin(), buckets.end());
+        buckets.erase(last, buckets.end());
+
+        if (buckets.empty() || !std::isinf(buckets.back())) {
+            buckets.push_back(std::numeric_limits<double>::infinity());
+        }
+
+        _buckets = std::move(buckets);
+        _bucket_counts.resize(_buckets.size());
+    }
+
+    std::vector<double> _buckets;
+    std::vector<RelaxedAtomicCounter> _bucket_counts;
+    std::atomic<double> _sum;
+    std::atomic<int64_t> _count;
+    double _max_bucket;
+};
+
+
+
 using IntCounter = CoreLocalCounter<int64_t>;
 using IntAtomicCounter = AtomicCounter<int64_t>;
 using UIntCounter = CoreLocalCounter<uint64_t>;
@@ -429,3 +587,10 @@ using DoubleGauge = LockGauge<double>;
 
 #define METRIC_DEFINE_DOUBLE_GAUGE(metric_name, unit) \
     starrocks::DoubleGauge metric_name { unit }
+
+// Histogram metric declaration macro
+#define METRIC_DEFINE_HISTOGRAM(metric_name, unit, ...) \
+    starrocks::HistogramMetric metric_name { \
+        unit, \
+        std::vector<double>{__VA_ARGS__} \
+    }

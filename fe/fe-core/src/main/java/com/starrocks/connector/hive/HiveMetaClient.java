@@ -22,6 +22,7 @@ import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.hive.events.MetastoreNotificationFetchException;
 import com.starrocks.connector.hive.glue.AWSCatalogMetastoreClient;
+import com.starrocks.metric.MetricRepo;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaHookLoader;
@@ -236,16 +237,44 @@ public class HiveMetaClient {
     }
 
     public List<String> getPartitionKeys(String dbName, String tableName) {
+        long start = System.nanoTime();
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "HMS.listPartitionNames")) {
-            return callRPC("listPartitionNames", String.format("Failed to get partitionKeys on [%s.%s]", dbName, tableName),
+            List<String> result = callRPC("listPartitionNames",
+                    String.format("Failed to get partitionKeys on [%s.%s]", dbName, tableName),
                     dbName, tableName, (short) -1);
+            // record the latency (automatically includes count statistics)
+            if (MetricRepo.hasInit) {
+                long elapsed = System.nanoTime() - start;
+                long elapsedMs = elapsed / 1_000_000;
+                MetricRepo.HISTO_LIST_PARTITION_NAMES_QUERY_LATENCY.update(elapsedMs);
+            }
+            return result;
+        } catch (Exception e) {
+            if (MetricRepo.hasInit) {
+                MetricRepo.COUNTER_LIST_PARTITION_NAMES_QUERY_FAIL.increase(1L);
+            }
+            throw e;
         }
     }
 
     public List<String> getPartitionKeysByValue(String dbName, String tableName, List<String> partitionValues) {
+        long start = System.nanoTime();
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "HMS.listPartitionNamesByValue")) {
-            return callRPC("listPartitionNames", String.format("Failed to get partitionKeys on [%s.%s]", dbName, tableName),
+            List<String> result = callRPC("listPartitionNames",
+                    String.format("Failed to get partitionKeys on [%s.%s]", dbName, tableName),
                     dbName, tableName, partitionValues, (short) -1);
+            // record the latency (automatically includes count statistics)
+            if (MetricRepo.hasInit) {
+                long elapsed = System.nanoTime() - start;
+                long elapsedMs = elapsed / 1_000_000;
+                MetricRepo.HISTO_LIST_PARTITION_NAMES_BY_VALUE_QUERY_LATENCY.update(elapsedMs);
+            }
+            return result;
+        } catch (Exception e) {
+            if (MetricRepo.hasInit) {
+                MetricRepo.COUNTER_LIST_PARTITION_NAMES_BY_VALUE_QUERY_FAIL.increase(1L);
+            }
+            throw e;
         }
     }
 
@@ -270,9 +299,24 @@ public class HiveMetaClient {
     }
 
     public Partition getPartition(String dbName, String tableName, List<String> partitionValues) {
+        long start = System.nanoTime();
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "HMS.getPartition")) {
-            return callRPC("getPartition", String.format("Failed to get partition on %s.%s", dbName, tableName),
+            Partition partition = callRPC("getPartition", String.format("Failed to get partition on %s.%s", dbName, tableName),
                     dbName, tableName, partitionValues);
+            // record the latency (automatically includes count statistics)
+            if (MetricRepo.hasInit) {
+                long elapsed = System.nanoTime() - start;
+                long elapsedMs = elapsed / 1_000_000;
+                MetricRepo.HISTO_LIST_PARTITION_QUERY_LATENCY.update(elapsedMs);
+            }
+            return partition;
+        } catch (Exception e) {
+            if (MetricRepo.hasInit) {
+                MetricRepo.COUNTER_LIST_PARTITION_QUERY_FAIL.increase(1L);
+            }
+            LOG.error("Failed to get partition on {}.{}.{}: {}", dbName, tableName, partitionValues, e.getMessage());
+            throw new StarRocksConnectorException("Failed to get partition on [%s.%s.%s] from meta store: %s",
+                    dbName, tableName, partitionValues, e.getMessage());
         }
     }
 
@@ -298,6 +342,7 @@ public class HiveMetaClient {
      * So we resend request "getPartitionsByNames" when an exception occurs.
      */
     public List<Partition> getPartitionsByNames(String dbName, String tblName, List<String> partitionNames) {
+        long start = System.nanoTime();
         int size = partitionNames.size();
         List<Partition> partitions;
         Tracers.record(EXTERNAL, "HMS.PARTITIONS.getPartitionsByNames." + tblName, size + " partitions");
@@ -311,9 +356,24 @@ public class HiveMetaClient {
                     LOG.warn("Expect to fetch {} partition on [{}.{}], but actually fetched {} partition",
                             partitionNames.size(), dbName, tblName, partitions.size());
                 }
+                // record the latency (automatically includes count statistics)
+                if (MetricRepo.hasInit) {
+                    long elapsed = System.nanoTime() - start;
+                    long elapsedMs = elapsed / 1_000_000;
+                    MetricRepo.HISTO_GET_PARTITIONS_BY_NAMES_QUERY_LATENCY.update(elapsedMs);
+                }
             } catch (TTransportException te) {
+                // If the number of partitions is too large, the getPartitionsByNames will throw TTransportException.
+                // We retry to get partitions by names with a smaller number of partitions.
+                // The retry will reduce the number of partitions fetched by half until only one partition is fetched at a time.
+                if (MetricRepo.hasInit) {
+                    MetricRepo.COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL.increase(1L);
+                }
                 partitions = getPartitionsWithRetry(dbName, tblName, partitionNames, 1);
             } catch (Exception e) {
+                if (MetricRepo.hasInit) {
+                    MetricRepo.COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL.increase(1L);
+                }
                 LOG.error("Failed to get partitions on {}.{}", dbName, tblName, e);
                 connectionException = new StarRocksConnectorException("Failed to get partitions on [%s.%s] from meta store: %s",
                         dbName, tblName, e.getMessage());
@@ -353,6 +413,7 @@ public class HiveMetaClient {
      */
     private List<Partition> getPartitionsWithRetry(String dbName, String tableName,
                                                    List<String> partNames, int retryNum) throws StarRocksConnectorException {
+        long start = System.nanoTime();
         int subListSize = (int) Math.pow(2, retryNum);
         int subListNum = partNames.size() / subListSize;
         if (subListNum == 0) {
@@ -372,15 +433,26 @@ public class HiveMetaClient {
             }
             LOG.info("Succeed to getPartitionByName on [{}.{}] with {} times retry, slice size is {}, partName size is {}",
                     dbName, tableName, retryNum, subListSize, partNames.size());
+            if (MetricRepo.hasInit) {
+                long elapsed = System.nanoTime() - start;
+                long elapsedMs = elapsed / 1_000_000;
+                MetricRepo.HISTO_GET_PARTITIONS_BY_NAMES_QUERY_LATENCY.update(elapsedMs);
+            }
             return partitions;
         } catch (TTransportException te) {
             if (subListNum > 1) {
                 return getPartitionsWithRetry(dbName, tableName, partNames, retryNum + 1);
             } else {
+                if (MetricRepo.hasInit) {
+                    MetricRepo.COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL.increase(1L);
+                }
                 throw new StarRocksConnectorException("Failed to getPartitionsByNames on [%s.%s] with slice size is %d",
                         dbName, tableName, subListNum);
             }
         } catch (Exception e) {
+            if (MetricRepo.hasInit) {
+                MetricRepo.COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL.increase(1L);
+            }
             throw new StarRocksConnectorException("Failed to getPartitionsNames on [%s.%s], msg: %s",
                     dbName, tableName, e.getMessage());
         } finally {
@@ -392,6 +464,7 @@ public class HiveMetaClient {
 
     public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStats(String dbName, String tblName,
                                                                           List<String> partitionNames, List<String> columnNames) {
+        long start = System.nanoTime();
         int size = partitionNames.size();
         Map<String, List<ColumnStatisticsObj>> partitionStats;
         Tracers.record(EXTERNAL, "HMS.PARTITIONS.getPartitionColumnStats." + tblName, size + " partitionStats");
@@ -404,6 +477,12 @@ public class HiveMetaClient {
                 if (partitionStats.size() != partitionNames.size()) {
                     LOG.warn("Expect to fetch {} partitionStats on [{}.{}], but actually fetched {} partition",
                             partitionNames.size(), dbName, tblName, partitionStats.size());
+                }
+                // record the latency (automatically includes count statistics)
+                if (MetricRepo.hasInit) {
+                    long elapsed = System.nanoTime() - start;
+                    long elapsedMs = elapsed / 1_000_000;
+                    MetricRepo.HISTO_GET_PARTITION_COLUMN_STATS_QUERY_LATENCY.update(elapsedMs);
                 }
             } catch (TTransportException te) {
                 partitionStats = getPartitionColumnStatsWithRetry(dbName, tblName, partitionNames, columnNames, 1);
@@ -433,6 +512,7 @@ public class HiveMetaClient {
                                                                                     List<String> columnNames,
                                                                                     int retryNum)
             throws StarRocksConnectorException {
+        long start = System.nanoTime();
         int subListSize = (int) Math.pow(2, retryNum);
         int subListNum = partNames.size() / subListSize;
         if (subListNum == 0) {
@@ -452,15 +532,26 @@ public class HiveMetaClient {
             }
             LOG.info("Succeed to getPartitionColumnStatistics on [{}.{}] with {} times retry, slice size is {}," +
                             " partName size is {}", dbName, tableName, retryNum, subListSize, partNames.size());
+            if (MetricRepo.hasInit) {
+                long elapsed = System.nanoTime() - start;
+                long elapsedMs = elapsed / 1_000_000;
+                MetricRepo.HISTO_GET_PARTITION_COLUMN_STATS_QUERY_LATENCY.update(elapsedMs);
+            }
             return partitionStats;
         } catch (TTransportException te) {
             if (subListNum > 1) {
                 return getPartitionColumnStatsWithRetry(dbName, tableName, partNames, columnNames, retryNum + 1);
             } else {
+                if (MetricRepo.hasInit) {
+                    MetricRepo.COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL.increase(1L);
+                }
                 throw new StarRocksConnectorException("Failed to getPartitionColumnStatistics on [%s.%s] with slice size is %d",
                         dbName, tableName, subListNum);
             }
         } catch (Exception e) {
+            if (MetricRepo.hasInit) {
+                MetricRepo.COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL.increase(1L);
+            }
             throw new StarRocksConnectorException("Failed to getPartitionColumnStatistics on [%s.%s], msg: %s",
                     dbName, tableName, e.getMessage());
         } finally {

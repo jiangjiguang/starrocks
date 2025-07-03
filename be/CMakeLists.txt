@@ -553,7 +553,9 @@ elseif ("${CMAKE_BUILD_TARGET_ARCH}" STREQUAL "aarch64")
 endif()
 
 foreach(lib IN ITEMS ${LLVM_LIBRARIES})
-    add_library(${lib} STATIC IMPORTED GLOBAL)
+    add_library(${lib} STATIC IMPORTED GLOBAL
+            test/util/histogram_hdfs_metrics_test.cpp
+            test/util/histogram_hdfs_metrics_test.cpp)
     set_target_properties(${lib} PROPERTIES IMPORTED_LOCATION ${THIRDPARTY_DIR}/llvm/lib/lib${lib}.a)
 endforeach()
 

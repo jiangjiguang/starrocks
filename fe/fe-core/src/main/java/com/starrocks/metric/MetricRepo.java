@@ -196,7 +196,19 @@ public final class MetricRepo {
 
     public static List<GaugeMetricImpl<Long>> GAUGE_ROUTINE_LOAD_LAGS;
 
-    public static GaugeMetricImpl<Long> GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY;
+    public static Histogram HISTO_LIST_LOCATED_STATUS_QUERY_LATENCY;
+
+    public static Histogram HISTO_LIST_PARTITION_NAMES_BY_VALUE_QUERY_LATENCY;
+
+    public static Histogram HISTO_LIST_PARTITION_NAMES_QUERY_LATENCY;
+    public static Histogram HISTO_GET_PARTITIONS_BY_NAMES_QUERY_LATENCY;
+    public static Histogram HISTO_LIST_PARTITION_QUERY_LATENCY;
+    public static Histogram HISTO_GET_PARTITION_COLUMN_STATS_QUERY_LATENCY;
+    public static LongCounterMetric COUNTER_LIST_PARTITION_NAMES_BY_VALUE_QUERY_FAIL;
+    public static LongCounterMetric COUNTER_LIST_PARTITION_NAMES_QUERY_FAIL;
+    public static LongCounterMetric COUNTER_LIST_PARTITION_QUERY_FAIL;
+    public static LongCounterMetric COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL;
+    public static LongCounterMetric COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL;
 
     public static List<GaugeMetricImpl<Long>> GAUGE_MEMORY_USAGE_STATS;
     public static List<GaugeMetricImpl<Long>> GAUGE_OBJECT_COUNT_STATS;
@@ -414,12 +426,6 @@ public final class MetricRepo {
         GAUGE_QUERY_LATENCY_P999.setValue(0.0);
         STARROCKS_METRIC_REGISTER.addMetric(GAUGE_QUERY_LATENCY_P999);
 
-        GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY = new GaugeMetricImpl<>("list_located_status_query_latency",
-                MetricUnit.MILLISECONDS, "namenode fileSystem.listLocatedStatus query latency ms");
-        GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY.addLabel(new MetricLabel("type", "mean"));
-        GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY.setValue(0L);
-        STARROCKS_METRIC_REGISTER.addMetric(GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY);
-
         GAUGE_SAFE_MODE = new GaugeMetricImpl<>("safe_mode", MetricUnit.NOUNIT, "safe mode flag");
         GAUGE_SAFE_MODE.addLabel(new MetricLabel("type", "safe_mode"));
         GAUGE_SAFE_MODE.setValue(0);
@@ -555,6 +561,55 @@ public final class MetricRepo {
         HISTO_SHORTCIRCUIT_RPC_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name("shortcircuit", "latency", "ms"));
         HISTO_THRIFT_RPC_LATENCY =
                METRIC_REGISTER.histogram(MetricRegistry.name("thrift", "rpc", "latency", "ns"));
+
+
+        HISTO_LIST_LOCATED_STATUS_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "namenode_list_located_status", "latency", "ms"));
+
+        HISTO_LIST_PARTITION_NAMES_BY_VALUE_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "hms_listPartitionNamesByValue", "latency", "ms"));
+
+        HISTO_GET_PARTITIONS_BY_NAMES_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "hms_getPartitionsByNames", "latency", "ms"));
+
+        HISTO_LIST_PARTITION_NAMES_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "hms_listPartitionNames", "latency", "ms"));
+
+        HISTO_LIST_PARTITION_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "hms_listPartition", "latency", "ms"));
+
+        HISTO_GET_PARTITION_COLUMN_STATS_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "hms_getPartitionColumnStats", "latency", "ms"));
+
+        COUNTER_LIST_PARTITION_NAMES_BY_VALUE_QUERY_FAIL = new LongCounterMetric(
+                "hms_listPartitionNamesByValue_failed",
+                MetricUnit.REQUESTS,
+                "counter of failed HMS.listPartitionNamesByValue queries");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_LIST_PARTITION_NAMES_BY_VALUE_QUERY_FAIL);
+
+        COUNTER_LIST_PARTITION_NAMES_QUERY_FAIL = new LongCounterMetric(
+                "hms_listPartitionNames_failed",
+                MetricUnit.REQUESTS,
+                "counter of failed HMS.listPartitionNames queries");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_LIST_PARTITION_NAMES_QUERY_FAIL);
+
+        COUNTER_LIST_PARTITION_QUERY_FAIL = new LongCounterMetric(
+                "hms_listPartition_failed",
+                MetricUnit.REQUESTS,
+                "counter of failed HMS.listPartition queries");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_LIST_PARTITION_QUERY_FAIL);
+
+        COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL = new LongCounterMetric(
+                "hms_getPartitionsByNames_failed",
+                MetricUnit.REQUESTS,
+                "counter of failed HMS.getPartitionsByNames queries");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL);
+
+        COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL = new LongCounterMetric(
+                "hms_getPartitionColumnStats_failed",
+                MetricUnit.REQUESTS,
+                "counter of failed HMS.getPartitionColumnStats queries");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL);
 
         // init system metrics
         initSystemMetrics();

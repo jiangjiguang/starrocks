@@ -29,6 +29,7 @@
 #include "testutil/sync_point.h"
 #include "udf/java/utils.h"
 #include "util/hdfs_util.h"
+#include "util/starrocks_metrics.h"
 
 using namespace fmt::literals;
 
@@ -51,11 +52,21 @@ public:
 
     StatusOr<hdfsFile> getOrCreateFile() {
         if (_file == nullptr) {
+            bool enable_report_hdfs_metrics = config::enable_report_hdfs_metrics;
+
             auto st = getOrCreateFS();
+
+            // record start time
+            auto start_time = std::chrono::steady_clock::now();
+
             SCOPED_RAW_TIMER(&_total_open_file_time_ns);
             if (!st.ok()) return st.status();
             _file = hdfsOpenFile(st.value(), _path.c_str(), O_RDONLY, _buffer_size, 0, 0);
             if (_file == nullptr) {
+                if (enable_report_hdfs_metrics) {
+                    StarRocksMetrics::instance()->hdfs_datanode_connect_error_total.increment(1);
+                }
+
                 if (errno == ENOENT) {
                     return Status::RemoteFileNotFound(fmt::format("hdfsOpenFile failed, backend={}, file={}",
                                                                   BackendOptions::get_localhost(), _path));
@@ -65,6 +76,14 @@ public:
                                                              get_hdfs_err_msg()));
                 }
             }
+
+            // record end time and calculate latency
+            if (enable_report_hdfs_metrics) {
+                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start_time);
+                StarRocksMetrics::instance()->hdfs_datanode_connect_latency.update(duration.count());
+            }
+
         }
         return _file;
     }
@@ -207,11 +226,32 @@ HdfsInputStream::~HdfsInputStream() {
 }
 
 StatusOr<int64_t> HdfsInputStream::read(void* data, int64_t size) {
+    // record start time
+    auto start_time = std::chrono::steady_clock::now();
+
     if (UNLIKELY(size > std::numeric_limits<tSize>::max())) {
         size = std::numeric_limits<tSize>::max();
     }
-    return _handle->pread(static_cast<uint8_t*>(data), size, config::hdfs_client_io_read_retry);
+
+    bool enable_report_hdfs_metrics = config::enable_report_hdfs_metrics;
+
+    // record request size
+    if (enable_report_hdfs_metrics) {
+        StarRocksMetrics::instance()->hdfs_datanode_read_request_size.update(size);
+    }
+
+    // us pread instead of read, because pread is more efficient for random access
+    auto result = _handle->pread(static_cast<uint8_t*>(data), size, config::hdfs_client_io_read_retry);
     // return _handle->read(static_cast<uint8_t*>(data), size, config::hdfs_client_io_read_retry);
+
+    // record end time and calculate latency
+    if (enable_report_hdfs_metrics) {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start_time);
+        StarRocksMetrics::instance()->hdfs_datanode_read_latency.update(duration.count());
+    }
+
+    return result;
 }
 
 Status HdfsInputStream::seek(int64_t offset) {
@@ -238,6 +278,7 @@ void HdfsInputStream::set_size(int64_t value) {
 }
 
 StatusOr<std::unique_ptr<io::NumericStatistics>> HdfsInputStream::get_numeric_statistics() {
+    LOG(INFO) << "==HdfsInputStream::get_numeric_statistics==";
     // `GetReadStatistics` is only supported in HDFS input stream
     if (!fs::is_hdfs_uri(_handle->getPath())) {
         return nullptr;
@@ -325,18 +366,39 @@ private:
 };
 
 Status HDFSWritableFile::append(const Slice& data) {
+    bool enable_report_hdfs_metrics = config::enable_report_hdfs_metrics;
+    // record start time
+    auto start_time = std::chrono::steady_clock::now();
+
     tSize r = hdfsWrite(_fs, _file, data.data, data.size);
     if (r == -1) { // error
+        if (enable_report_hdfs_metrics) {
+            StarRocksMetrics::instance()->hdfs_datanode_write_error_total.increment(1);
+        }
+
         auto error_msg = fmt::format("Fail to append {}: {}", _path, get_hdfs_err_msg());
         LOG(WARNING) << error_msg;
         return Status::IOError(error_msg);
     }
     if (r != data.size) {
+        if (enable_report_hdfs_metrics) {
+            StarRocksMetrics::instance()->hdfs_datanode_write_error_total.increment(1);
+        }
+
         auto error_msg =
                 fmt::format("Fail to append {}, expect written size: {}, actual written size {} ", _path, data.size, r);
         LOG(WARNING) << error_msg;
         return Status::IOError(error_msg);
     }
+
+    // record end time and calculate latency
+    if (enable_report_hdfs_metrics) {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - start_time);
+        StarRocksMetrics::instance()->hdfs_datanode_write_latency.update(duration.count());
+        StarRocksMetrics::instance()->hdfs_datanode_write_request_size.update(data.size);
+    }
+
     _offset += data.size;
     return Status::OK();
 }

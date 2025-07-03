@@ -354,6 +354,42 @@ public:
     METRIC_DEFINE_INT_COUNTER(short_circuit_request_total, MetricUnit::REQUESTS);
     METRIC_DEFINE_INT_COUNTER(short_circuit_request_duration_us, MetricUnit::MICROSECONDS);
 
+
+    // The number of failed datanode connections
+    METRIC_DEFINE_INT_COUNTER(hdfs_datanode_connect_error_total, MetricUnit::NOUNIT);
+
+    // datanode connection histogram metric
+    METRIC_DEFINE_HISTOGRAM(hdfs_datanode_connect_latency, MetricUnit::MILLISECONDS,
+        500, 1000, 2000, 3000, 4000, 5000, 10000, 50000, 100000);
+
+    // datanode read latency histogram metric
+    METRIC_DEFINE_HISTOGRAM(hdfs_datanode_read_latency, MetricUnit::MILLISECONDS,
+        500, 1000, 2000, 3000, 4000, 5000, 10000, 50000, 100000);
+
+    // datanode read request size histogram metric
+    METRIC_DEFINE_HISTOGRAM(hdfs_datanode_read_request_size, MetricUnit::BYTES,
+        65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216);
+
+    // datanode write latency histogram metric
+    METRIC_DEFINE_HISTOGRAM(hdfs_datanode_write_latency, MetricUnit::MILLISECONDS,
+        500, 1000, 2000, 3000, 4000, 5000, 10000, 50000, 100000);
+
+    // datanode write failure count
+    METRIC_DEFINE_INT_COUNTER(hdfs_datanode_write_error_total, MetricUnit::NOUNIT);
+
+    // datanode write request size histogram metric
+    METRIC_DEFINE_HISTOGRAM(hdfs_datanode_write_request_size, MetricUnit::BYTES,
+        65536, 131072, 262144, 524288, 1048576, 2097152, 4194304, 8388608, 16777216);
+
+    // Histogram of connection time consumption of namenode
+    METRIC_DEFINE_HISTOGRAM(hdfs_namenode_connect_latency, MetricUnit::MILLISECONDS,
+        500, 1000, 2000, 3000, 4000, 5000, 10000, 50000, 100000);
+
+    // The number of failed namenode connections
+    METRIC_DEFINE_INT_COUNTER(hdfs_namenode_connect_error_total, MetricUnit::NOUNIT);
+
+
+
     static StarRocksMetrics* instance() {
         static StarRocksMetrics instance;
         return &instance;

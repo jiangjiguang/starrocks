@@ -133,7 +133,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
             long elapsedMs = elapsed / 1_000_000;
             LOG.debug("Get hive remote files on path: {}, elapsed: {} ms", pathKey, elapsedMs);
             if (MetricRepo.hasInit) {
-                MetricRepo.GAUGE_LIST_LOCATED_STATUS_QUERY_LATENCY.setValue(elapsedMs);
+                MetricRepo.HISTO_LIST_LOCATED_STATUS_QUERY_LATENCY.update(elapsedMs);
             }
         }
 

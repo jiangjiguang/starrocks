@@ -238,6 +238,16 @@ StarRocksMetrics::StarRocksMetrics() : _metrics(_s_registry_name) {
 
     REGISTER_STARROCKS_METRIC(short_circuit_request_total);
     REGISTER_STARROCKS_METRIC(short_circuit_request_duration_us);
+
+
+    REGISTER_STARROCKS_METRIC(hdfs_datanode_connect_latency);
+    REGISTER_STARROCKS_METRIC(hdfs_datanode_connect_error_total);
+    REGISTER_STARROCKS_METRIC(hdfs_datanode_read_latency);
+    REGISTER_STARROCKS_METRIC(hdfs_datanode_write_latency);
+    REGISTER_STARROCKS_METRIC(hdfs_datanode_write_error_total);
+    REGISTER_STARROCKS_METRIC(hdfs_datanode_read_request_size);
+    REGISTER_STARROCKS_METRIC(hdfs_namenode_connect_latency);
+    REGISTER_STARROCKS_METRIC(hdfs_namenode_connect_error_total);
 }
 
 void StarRocksMetrics::initialize(const std::vector<std::string>& paths, bool init_system_metrics,

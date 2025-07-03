@@ -1224,7 +1224,7 @@ TEST_F(TimeFunctionsTest, toUnixFromDatetimeWithIllegalFormat) {
         columns.emplace_back(tc2);
 
         EXPECT_STATUS(Status::InternalError("Illegal date format yyyymm , please correct the input format."),
-                      TimeFunctions::to_unix_from_datetime_with_format(_utils->get_fn_ctx(), columns).status());
+                      TimeFunctions::to_unix_from_datetime_with_format_32(_utils->get_fn_ctx(), columns).status());
     }
 }
 
@@ -1773,7 +1773,7 @@ TEST_F(TimeFunctionsTest, date_format) {
         Columns columns;
         columns.emplace_back(dt_col);
         columns.emplace_back(fmt_col);
-        ctx->impl()->set_constant_columns(columns);
+        ctx->set_constant_columns(columns);
         TimeFunctions::format_prepare(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
         ColumnPtr result = TimeFunctions::datetime_format(ctx, columns).value();
         TimeFunctions::format_close(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
@@ -1788,7 +1788,7 @@ TEST_F(TimeFunctionsTest, date_format) {
         Columns columns;
         columns.emplace_back(dt_col);
         columns.emplace_back(fmt_col);
-        ctx->impl()->set_constant_columns(columns);
+        ctx->set_constant_columns(columns);
         TimeFunctions::format_prepare(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
         ColumnPtr result = TimeFunctions::datetime_format(ctx, columns).value();
         TimeFunctions::format_close(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
@@ -1803,7 +1803,7 @@ TEST_F(TimeFunctionsTest, date_format) {
         Columns columns;
         columns.emplace_back(dt_col);
         columns.emplace_back(fmt_col);
-        ctx->impl()->set_constant_columns(columns);
+        ctx->set_constant_columns(columns);
         TimeFunctions::format_prepare(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
         ColumnPtr result = TimeFunctions::datetime_format(ctx, columns).value();
         TimeFunctions::format_close(ctx, FunctionContext::FunctionStateScope::FRAGMENT_LOCAL);
@@ -3011,7 +3011,7 @@ TEST_F(TimeFunctionsTest, datetimeTruncTest) {
     //trunc('yyyy-MM-dd HH:mm:ss', 'MONTH') for presto
     {
         // enable_presto_translation = true
-        auto runtime_state = _utils->get_fn_ctx()->impl()->state();
+        auto runtime_state = _utils->get_fn_ctx()->state();
         auto query_options = runtime_state->query_options();
         query_options.__set_enable_presto_translation(true);
         starrocks::RuntimeState state(runtime_state->fragment_instance_id(), query_options, TQueryGlobals(), nullptr);
@@ -3120,7 +3120,7 @@ TEST_F(TimeFunctionsTest, dateTruncTest) {
     //trunc('yyyy-MM-dd', 'day') for presto
     {
         // enable_presto_translation = true
-        auto runtime_state = _utils->get_fn_ctx()->impl()->state();
+        auto runtime_state = _utils->get_fn_ctx()->state();
         auto query_options = runtime_state->query_options();
         query_options.__set_enable_presto_translation(true);
         starrocks::RuntimeState state(runtime_state->fragment_instance_id(), query_options, TQueryGlobals(), nullptr);
