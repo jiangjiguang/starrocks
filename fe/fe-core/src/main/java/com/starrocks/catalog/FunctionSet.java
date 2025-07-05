@@ -348,6 +348,8 @@ public class FunctionSet {
 
     public static final String ARRAY_TO_BITMAP = "array_to_bitmap";
 
+    public static final String SIZE = "size";
+
     // Bit functions:
     public static final String BITAND = "bitand";
     public static final String BITNOT = "bitnot";

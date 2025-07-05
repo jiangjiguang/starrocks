@@ -253,4 +253,22 @@ public class ExpressionAnalyzerTest extends PlanTestBase {
             Assert.fail();
         }
     }
+
+    @Test
+    public void testSizeExprAnalyzerForPresto() throws Exception {
+        try {
+            String sql = "SELECT size(split('a,b,c', ','))";
+            ExecPlan execPlan = getExecPlan(sql);
+            Assert.assertEquals(1, execPlan.getColNames().size());
+        } catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("No matching function with signature: size(array<varchar>)"));
+        }
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "SELECT size(split('a,b,c', ',')) as _arr";
+        ExecPlan execPlan = getExecPlan(sql);
+        Assert.assertEquals(1, execPlan.getColNames().size());
+    }
 }
