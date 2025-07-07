@@ -14,6 +14,8 @@
 
 package com.starrocks.connector.parser.trino;
 
+import com.starrocks.qe.ConnectContext;
+import com.starrocks.utframe.UtFrameUtils;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -49,6 +51,13 @@ public class TrinoFunctionTransformTest extends TrinoTestBase {
         sql = "select count_if(v1) from t0;";
         assertPlanContains(sql, "  2:AGGREGATE (update finalize)\n" +
                 "  |  output: count(if(CAST(1: v1 AS BOOLEAN), 1, NULL))");
+
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        sql = "select collect_set(v1) from t0;";
+        assertPlanContains(sql, "output: array_agg_distinct(1: v1)");
     }
 
     @Test
@@ -474,5 +483,16 @@ public class TrinoFunctionTransformTest extends TrinoTestBase {
 
         sql = "select merge(approx_set(\"tc\")) from tall";
         assertPlanContains(sql, "hll_raw_agg(hll_hash(CAST(3: tc AS VARCHAR)))");
+    }
+
+
+    @Test
+    public void testCollectSetFuncForPresto() throws Exception {
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select collect_set(v1) from t0;";
+        assertPlanContains(sql, "output: array_agg_distinct(1: v1)");
     }
 }

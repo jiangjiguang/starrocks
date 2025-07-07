@@ -267,6 +267,7 @@ public class SelectAnalyzer {
                                 item.setExpr(newNode);
                             }
                         }
+
                         // if open the presto translation,we need to check approx_percentile function
                         if (fnName.equalsIgnoreCase(FunctionSet.APPROX_PERCENTILE)) {
                             // check child in node whether double type, if not, just cast to double
@@ -281,10 +282,23 @@ public class SelectAnalyzer {
                                 item.setExpr(newNode);
                             }
                         }
+
                         if (fnName.equalsIgnoreCase(FunctionSet.PERCENTILE_APPROX)) {
                             // check child in node whether double type, if not, just cast to double
                             ExpressionAnalyzer.castNodeToDouble(node);
                             item.setExpr(node);
+                        }
+
+                        if (fnName.equalsIgnoreCase(FunctionSet.COLLECT_SET)) {
+                            // COLLECT_SET is not supported in presto, so we rewrite it to ARRAY_AGG_DISTINCT
+                            FunctionName newFnName = new FunctionName(FunctionSet.ARRAY_AGG_DISTINCT);
+                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+                            if (node.getChildren().size() > 0) {
+                                for (int i = 0; i < node.getChildren().size(); i++) {
+                                    newNode.setChild(i, node.getChild(i));
+                                }
+                                item.setExpr(newNode);
+                            }
                         }
 
                     }
