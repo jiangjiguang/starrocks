@@ -524,8 +524,8 @@ public class FunctionSet {
     public static final String CURRENT_USER = "current_user";
 
     public static final String CURRENT_ROLE = "current_role";
-
     public static final String COLLECT_SET = "collect_set";
+    public static final String COLLECT_LIST = "collect_list";
 
     private static final Logger LOGGER = LogManager.getLogger(FunctionSet.class);
 

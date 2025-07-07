@@ -301,6 +301,18 @@ public class SelectAnalyzer {
                             }
                         }
 
+                        if (fnName.equalsIgnoreCase(FunctionSet.COLLECT_LIST)) {
+                            fnName = FunctionSet.ARRAY_AGG;
+                            FunctionName newFnName = new FunctionName(fnName);
+                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+                            if (node.getChildren().size() > 0) {
+                                for (int i = 0; i < node.getChildren().size(); i++) {
+                                    newNode.setChild(i, node.getChild(i));
+                                }
+                                item.setExpr(newNode);
+                            }
+                        }
+
                     }
                 }
 

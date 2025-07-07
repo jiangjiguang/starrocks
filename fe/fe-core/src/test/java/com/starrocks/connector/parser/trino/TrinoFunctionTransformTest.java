@@ -486,6 +486,7 @@ public class TrinoFunctionTransformTest extends TrinoTestBase {
     }
 
 
+
     @Test
     public void testCollectSetFuncForPresto() throws Exception {
         // create scalar rewrite context
@@ -494,5 +495,15 @@ public class TrinoFunctionTransformTest extends TrinoTestBase {
         session.getSessionVariable().setEnablePrestoTranslation(true);
         String sql = "select collect_set(v1) from t0;";
         assertPlanContains(sql, "output: array_agg_distinct(1: v1)");
+    }
+
+    @Test
+    public void testCollectListFunction() throws Exception {
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select collect_list(v1) from t0; ";
+        assertPlanContains(sql, "output: array_agg");
     }
 }
