@@ -931,13 +931,15 @@ public final class SparkDpp implements java.io.Serializable {
         List<StarRocksRangePartitioner.PartitionRangeKey> partitionRangeKeys = new ArrayList<>();
         for (EtlJobConfig.EtlPartition partition : partitionInfo.partitions) {
             StarRocksRangePartitioner.PartitionRangeKey partitionRangeKey = new StarRocksRangePartitioner.PartitionRangeKey();
-
+            LOG.info("current partition detail is: " + partition.toString());
             if (!partition.isMinPartition) {
                 partitionRangeKey.isMinPartition = false;
                 List<Object> startKeyColumns = new ArrayList<>();
-                for (int i = 0; i < partition.startKeys.size(); i++) {
-                    Object value = partition.startKeys.get(i);
-                    startKeyColumns.add(convertPartitionKey(value, partitionKeySchema.get(i)));
+                if (partition.startKeys != null) {
+                    for (int i = 0; i < partition.startKeys.size(); i++) {
+                        Object value = partition.startKeys.get(i);
+                        startKeyColumns.add(convertPartitionKey(value, partitionKeySchema.get(i)));
+                    }
                 }
                 partitionRangeKey.startKeys = new DppColumns(startKeyColumns);
             } else {
@@ -947,9 +949,11 @@ public final class SparkDpp implements java.io.Serializable {
             if (!partition.isMaxPartition) {
                 partitionRangeKey.isMaxPartition = false;
                 List<Object> endKeyColumns = new ArrayList<>();
-                for (int i = 0; i < partition.endKeys.size(); i++) {
-                    Object value = partition.endKeys.get(i);
-                    endKeyColumns.add(convertPartitionKey(value, partitionKeySchema.get(i)));
+                if (partition.endKeys != null) {
+                    for (int i = 0; i < partition.endKeys.size(); i++) {
+                        Object value = partition.endKeys.get(i);
+                        endKeyColumns.add(convertPartitionKey(value, partitionKeySchema.get(i)));
+                    }
                 }
                 partitionRangeKey.endKeys = new DppColumns(endKeyColumns);
             } else {

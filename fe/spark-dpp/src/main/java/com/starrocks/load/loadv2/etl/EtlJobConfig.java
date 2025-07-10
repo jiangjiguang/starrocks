@@ -27,6 +27,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -465,6 +466,8 @@ public class EtlJobConfig implements Serializable {
             this.partitionId = partitionId;
             this.inKeys = inKeys;
             this.bucketNum = bucketNum;
+            this.startKeys = new ArrayList<>();
+            this.endKeys = new ArrayList<>();
         }
 
         @Override
