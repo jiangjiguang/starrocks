@@ -946,6 +946,15 @@ public class ExpressionAnalyzer {
         public Void visitLikePredicate(LikePredicate node, Scope scope) {
             predicateBaseAndCheck(node);
 
+            if (session.getSessionVariable().isEnablePrestoTranslation()) {
+                for (int i = 0; i < node.getChildren().size(); i++) {
+                    Type type = node.getChild(i).getType();
+                    if (!type.isNull() && !type.isStringType()) {
+                        addCastChild(Type.VARCHAR, node, i);
+                    }
+                }
+            }
+
             Type type1 = node.getChild(0).getType();
             Type type2 = node.getChild(1).getType();
 
@@ -2239,6 +2248,10 @@ public class ExpressionAnalyzer {
                 node.setChild(0, castExpr);
             }
         });
+    }
+
+    public static void addCastChild(Type returnType, LikePredicate node, int index) {
+        node.getChildren().set(index, new CastExpr(returnType, node.getChild(index)));
     }
 }
 

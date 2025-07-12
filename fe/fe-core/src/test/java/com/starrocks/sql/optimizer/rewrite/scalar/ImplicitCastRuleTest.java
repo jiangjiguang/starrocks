@@ -234,6 +234,29 @@ public class ImplicitCastRuleTest {
     }
 
     @Test
+    public void testLikePredicateDoubleTypeOperator() {
+        LikePredicateOperator op =
+                new LikePredicateOperator(ConstantOperator.createDouble(1), ConstantOperator.createVarchar("1"));
+
+        ScalarOperatorRewriteContext context = new ScalarOperatorRewriteContext();
+        ConnectContext session = new ConnectContext();
+
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        context.setSession(session);
+
+        ImplicitCastRule rule = new ImplicitCastRule();
+        ScalarOperator result = rule.apply(op, context);
+
+        assertTrue(result.getChild(0) instanceof CastOperator);
+        assertFalse(result.getChild(1) instanceof CastOperator);
+
+        assertTrue(result.getChild(0).getType().isVarchar());
+        assertTrue(result.getChild(1).getType().isVarchar());
+
+        assertTrue(result.getChild(0).getType().isVarchar());
+    }
+
+    @Test
     public void testPredicateForPrestoTranslate() {
         // create scalar rewrite context
         ScalarOperatorRewriteContext context = new ScalarOperatorRewriteContext();
