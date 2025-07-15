@@ -155,4 +155,16 @@ public class DataCacheStmtAnalyzerTest {
         Assert.assertEquals(1, stmt.getPriority());
         Assert.assertEquals(24 * 3600 + 1, stmt.getTTLSeconds());
     }
+
+    @Test
+    public void testTTL() {
+        ConnectContext context = AnalyzeTestUtil.getConnectContext();
+        context.getSessionVariable().setDatacacheTTLSeconds(30);
+        DataCacheSelectStatement stmt = (DataCacheSelectStatement) analyzeSuccess(
+                "cache select * from hive0.datacache_db.multi_partition_table");
+        Assert.assertEquals(30, stmt.getTTLSeconds());
+        stmt = (DataCacheSelectStatement) analyzeSuccess(
+                "cache select * from hive0.datacache_db.multi_partition_table properties(\"TTL\"=\"PT10S\")");
+        Assert.assertEquals(10, stmt.getTTLSeconds());
+    }
 }

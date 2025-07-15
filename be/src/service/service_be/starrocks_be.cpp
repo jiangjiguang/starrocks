@@ -147,6 +147,8 @@ Status init_datacache(GlobalEnv* global_env, const std::vector<StorePath>& stora
         cache_options.inline_item_count_limit = config::datacache_inline_item_count_limit;
         cache_options.engine = config::datacache_engine;
         cache_options.eviction_policy = config::datacache_eviction_policy;
+        cache_options.ttl_check_interval_ms = config::datacache_ttl_check_interval_ms;
+        cache_options.ttl_remove_batch = config::datacache_ttl_remove_batch;
         return cache->init(cache_options);
     }
     return Status::OK();

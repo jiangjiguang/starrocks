@@ -1185,6 +1185,10 @@ CONF_mInt64(datacache_min_disk_quota_for_adjustment, "107374182400");
 // to optimize the io performance and reduce disk waste.
 // Set the parameter to `0` will turn off this optimization.
 CONF_Int32(datacache_inline_item_count_limit, "130172");
+// The interval for ttl reaper to check the expired cache item.
+// If set to 0, the ttl dose not take effect.
+CONF_Int32(datacache_ttl_check_interval_ms, "0");
+CONF_Int32(datacache_ttl_remove_batch, "100");
 // Whether use an unified datacache instance.
 CONF_Bool(datacache_unified_instance_enable, "true");
 // The eviction policy for datacache, alternatives: [lru, slru].

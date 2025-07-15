@@ -52,6 +52,9 @@ Status StarCacheWrapper::init(const CacheOptions& options) {
     }
     opt.lru_segment_freq_bits = 0;
 
+    opt.ttl_check_interval_ms = options.ttl_check_interval_ms;
+    opt.ttl_remove_batch = options.ttl_remove_batch;
+
     _enable_tiered_cache = options.enable_tiered_cache;
     _enable_datacache_persistence = options.enable_datacache_persistence;
     _cache = std::make_unique<starcache::StarCache>();
