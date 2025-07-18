@@ -19,6 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.starrocks.common.Config;
 import com.starrocks.common.FeConstants;
 import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.PartitionUtil;
@@ -26,6 +27,7 @@ import com.starrocks.connector.RemoteFileBlockDesc;
 import com.starrocks.connector.RemoteFileDesc;
 import com.starrocks.connector.RemoteFileIO;
 import com.starrocks.connector.RemotePathKey;
+import com.starrocks.connector.exception.RemoteFileNotFoundException;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.metric.MetricRepo;
 import org.apache.hadoop.conf.Configuration;
@@ -54,6 +56,8 @@ public class HiveRemoteFileIO implements RemoteFileIO {
     // only used for ut.
     private FileSystem fileSystem;
 
+    private static final FileSystemLRUCache FS_CACHE = new FileSystemLRUCache();
+
     // blockHost is ip:port
     private final Map<String, Long> blockHostToId = new ConcurrentHashMap<>();
     private final Map<Long, String> idToBlockHost = new ConcurrentHashMap<>();
@@ -68,19 +72,25 @@ public class HiveRemoteFileIO implements RemoteFileIO {
         return getRemoteFiles(pathKey, false);
     }
 
+    private FileSystem getFileSystem(URI uri) throws IOException {
+        if (FeConstants.runningUnitTest) {
+            return this.fileSystem;
+        }
+        if (Config.enable_file_system_with_cache) {
+            String path = uri.toString();
+            return FS_CACHE.getFileSystem(path, configuration);
+        }
+        return HdfsEnvironment.getFileSystem(configuration, uri);
+    }
+
     public Map<RemotePathKey, List<RemoteFileDesc>> getRemoteFiles(RemotePathKey pathKey, boolean expandWildCards) {
         long start = System.nanoTime();
         ImmutableMap.Builder<RemotePathKey, List<RemoteFileDesc>> resultPartitions = ImmutableMap.builder();
         String path = pathKey.getPath();
         List<RemoteFileDesc> fileDescs = Lists.newArrayList();
-        FileSystem fileSystem = null;
         try {
             URI uri = new Path(path).toUri();
-            if (!FeConstants.runningUnitTest) {
-                fileSystem = HdfsEnvironment.getFileSystem(configuration, uri);
-            } else {
-                fileSystem = this.fileSystem;
-            }
+            FileSystem fileSystem = getFileSystem(uri);
             List<Path> expandedPaths = Lists.newArrayList();
             if (!expandWildCards) {
                 expandedPaths.add(new Path(uri.getPath()));
@@ -115,20 +125,16 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                     fileDescs.add(fileDesc);
                 }
             }
+
         } catch (FileNotFoundException e) {
-            LOG.warn("Hive remote file on path: {} not existed, ignore it", path, e);
+            String msg = String.format("Hive remote file on path: %s not existed, reason: %s", path, e);
+            LOG.warn(msg);
+            throw new RemoteFileNotFoundException(msg);
         } catch (Exception e) {
             LOG.error("Failed to get hive remote file's metadata on path: {}", path, e);
             throw new StarRocksConnectorException("Failed to get hive remote file's metadata on path: %s. msg: %s",
                     pathKey, e.getMessage());
         } finally {
-            if (fileSystem != null) {
-                try {
-                    fileSystem.close();
-                } catch (IOException e) {
-                    throw new StarRocksConnectorException("close FileSystem fail.", e);
-                }
-            }
             long elapsed = System.nanoTime() - start;
             long elapsedMs = elapsed / 1_000_000;
             LOG.debug("Get hive remote files on path: {}, elapsed: {} ms", pathKey, elapsedMs);
@@ -252,4 +258,5 @@ public class HiveRemoteFileIO implements RemoteFileIO {
     public void setFileSystem(FileSystem fs) {
         this.fileSystem = fs;
     }
+
 }

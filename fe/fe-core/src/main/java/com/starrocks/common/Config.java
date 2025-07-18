@@ -3296,4 +3296,11 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true)
     public static boolean enable_presto_field_delim = false;
 
+    // filesystem cache map key length,lru cache when exceed
+    @ConfField(mutable = true)
+    public static int hdfs_client_max_cache_size = 64;
+
+    // FileSystem.get by cache if open the flag
+    @ConfField(mutable = true)
+    public static boolean enable_file_system_with_cache = true;
 }

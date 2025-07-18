@@ -26,15 +26,19 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
 import java.net.URI;
 import java.security.PrivilegedExceptionAction;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 public class HdfsEnvironment {
     private static final Logger LOG = LogManager.getLogger(HdfsEnvironment.class);
     private final Configuration hdfsConfiguration;
     private CloudConfiguration cloudConfiguration;
+    private static final ConcurrentMap<String, UserGroupInformation> UGI_CACHE = new ConcurrentHashMap<>();
 
     /**
      * Create default Hdfs environment
@@ -76,19 +80,41 @@ public class HdfsEnvironment {
             if (!StringUtils.isBlank(username) && !StringUtils.isBlank(password)) {
                 LOG.info("Hadoop user is set in configuration, user: [{}], password:[{}]",
                         username, password);
-                return UserGroupInformation.createRemoteUser(username, password);
+                return getUgiByCache(username, password);
             }
             username = System.getenv(HadoopExt.SYSTEM_ENVIRONMENT_HADOOP_USERNAME);
             password = System.getenv(HadoopExt.SYSTEM_ENVIRONMENT_HADOOP_PASSWORD);
             if (!StringUtils.isBlank(username) && !StringUtils.isBlank(password)) {
                 LOG.info("Hadoop user is set from environment, user: [{}], password:[{}]",
                         username, password);
-                return UserGroupInformation.createRemoteUser(username, password);
+                return getUgiByCache(username, password);
             }
             LOG.warn("Didn't set hadoop user in UserGroupInformation, FileSystem connection maybe fail");
-            return UserGroupInformation.getCurrentUser();
+            return getCurrentUserSafe();
         } catch (Exception e) {
             throw new RuntimeException("Failed to get HDFS UserGroupInformation", e);
+        }
+    }
+
+    private static UserGroupInformation getUgiByCache(String username, String password) {
+        String cacheKey = username + "||" + password;
+
+        return UGI_CACHE.computeIfAbsent(cacheKey, k -> {
+            try {
+                UserGroupInformation ugi = UserGroupInformation.createRemoteUser(username, password);
+                return ugi;
+            } catch (Exception e) {
+                throw new RuntimeException("Create UGI failed", e);
+            }
+        });
+    }
+
+
+    private static UserGroupInformation getCurrentUserSafe() {
+        try {
+            return UserGroupInformation.getCurrentUser();
+        } catch (IOException e) {
+            throw new RuntimeException("Get current UGI failed", e);
         }
     }
 
