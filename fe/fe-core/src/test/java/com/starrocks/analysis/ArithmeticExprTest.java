@@ -148,4 +148,82 @@ public class ArithmeticExprTest {
             }
         }
     }
+
+    @Test
+    public void testDecimalDivide() throws AnalysisException {
+        Object[][] cases = new Object[][] {
+                {
+                        dec(32, 4, 3),
+                        dec(32, 4, 3),
+                        dec(128, 38, 3),
+                        dec(128, 38, 3),
+                        dec(128, 38, 3),
+                },
+                {
+                        dec(64, 7, 2),
+                        dec(64, 7, 2),
+                        dec(128, 38, 2),
+                        dec(128, 38, 2),
+                        dec(128, 38, 2),
+                },
+                {
+                        dec(32, 7, 2),
+                        dec(32, 9, 4),
+                        dec(128, 38, 4),
+                        dec(128, 38, 2),
+                        dec(128, 38, 4),
+                },
+                {
+                        dec(64, 14, 4),
+                        dec(32, 7, 2),
+                        dec(128, 38, 4),
+                        dec(128, 38, 4),
+                        dec(128, 38, 2),
+                },
+                {
+                        dec(64, 14, 4),
+                        dec(64, 18, 14),
+                        dec(128, 38, 14),
+                        dec(128, 38, 4),
+                        dec(128, 38, 14),
+                },
+                {
+                        dec(128, 35, 18),
+                        dec(128, 35, 20),
+                        dec(128, 38, 20),
+                        dec(128, 38, 18),
+                        dec(128, 38, 20),
+                },
+                {
+                        dec(128, 35, 30),
+                        dec(32, 8, 7),
+                        dec(128, 38, 30),
+                        dec(128, 38, 30),
+                        dec(128, 38, 7),
+                },
+                {
+                        dec(128, 36, 31),
+                        dec(64, 18, 7),
+                        dec(128, 38, 31),
+                        dec(128, 38, 31),
+                        dec(128, 38, 7),
+                }
+        };
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        for (Object[] c : cases) {
+            ScalarType lhsType = (ScalarType) c[0];
+            ScalarType rhsType = (ScalarType) c[1];
+            ScalarType expectReturnType = (ScalarType) c[2];
+            ScalarType expectLhsType = (ScalarType) c[3];
+            ScalarType expectRhsType = (ScalarType) c[4];
+            ArithmeticExpr.TypeTriple tr =
+                    ArithmeticExpr.getReturnTypeOfDecimal(ArithmeticExpr.Operator.DIVIDE, lhsType, rhsType);
+            Assert.assertEquals(tr.returnType, expectReturnType);
+            Assert.assertEquals(tr.lhsTargetType, expectLhsType);
+            Assert.assertEquals(tr.rhsTargetType, expectRhsType);
+        }
+    }
 }
