@@ -1468,7 +1468,7 @@ public class AstToStringBuilder {
             return node.toSql();
         }
 
-        private String visitAstList(List<? extends ParseNode> contexts) {
+        public String visitAstList(List<? extends ParseNode> contexts) {
             return Joiner.on(", ").join(contexts.stream().map(this::visit).collect(toList()));
         }
 

@@ -93,6 +93,23 @@ public class StatementPlanner {
         return plan(stmt, session, TResultSinkType.MYSQL_PROTOCAL);
     }
 
+    public static void onlyAnalyze(StatementBase stmt, ConnectContext session) {
+        PlannerMetaLocker plannerMetaLocker = new PlannerMetaLocker(session, stmt);
+        try (var guard = session.bindScope()) {
+            analyzeStatement(stmt, session, plannerMetaLocker);
+        } catch (OutOfMemoryError e) {
+            LOG.warn("analyzer step out of memory, sql is:" + stmt.getOrigStmt().getOrigStmt());
+            throw e;
+        } catch (Throwable e) {
+            if (stmt instanceof DmlStmt) {
+                abortTransaction((DmlStmt) stmt, session, e.getMessage());
+            }
+            throw e;
+        } finally {
+            unLock(plannerMetaLocker);
+        }
+    }
+
     public static ExecPlan plan(StatementBase stmt, ConnectContext session,
                                 TResultSinkType resultSinkType) {
         if (stmt instanceof QueryStatement) {

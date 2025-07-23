@@ -64,6 +64,11 @@ public class AstToSQLBuilder {
         return new AST2SQLBuilderVisitor(sameCatalogDb, false, true).visit(statement);
     }
 
+
+    public static String toSQL(boolean simple, boolean withoutTbl, ParseNode statement) {
+        return new AstToSQLBuilder.AST2SQLBuilderVisitor(simple, withoutTbl, false).visit(statement);
+    }
+
     public static String toSQL(ParseNode statement) {
         return new AST2SQLBuilderVisitor(false, false, true).visit(statement);
     }
@@ -96,7 +101,7 @@ public class AstToSQLBuilder {
             this.withoutTbl = withoutTbl;
         }
 
-        private String buildColumnName(TableName tableName, String fieldName, String columnName) {
+        public String buildColumnName(TableName tableName, String fieldName, String columnName) {
             String res = "";
             if (tableName != null && !withoutTbl) {
                 if (!simple) {
@@ -114,7 +119,7 @@ public class AstToSQLBuilder {
             return res;
         }
 
-        private String buildStructColumnName(TableName tableName, String fieldName, String columnName) {
+        public String buildStructColumnName(TableName tableName, String fieldName, String columnName) {
             String res = "";
             if (tableName != null) {
                 if (!simple) {
@@ -136,7 +141,7 @@ public class AstToSQLBuilder {
         }
 
         // Consider struct, like fieldName = a.b.c, columnName = a.b.c
-        private String handleColumnName(String name) {
+        public String handleColumnName(String name) {
             String[] fields = name.split("\\.");
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < fields.length; i++) {
@@ -155,21 +160,8 @@ public class AstToSQLBuilder {
             return "";
         }
 
-        @Override
-        public String visitSelect(SelectRelation stmt, Void context) {
-            StringBuilder sqlBuilder = new StringBuilder();
-            SelectList selectList = stmt.getSelectList();
-            sqlBuilder.append("SELECT ");
 
-            // add hint
-            if (selectList.getHintNodes() != null) {
-                sqlBuilder.append(extractHintStr(selectList.getHintNodes()));
-            }
-
-            if (selectList.isDistinct()) {
-                sqlBuilder.append("DISTINCT ");
-            }
-
+        public List<String> makeNormalSelectItem(SelectRelation stmt) {
             List<String> selectListString = new ArrayList<>();
             if (CollectionUtils.isNotEmpty(stmt.getOutputExpression())) {
                 for (int i = 0; i < stmt.getOutputExpression().size(); ++i) {
@@ -211,6 +203,26 @@ public class AstToSQLBuilder {
                 }
             }
 
+            return selectListString;
+        }
+
+        @Override
+        public String visitSelect(SelectRelation stmt, Void context) {
+            StringBuilder sqlBuilder = new StringBuilder();
+            SelectList selectList = stmt.getSelectList();
+            sqlBuilder.append("SELECT ");
+
+            // add hint
+            if (selectList.getHintNodes() != null) {
+                sqlBuilder.append(extractHintStr(selectList.getHintNodes()));
+            }
+
+            if (selectList.isDistinct()) {
+                sqlBuilder.append("DISTINCT ");
+            }
+
+            // make select item list
+            List<String> selectListString = makeNormalSelectItem(stmt);
             sqlBuilder.append(Joiner.on(", ").join(selectListString));
 
             String fromClause = visit(stmt.getRelation());
