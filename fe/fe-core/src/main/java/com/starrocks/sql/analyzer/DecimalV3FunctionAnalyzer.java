@@ -485,9 +485,23 @@ public class DecimalV3FunctionAnalyzer {
         Function newFn = fn.copy();
         Preconditions.checkState(argumentTypes.length > 0);
         switch (fn.functionName()) {
+            case FunctionSet.REVERSE: {
+                ConnectContext context = ConnectContext.get();
+                if (context != null && context.getSessionVariable() != null) {
+                    if (context.getSessionVariable().isEnablePrestoTranslation()) {
+                        if (argumentTypes[0].getPrimitiveType().isNumericType()) {
+                            newFn.setArgsType(new Type[] {ScalarType.createVarcharType()});
+                            newFn.setRetType(ScalarType.createVarcharType());
+                            return newFn;
+                        }
+                    }
+                }
+                newFn.setArgsType(new Type[] {argumentTypes[0]});
+                newFn.setRetType(argumentTypes[0]);
+                return newFn;
+            }
             case FunctionSet.ARRAY_DISTINCT:
             case FunctionSet.ARRAY_SORT:
-            case FunctionSet.REVERSE:
             case FunctionSet.ARRAY_INTERSECT:
             case FunctionSet.ARRAY_CONCAT: {
                 newFn.setArgsType(new Type[] {argumentTypes[0]});
