@@ -53,6 +53,8 @@ import io.netty.util.ReferenceCountUtil;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.util.concurrent.ThreadPoolExecutor;
+
 public class HttpServerHandler extends ChannelInboundHandlerAdapter {
     private static final Logger LOG = LogManager.getLogger(HttpServerHandler.class);
     // keep connectContext when channel is open
@@ -60,11 +62,13 @@ public class HttpServerHandler extends ChannelInboundHandlerAdapter {
             AttributeKey.valueOf("httpContextKey");
     protected HttpRequest request = null;
     private final ActionController controller;
+    private final ThreadPoolExecutor executor;
     private BaseAction action = null;
 
-    public HttpServerHandler(ActionController controller) {
+    public HttpServerHandler(ActionController controller, ThreadPoolExecutor executor) {
         super();
         this.controller = controller;
+        this.executor = executor;
     }
 
     @Override
@@ -74,6 +78,21 @@ public class HttpServerHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+        if (Config.http_server_async) {
+            ReferenceCountUtil.retain(msg);
+            executor.execute(() -> {
+                try {
+                    handleChannelRead(ctx, msg);
+                } catch (Exception e) {
+                    LOG.error("Failed to handle channel read.", e);
+                }
+            });
+        } else {
+            handleChannelRead(ctx, msg);
+        }
+    }
+
+    public void handleChannelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         try {
             if (!(msg instanceof HttpRequest)) {
                 return;
@@ -117,6 +136,7 @@ public class HttpServerHandler extends ChannelInboundHandlerAdapter {
                 }
             }
         } finally {
+            ctx.flush();
             ReferenceCountUtil.release(msg);
         }
     }

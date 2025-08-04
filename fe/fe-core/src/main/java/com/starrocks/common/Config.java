@@ -766,6 +766,34 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true)
     public static boolean enable_http_detail_metrics = false;
 
+    @ConfField
+    public static boolean http_server_async = false;
+
+    /**
+     * The http server min worker threads, recommend set much smaller if thrift_server_nio_enabled
+     */
+    @ConfField(mutable = true)
+    public static int http_server_min_worker_threads = 10;
+
+    /**
+     * The http server max worker threads
+     */
+    @ConfField(mutable = true)
+    public static int http_server_max_worker_threads = 500;
+
+    /**
+     * If there is no thread to handle new request, the request will be pend to a queue,
+     * the pending queue size is http_server_queue_size
+     */
+    @ConfField
+    public static int http_server_queue_size = 4096;
+
+    /**
+     * http server thread pool keep alive time, terminate idle threads
+     */
+    @ConfField(mutable = true)
+    public static int http_server_worker_keep_alive_second = 60;
+
     /**
      * Cluster name will be shown as the title of web page
      */

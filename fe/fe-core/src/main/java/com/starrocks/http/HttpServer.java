@@ -36,6 +36,7 @@ package com.starrocks.http;
 
 import com.starrocks.common.Config;
 import com.starrocks.common.Log4jConfig;
+import com.starrocks.common.ThreadPoolManager;
 import com.starrocks.http.action.BackendAction;
 import com.starrocks.http.action.HaAction;
 import com.starrocks.http.action.IndexAction;
@@ -121,6 +122,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -136,9 +138,18 @@ public class HttpServer {
 
     private AtomicBoolean isStarted = new AtomicBoolean(false);
 
+    private ThreadPoolExecutor executor;
+
     public HttpServer(int port) {
         this.port = port;
         controller = new ActionController();
+        executor = ThreadPoolManager.newDaemonCacheThreadPool(
+                Config.http_server_min_worker_threads, Config.http_server_max_worker_threads,
+                Config.http_server_queue_size, Config.http_server_worker_keep_alive_second,
+                "http-server-pool", true);
+        // allow core thread time out so that the thread can be released
+        // if not used for ThreadPoolManager.KEEP_ALIVE_TIME
+        executor.allowCoreThreadTimeOut(true);
     }
 
     public void setup() throws IllegalArgException {
@@ -244,7 +255,7 @@ public class HttpServer {
                     .addLast(new ChunkedWriteHandler())
                     // add content compressor
                     .addLast(new CustomHttpContentCompressor())
-                    .addLast(new HttpServerHandler(controller));
+                    .addLast(new HttpServerHandler(controller, executor));
         }
     }
 
