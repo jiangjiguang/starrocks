@@ -841,7 +841,9 @@ public class StreamLoadTask extends AbstractTxnStateChangeCallback
             if (waitSecond <= 0) {
                 throw new LoadException("Load timeout. Increase the timeout and retry");
             }
+            writeUnlock();
             if (coord.join(waitSecond)) {
+                writeLock();
                 Status status = coord.getExecStatus();
                 Map<String, String> loadCounters = coord.getLoadCounters();
                 if (loadCounters == null || loadCounters.get(LoadEtlTask.DPP_NORMAL_ALL) == null) {
