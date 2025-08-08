@@ -780,7 +780,7 @@ CONF_mInt32(tablet_max_pending_versions, "1000");
 CONF_mBool(enable_bitmap_union_disk_format_with_set, "false");
 
 // scan task use driver threads.
-CONF_Bool(pipeline_scan_use_driver_thread, "false");
+CONF_mBool(pipeline_scan_use_driver_thread, "false");
 
 // The number of scan threads pipeline engine.
 CONF_Int64(pipeline_scan_thread_pool_thread_num, "0");

@@ -476,7 +476,7 @@ Status ScanOperator::_trigger_next_scan(RuntimeState* state, int chunk_source_in
         }
     };
 
-    if (config::pipeline_scan_use_driver_thread) {
+    if (config::pipeline_scan_use_driver_thread && sched_entity_type() == workgroup::ScanSchedEntityType::OLAP) {
         task.run();
     } else {
         bool submit_success;
