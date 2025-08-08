@@ -44,7 +44,6 @@ import com.starrocks.catalog.ScalarFunction;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
-import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.parser.NodePosition;
@@ -295,17 +294,6 @@ public class ArithmeticExpr extends Expr {
                 }
             case INT_DIVIDE:
             case DIVIDE:
-                ConnectContext context = ConnectContext.get();
-                if (context != null && context.getSessionVariable() != null) {
-                    if (context.getSessionVariable().isEnablePrestoTranslation()) {
-                        returnScale = Math.max(lhsScale, rhsScale);
-                        widerType = PrimitiveType.DECIMAL128;
-                        maxPrecision = PrimitiveType.getMaxPrecisionOfDecimal(widerType);
-                        result.lhsTargetType = ScalarType.createDecimalV3Type(widerType, maxPrecision, lhsScale);
-                        result.rhsTargetType = ScalarType.createDecimalV3Type(widerType, maxPrecision, rhsScale);
-                        break;
-                    }
-                }
                 if (lhsScale <= 6) {
                     returnScale = lhsScale + 6;
                 } else if (lhsScale <= 12) {
