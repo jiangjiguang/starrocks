@@ -72,7 +72,10 @@ public class AstToConcatWsSqlBuilderTest {
 
     @Test
     public void testToSQLWithDefaultSeparator() {
-        String result = AstToConcatWsSQLBuilder.toSQL(false, false, mockParseNode);
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String result = AstToConcatWsSQLBuilder.toSQL(false, false, mockParseNode, null,
+                session.getSessionVariable());
         assertNotNull(result);
         // Verify the default separator is used
         assertTrue(result.contains("CONCAT_WS(char(001)"));
@@ -80,25 +83,32 @@ public class AstToConcatWsSqlBuilderTest {
 
     @Test
     public void testToSQLWithCustomSeparator() {
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
         String customSeparator = "','";
-        String result = AstToConcatWsSQLBuilder.toSQL(false, false, mockParseNode, customSeparator);
+        String result = AstToConcatWsSQLBuilder.toSQL(false, false, mockParseNode, customSeparator,
+                session.getSessionVariable());
         assertNotNull(result);
         assertTrue(result.contains("CONCAT_WS(" + customSeparator));
     }
 
     @Test
     public void testGetOriginFieldListWithFunctionCall() {
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
         fieldList.add(mockField1);
         when(mockField1.getOriginExpression()).thenReturn(mockFunctionCallExpr);
         when(mockFunctionCallExpr.toSql()).thenReturn("COUNT(*)");
 
-        List<String> fields = AstToConcatWsSQLBuilder.getOriginFiledList(mockSelectRelation);
+        List<String> fields = AstToConcatWsSQLBuilder.getOriginFiledList(mockSelectRelation, session.getSessionVariable());
         assertEquals(1, fields.size());
         assertEquals("COUNT(*)", fields.get(0));
     }
 
     @Test
     public void testGetOriginFieldListWithMixedTypes() {
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
         // Add SlotRef field
         fieldList.add(mockField1);
         when(mockField1.getOriginExpression()).thenReturn(mockSlotRef);
@@ -109,7 +119,7 @@ public class AstToConcatWsSqlBuilderTest {
         when(mockField2.getOriginExpression()).thenReturn(mockFunctionCallExpr);
         when(mockFunctionCallExpr.toSql()).thenReturn("SUM(column2)");
 
-        List<String> fields = AstToConcatWsSQLBuilder.getOriginFiledList(mockSelectRelation);
+        List<String> fields = AstToConcatWsSQLBuilder.getOriginFiledList(mockSelectRelation, session.getSessionVariable());
         assertEquals(2, fields.size());
         assertTrue(fields.contains("column1"));
         assertTrue(fields.contains("SUM(column2)"));
@@ -126,8 +136,11 @@ public class AstToConcatWsSqlBuilderTest {
 
     @Test
     public void testVisitSelectWithOutermostSelect() {
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
         AstToConcatWsSQLBuilder.AstToConcatWsSQLBuilderVisitor visitor =
-                new AstToConcatWsSQLBuilder.AstToConcatWsSQLBuilderVisitor(false, false, false, "|");
+                new AstToConcatWsSQLBuilder.AstToConcatWsSQLBuilderVisitor(false, false, false, "|",
+                        session.getSessionVariable());
 
         when(mockSelectRelation.getOutputExpression()).thenReturn(new ArrayList<>());
 
@@ -138,8 +151,11 @@ public class AstToConcatWsSqlBuilderTest {
 
     @Test
     public void testVisitSelectWithNestedSelect() {
+        ConnectContext session = AnalyzeTestUtil.getConnectContext();
+        session.getSessionVariable().setEnablePrestoTranslation(true);
         AstToConcatWsSQLBuilder.AstToConcatWsSQLBuilderVisitor visitor =
-                new AstToConcatWsSQLBuilder.AstToConcatWsSQLBuilderVisitor(false, false, false, "|");
+                new AstToConcatWsSQLBuilder.AstToConcatWsSQLBuilderVisitor(false, false, false, "|",
+                        session.getSessionVariable());
         visitor.isOutermostSelect = false; // Simulate nested select
 
         List<SelectListItem> selectListItems = new ArrayList<>();

@@ -114,7 +114,7 @@ public class GetConcatWsSqlAction extends RestBaseAction {
         if (StringUtils.isBlank(separator)) {
             sql = AstToSQLBuilder.toSQL(true, false, statementBase);
         } else {
-            sql = AstToConcatWsSQLBuilder.toSQL(true, false, statementBase, separator);
+            sql = AstToConcatWsSQLBuilder.toSQL(true, false, statementBase, separator, ctx.getSessionVariable());
         }
         result.addResultEntry("sql", sql);
 

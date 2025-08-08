@@ -108,7 +108,7 @@ public class GetSqlColumnsAction extends RestBaseAction {
             QueryStatement queryStatement = (QueryStatement) statementBase;
             if (queryStatement.getQueryRelation() instanceof SelectRelation) {
                 SelectRelation selectRelation = (SelectRelation) queryStatement.getQueryRelation();
-                realColumnList = AstToConcatWsSQLBuilder.getOriginFiledList(selectRelation);
+                realColumnList = AstToConcatWsSQLBuilder.getOriginFiledList(selectRelation, ctx.getSessionVariable());
             }
         }
 

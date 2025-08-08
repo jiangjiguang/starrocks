@@ -18,6 +18,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
 import com.starrocks.analysis.AnalyticExpr;
 import com.starrocks.analysis.CaseExpr;
+import com.starrocks.analysis.CollectionElementExpr;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionCallExpr;
 import com.starrocks.analysis.HintNode;
@@ -53,14 +54,18 @@ public class AstToConcatWsSQLBuilder {
     // default separator for dps cluster
     private static final String DEFAULT_SEPARATOR = "char(001)";
 
-    public static String toSQL(boolean simple, boolean withoutTbl, ParseNode statement) {
-        return new AstToConcatWsSQLBuilderVisitor(simple, withoutTbl,
-                false, DEFAULT_SEPARATOR).visit(statement);
-    }
-
-    public static String toSQL(boolean simple, boolean withoutTbl, ParseNode statement, String separator) {
-        return new AstToConcatWsSQLBuilderVisitor(simple, withoutTbl,
-                false, separator).visit(statement);
+    public static String toSQL(boolean simple,
+                               boolean withoutTbl,
+                               ParseNode statement,
+                               String separator,
+                               SessionVariable sessionVariable) {
+        return new AstToConcatWsSQLBuilderVisitor(
+                simple,
+                withoutTbl,
+                false,
+                separator,
+                sessionVariable
+        ).visit(statement);
     }
 
     public static class AstToConcatWsSQLBuilderVisitor extends AstToSQLBuilder.AST2SQLBuilderVisitor {
@@ -74,12 +79,16 @@ public class AstToConcatWsSQLBuilder {
         // Store the delimiter variable
         private final String concatSeparator;
 
+        private final SessionVariable sessionVariable;
+
         public AstToConcatWsSQLBuilderVisitor(boolean simple,
                                               boolean withoutTbl,
                                               boolean hideCredential,
-                                              String separator) {
+                                              String separator,
+                                              SessionVariable sessionVariable) {
             super(simple, withoutTbl, hideCredential);
             this.concatSeparator = !StringUtils.isBlank(separator) ? separator : DEFAULT_SEPARATOR;
+            this.sessionVariable = sessionVariable;
         }
 
 
@@ -98,7 +107,7 @@ public class AstToConcatWsSQLBuilder {
             if (isOutermostSelect && !inCTE) {
                 sqlBuilder.append("CONCAT_WS(\n").append(concatSeparator).append(",\n");
                 List<String> coalesceColumns = new ArrayList<>();
-                getOriginFiledList(stmt).forEach(columnName -> {
+                getOriginFiledList(stmt, sessionVariable).forEach(columnName -> {
                     String coalesceColumn = String.format("COALESCE(CAST(%s AS STRING), 'null')",
                             columnName.replace("`", ""));
                     coalesceColumns.add(coalesceColumn);
@@ -185,10 +194,6 @@ public class AstToConcatWsSQLBuilder {
                 List<String> nodeList = new ArrayList<>();
                 for (int i = 0; i < tempArr.length; i++) {
                     String[] temp = tempArr[i].split("=");
-                    // filter , enable_presto_translation='false' when convert to string sql
-                    if (temp[0].equalsIgnoreCase("enable_presto_translation")) {
-                        continue;
-                    }
                     nodeList.add(tempArr[i]);
                 }
                 hintBuilder.append("/*+ SET_VAR( ").append(String.join(", ", nodeList)).append(" ) */");
@@ -197,10 +202,15 @@ public class AstToConcatWsSQLBuilder {
             return hintBuilder.toString();
         }
 
+        @Override
+        public String visitCollectionElementExpr(CollectionElementExpr node, Void context) {
+            remakeCollectionElementExpr(node, sessionVariable);
+            return visit(node.getChild(0)) + "[" + visit(node.getChild(1)) + "]";
+        }
 
     }
 
-    public static List<String> getOriginFiledList(SelectRelation stmt) {
+    public static List<String> getOriginFiledList(SelectRelation stmt, SessionVariable sessionVariable) {
         List<String> columnList = new ArrayList<>();
         List<Field> fieldList = stmt.getScope().getRelationFields().getAllFields();
         if (fieldList.isEmpty()) {
@@ -231,6 +241,10 @@ public class AstToConcatWsSQLBuilder {
                 } else if (field.getOriginExpression() instanceof CaseExpr) {
                     CaseExpr caseExpr = (CaseExpr) field.getOriginExpression();
                     columnName = caseExpr.toSqlImpl();
+                } else if (field.getOriginExpression() instanceof CollectionElementExpr) {
+                    CollectionElementExpr node = (CollectionElementExpr) field.getOriginExpression();
+                    remakeCollectionElementExpr(node, sessionVariable);
+                    columnName = node.toSqlImpl();
                 } else {
                     LOG.info("didn't get the instance typ in field list, so we cast to origin type, field: {}", field);
                     columnName = field.getOriginExpression().toSql();
@@ -247,6 +261,33 @@ public class AstToConcatWsSQLBuilder {
                     fieldList, columnList));
         }
         return columnList;
+    }
+
+    protected static void remakeCollectionElementExpr(CollectionElementExpr node, SessionVariable sessionVariable) {
+        Expr expr = node.getChild(0);
+        Expr subscript = node.getChild(1);
+        if (expr.getType().isArrayType()) {
+            if (!subscript.getType().isNumericType()) {
+                throw new SemanticException("array subscript must have type integer", subscript.getPos());
+            }
+            if (sessionVariable.isEnablePrestoTranslation()) {
+                if (subscript instanceof IntLiteral) {
+                    IntLiteral newSubscript = (IntLiteral) subscript;
+                    long idx = newSubscript.getValue();
+                    if (idx < 0) {
+                        throw new SemanticException("The array subscript must be greater than or equal to 1");
+                    }
+                    // During the analyzer stage, the subscript has already been automatically incremented by 1.
+                    // Therefore, when reverting to sql, it needs to be decremented by 1 to restore.
+                    // Otherwise, if the generated submit task sql is resubmitted to sr,
+                    // it will be incremented by 1 again when entering the analyzer stage
+                    idx = idx - 1;
+                    IntLiteral fitPrestoSubscript = new IntLiteral(idx);
+                    node.setChild(1, fitPrestoSubscript);
+                    subscript = node.getChild(1);
+                }
+            }
+        }
     }
 
     public static void initSessionVariableByQueryHint(StatementBase statementBase, ConnectContext ctx) {
@@ -288,11 +329,6 @@ public class AstToConcatWsSQLBuilder {
         if (paramsList.isEmpty()) {
             return hintNodeList;
         }
-
-        // need to set presto translate false,and then the sql will be normal
-        List<String> tempList = new ArrayList<>();
-        tempList.add("false");
-        paramsList.put(SessionVariable.ENABLE_PRESTO_TRANSLATION, tempList);
 
         // init session to context
         paramsList.keySet().forEach(key -> {
