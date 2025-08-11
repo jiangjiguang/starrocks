@@ -295,7 +295,8 @@ void PInternalServiceImplBase<T>::_exec_plan_fragment(google::protobuf::RpcContr
                                                       google::protobuf::Closure* done) {
     ClosureGuard closure_guard(done);
     auto* cntl = static_cast<brpc::Controller*>(cntl_base);
-    if (process_exit_in_progress()) {
+    if (process_exit_in_progress() &&
+        (!config::graceful_exit_wait_for_frontend_heartbeat || is_frontend_aware_of_exit())) {
         cntl->SetFailed(brpc::EINTERNAL, "BE is shutting down");
         LOG(WARNING) << "reject exec plan fragment because of exit";
         return;
