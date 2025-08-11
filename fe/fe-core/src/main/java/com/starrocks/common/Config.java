@@ -3303,4 +3303,12 @@ public class Config extends ConfigBase {
     // FileSystem.get by cache if open the flag
     @ConfField(mutable = true)
     public static boolean enable_file_system_with_cache = true;
+
+    // filesystem expire when idle
+    @ConfField(mutable = true)
+    public static int hdfs_client_expire_after_access_minutes = 30;
+
+    // filesystem refresh
+    @ConfField(mutable = true)
+    public static int hdfs_client_refresh_after_write_minutes = 10;
 }

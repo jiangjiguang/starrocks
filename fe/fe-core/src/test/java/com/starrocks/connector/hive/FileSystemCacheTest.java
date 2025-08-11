@@ -38,11 +38,11 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-public class FileSystemLRUCacheTest {
+public class FileSystemCacheTest {
     private static final String TEST_HDFS_URI = "hdfs://namenode:8020";
     private static final String TEST_HAR_URI = "har://hdfs-namenode/path/to/archive.har";
     private Configuration conf;
-    private FileSystemLRUCache cache;
+    private FileSystemCache cache;
     private FileSystem mockFs;
 
     @Before
@@ -55,7 +55,7 @@ public class FileSystemLRUCacheTest {
         try (MockedStatic<HdfsEnvironment> mocked = mockStatic(HdfsEnvironment.class)) {
             mocked.when(() -> HdfsEnvironment.getFileSystem(any(), any()))
                     .thenReturn(mockFs);
-            cache = new FileSystemLRUCache();
+            cache = new FileSystemCache(conf);
         }
     }
 
@@ -87,7 +87,7 @@ public class FileSystemLRUCacheTest {
     public void testLruEviction() throws IOException {
         // Set the maximum cache to 2
         // A parameter constructor needs to be added
-        FileSystemLRUCache smallCache = new FileSystemLRUCache(2);
+        FileSystemCache smallCache = new FileSystemCache(2, conf);
 
         smallCache.getFileSystem("hdfs://nn1", conf);
         smallCache.getFileSystem("hdfs://nn2", conf);

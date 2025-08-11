@@ -56,7 +56,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
     // only used for ut.
     private FileSystem fileSystem;
 
-    private static final FileSystemLRUCache FS_CACHE = new FileSystemLRUCache();
+    private static final FileSystemCache GLOBAL_FS_CACHE = new FileSystemCache();
 
     // blockHost is ip:port
     private final Map<String, Long> blockHostToId = new ConcurrentHashMap<>();
@@ -78,7 +78,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
         }
         if (Config.enable_file_system_with_cache) {
             String path = uri.toString();
-            return FS_CACHE.getFileSystem(path, configuration);
+            return GLOBAL_FS_CACHE.getFileSystem(path, configuration);
         }
         return HdfsEnvironment.getFileSystem(configuration, uri);
     }
