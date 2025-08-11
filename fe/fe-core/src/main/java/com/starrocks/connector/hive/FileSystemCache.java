@@ -73,7 +73,9 @@ public class FileSystemCache {
                 .expireAfterAccess(EXPIRE_AFTER_ACCESS_MINUTES, TimeUnit.MINUTES)
                 .refreshAfterWrite(REFRESH_AFTER_WRITE_MINUTES, TimeUnit.MINUTES)
                 .removalListener((String key, FileSystem fs, RemovalCause cause) -> {
-                    if (fs != null) {
+                    // The old value was replaced due to the successful loading of the new value
+                    // (such as refresh or put overwriting)
+                    if (cause != RemovalCause.REPLACED) {
                         LOG.info("Evicting cache key: {} due to {}", key, cause);
                         closeQuietly(fs);
                     }
@@ -90,11 +92,13 @@ public class FileSystemCache {
     }
 
     public FileSystem getFileSystem(String path, Configuration configuration) throws IOException {
+        LOG.info("get filesystem by path: {}", path);
         // rewrite the config
         this.conf = configuration;
         // initial the cache key
         String cacheKey = getCacheKey(path);
         try {
+            LOG.info("get filesystem by cache key: {}", cacheKey);
             return cache.get(cacheKey, k -> {
                 try {
                     return loadFileSystem(k);
@@ -128,6 +132,7 @@ public class FileSystemCache {
 
         // Immediate validation for new connections
         if (!isFileSystemValid(fs, cacheKey)) {
+            LOG.info("check filesystem invalid by cache key: {}", cacheKey);
             closeQuietly(fs);
             throw new IOException("Failed to establish valid file system connection to " + cacheKey);
         }
@@ -137,6 +142,7 @@ public class FileSystemCache {
     public void closeQuietly(FileSystem fs) {
         try {
             if (fs != null) {
+                LOG.info("close quietly filesystem: {}", fs);
                 fs.close();
             }
         } catch (IOException e) {
