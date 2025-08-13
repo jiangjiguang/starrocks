@@ -55,7 +55,7 @@ public class FileSystemCacheTest {
         try (MockedStatic<HdfsEnvironment> mocked = mockStatic(HdfsEnvironment.class)) {
             mocked.when(() -> HdfsEnvironment.getFileSystem(any(), any()))
                     .thenReturn(mockFs);
-            cache = new FileSystemCache(conf);
+            cache = new FileSystemCache(2, conf);
         }
     }
 
@@ -63,19 +63,19 @@ public class FileSystemCacheTest {
     @Test
     public void testCacheHdfsPath() throws IOException {
         // First acquisition (a new instance should be created)
-        FileSystem fs1 = cache.getFileSystem(TEST_HDFS_URI, conf);
+        FileSystem fs1 = cache.getFileSystem(TEST_HDFS_URI, conf).acquire();
         Assert.assertSame(mockFs, fs1);
         Assert.assertEquals(1, cache.size());
 
         // Get again (should hit the cache)
-        FileSystem fs2 = cache.getFileSystem(TEST_HDFS_URI, conf);
+        FileSystem fs2 = cache.getFileSystem(TEST_HDFS_URI, conf).acquire();
         Assert.assertSame(fs1, fs2);
     }
 
     // Special handling of HAR paths
     @Test
     public void testHarPathHandling() throws IOException, URISyntaxException {
-        FileSystem fs = cache.getFileSystem(TEST_HAR_URI, conf);
+        FileSystem fs = cache.getFileSystem(TEST_HAR_URI, conf).acquire();
         verify(mockFs).initialize(eq(new URI(TEST_HAR_URI)), eq(conf));
         Assert.assertEquals(1, cache.size());
     }

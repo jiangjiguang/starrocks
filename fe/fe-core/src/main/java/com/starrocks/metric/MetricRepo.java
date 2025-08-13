@@ -204,11 +204,15 @@ public final class MetricRepo {
     public static Histogram HISTO_GET_PARTITIONS_BY_NAMES_QUERY_LATENCY;
     public static Histogram HISTO_LIST_PARTITION_QUERY_LATENCY;
     public static Histogram HISTO_GET_PARTITION_COLUMN_STATS_QUERY_LATENCY;
+
+    public static Histogram HISTO_GET_FILE_SYSTEM_CACHE_LATENCY;
     public static LongCounterMetric COUNTER_LIST_PARTITION_NAMES_BY_VALUE_QUERY_FAIL;
     public static LongCounterMetric COUNTER_LIST_PARTITION_NAMES_QUERY_FAIL;
     public static LongCounterMetric COUNTER_LIST_PARTITION_QUERY_FAIL;
     public static LongCounterMetric COUNTER_GET_PARTITIONS_BY_NAMES_QUERY_FAIL;
     public static LongCounterMetric COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL;
+    public static LongCounterMetric COUNTER_FILE_SYSTEM_CACHE_EVICT;
+
 
     public static List<GaugeMetricImpl<Long>> GAUGE_MEMORY_USAGE_STATS;
     public static List<GaugeMetricImpl<Long>> GAUGE_OBJECT_COUNT_STATS;
@@ -581,6 +585,9 @@ public final class MetricRepo {
         HISTO_GET_PARTITION_COLUMN_STATS_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
                 "hms_getPartitionColumnStats", "latency", "ms"));
 
+        HISTO_GET_FILE_SYSTEM_CACHE_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
+                "histo_get_file_system_cache_latency", "latency", "ms"));
+
         COUNTER_LIST_PARTITION_NAMES_BY_VALUE_QUERY_FAIL = new LongCounterMetric(
                 "hms_listPartitionNamesByValue_failed",
                 MetricUnit.REQUESTS,
@@ -610,6 +617,13 @@ public final class MetricRepo {
                 MetricUnit.REQUESTS,
                 "counter of failed HMS.getPartitionColumnStats queries");
         STARROCKS_METRIC_REGISTER.addMetric(COUNTER_GET_PARTITION_COLUMN_STATS_QUERY_FAIL);
+
+
+        COUNTER_FILE_SYSTEM_CACHE_EVICT = new LongCounterMetric(
+                "counter_file_system_cache_evict",
+                MetricUnit.REQUESTS,
+                "counter of filesystem eviction");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_FILE_SYSTEM_CACHE_EVICT);
 
         // init system metrics
         initSystemMetrics();

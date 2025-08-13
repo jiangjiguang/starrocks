@@ -3298,17 +3298,21 @@ public class Config extends ConfigBase {
 
     // filesystem cache map key length,lru cache when exceed
     @ConfField(mutable = true)
-    public static int hdfs_client_max_cache_size = 64;
+    public static int hdfs_client_max_cache_size = 100;
 
     // FileSystem.get by cache if open the flag
     @ConfField(mutable = true)
     public static boolean enable_file_system_with_cache = true;
 
-    // filesystem expire when idle
+    // filesystem expire when idle in 24 hours
     @ConfField(mutable = true)
-    public static int hdfs_client_expire_after_access_minutes = 30;
+    public static int hdfs_client_expire_after_access_minutes = 1440;
 
-    // filesystem refresh
+    // filesystem refresh loop every 3 hours
     @ConfField(mutable = true)
-    public static int hdfs_client_refresh_after_write_minutes = 10;
+    public static int hdfs_client_refresh_after_write_minutes = 180;
+
+    // no close FileSystem if open the flag
+    @ConfField(mutable = true)
+    public static boolean enable_file_system_recycle = true;
 }
