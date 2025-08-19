@@ -117,6 +117,9 @@ public class AstToConcatWsSQLBuilder {
                 sqlBuilder.append("\n) AS content");
                 isOutermostSelect = false;
             } else {
+                if (stmt.getSelectList().isDistinct()) {
+                    sqlBuilder.append("DISTINCT ");
+                }
                 // get select item list
                 List<String> selectListString = makeNormalSelectItem(stmt);
                 sqlBuilder.append(Joiner.on(", ").join(selectListString));
@@ -270,6 +273,10 @@ public class AstToConcatWsSQLBuilder {
             throw new RuntimeException(String.format(
                     "It might be that the parser did not handle all the fields, fieldList:%s, columnList:%s",
                     fieldList, columnList));
+        }
+        if (stmt.getSelectList().isDistinct()) {
+            String newColumn = "DISTINCT " + columnList.get(0);
+            columnList.set(0, newColumn);
         }
         return columnList;
     }
