@@ -378,5 +378,22 @@ public class ImplicitCastRuleTest {
         result = rule.apply(caseWhenOperator1, context);
         assertEquals(PrimitiveType.DATE, result.getChild(0).getChild(0).getType().getPrimitiveType());
         // ==== test case for CASE WHEN x > date_sub(current_date(), 7) THEN 1 ELSE 0 END === end
+
+
+        // ==== test case for CASE x WHEN substr(current_date, 1, 4) THEN 1 ELSE 0 END === begin
+        ColumnRefOperator substrX = new ColumnRefOperator(0, Type.VARCHAR, "x", false);
+        CallOperator currentDate1 = new CallOperator(FunctionSet.CURDATE, Type.DATE, new ArrayList<>());
+        List<ScalarOperator> substrArgList = new ArrayList<>();
+        substrArgList.add(currentDate1);
+        substrArgList.add(new ConstantOperator(1, Type.TINYINT));
+        substrArgList.add(new ConstantOperator(4, Type.TINYINT));
+        CallOperator substrOperator = new CallOperator(FunctionSet.SUBSTR, Type.STRING, substrArgList);
+        ConstantOperator substrThen = new ConstantOperator(1, Type.TINYINT);
+        ConstantOperator substrElse = new ConstantOperator(1, Type.TINYINT);
+        List<ScalarOperator> substrWhenClause = Lists.newArrayList(substrOperator, substrThen);
+        CaseWhenOperator substrCaseWhenOperator = new CaseWhenOperator(Type.TINYINT, substrX, substrElse, substrWhenClause);
+        result = rule.apply(substrCaseWhenOperator, context);
+        assertEquals(PrimitiveType.VARCHAR, result.getChild(0).getChild(0).getType().getPrimitiveType());
+        // ==== test case for CASE substr(x, 1, 4) WHEN substr(current_date, 1, 4) THEN 1 ELSE 0 END === end
     }
 }

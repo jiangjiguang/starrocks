@@ -382,6 +382,14 @@ public class ImplicitCastRule extends TopDownScalarOperatorRewriteRule {
                 continue;
             }
 
+            // Reason: Function calls (such as array_contains) are usually type-safe by function signatures
+            // and do not require additional conversions.
+            // case when array_container(map_keys(x), '123') then 'abc'
+            // case when substr(current_date, 1, 4) then 'xx'
+            if (whenOperator instanceof CallOperator) {
+                continue;
+            }
+
             // CASE WHEN to_date(xx) BETWEEN '2025-02-24' AND '2025-03-02' THEN 1 ELSE 0 END
             // CASE WHEN xx > date_sub(current_date(), 7) THEN 1 ELSE 0 END
             boolean isDateColumn = whenOperator.getChildren().stream().anyMatch(item -> item.getType().isDate());
