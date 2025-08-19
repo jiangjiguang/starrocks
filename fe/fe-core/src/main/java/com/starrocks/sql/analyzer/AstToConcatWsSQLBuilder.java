@@ -108,8 +108,9 @@ public class AstToConcatWsSQLBuilder {
                 sqlBuilder.append("CONCAT_WS(\n").append(concatSeparator).append(",\n");
                 List<String> coalesceColumns = new ArrayList<>();
                 getOriginFiledList(stmt, sessionVariable).forEach(columnName -> {
-                    String coalesceColumn = String.format("COALESCE(CAST(%s AS STRING), 'null')",
-                            columnName.replace("`", ""));
+                    String coalesceColumn = String.format(
+                            "COALESCE(CAST(%s AS STRING), 'null')",
+                            columnName);
                     coalesceColumns.add(coalesceColumn);
                 });
                 sqlBuilder.append(String.join(",\n", coalesceColumns));
@@ -229,6 +230,16 @@ public class AstToConcatWsSQLBuilder {
                     } else {
                         columnName = slotRef.getColumnName();
                     }
+                    columnName = String.format("`%s`", columnName);
+                    if (slotRef.getType().isMapType()
+                            || slotRef.getType().isArrayType()
+                            || slotRef.getType().isStructType()
+                            || field.getType().isMapType()
+                            || field.getType().isArrayType()
+                            || field.getType().isStructType()
+                    ) {
+                        columnName = String.format("TO_JSON(%s)", columnName);
+                    }
                 } else if (field.getOriginExpression() instanceof FunctionCallExpr) {
                     FunctionCallExpr functionCallExpr = (FunctionCallExpr) field.getOriginExpression();
                     columnName = functionCallExpr.toSql();
@@ -252,7 +263,7 @@ public class AstToConcatWsSQLBuilder {
             }
 
             if (!StringUtils.isBlank(columnName)) {
-                columnList.add(columnName.replace("`", ""));
+                columnList.add(columnName);
             }
         });
         if (fieldList.size() != columnList.size()) {
