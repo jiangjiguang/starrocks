@@ -3315,4 +3315,7 @@ public class Config extends ConfigBase {
     // no close FileSystem if open the flag
     @ConfField(mutable = true)
     public static boolean enable_file_system_recycle = true;
+
+    @ConfField(mutable = true)
+    public static String default_presto_catalog = "unified_catalog_hms";
 }

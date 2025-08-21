@@ -42,6 +42,7 @@ import com.starrocks.analysis.StringLiteral;
 import com.starrocks.analysis.VariableExpr;
 import com.starrocks.authentication.UserProperty;
 import com.starrocks.cluster.ClusterNamespace;
+import com.starrocks.common.Config;
 import com.starrocks.common.DdlException;
 import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
@@ -792,6 +793,9 @@ public class ConnectContext {
     }
 
     public String getCurrentCatalog() {
+        if (this.sessionVariable.isEnablePrestoTranslation()) {
+            return Config.default_presto_catalog;
+        }
         return this.sessionVariable.getCatalog();
     }
 
