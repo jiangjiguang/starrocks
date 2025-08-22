@@ -2657,6 +2657,7 @@ baseType
     | DOUBLE
     | DATE
     | DATETIME
+    | TIMESTAMP
     | TIME
     | CHAR typeParameter?
     | VARCHAR typeParameter?

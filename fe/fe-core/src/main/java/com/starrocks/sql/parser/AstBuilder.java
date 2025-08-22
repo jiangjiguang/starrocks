@@ -7718,6 +7718,9 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
         } else if (context.BINARY() != null || context.VARBINARY() != null) {
             ScalarType type = ScalarType.createVarbinary(length);
             return type;
+        } else if (context.TIMESTAMP() != null) {
+            ScalarType type = ScalarType.DATETIME;
+            return type;
         } else {
             return ScalarType.createType(context.getChild(0).getText());
         }

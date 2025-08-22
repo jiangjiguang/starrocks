@@ -15,9 +15,9 @@
 
 package com.starrocks.sql.analyzer;
 
-
 import com.starrocks.common.util.UUIDUtil;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.sql.StatementPlanner;
 import com.starrocks.sql.ast.AlterClause;
 import com.starrocks.sql.ast.AlterTableStmt;
 import com.starrocks.sql.ast.ModifyBackendClause;
@@ -29,6 +29,8 @@ import com.starrocks.sql.parser.CaseInsensitiveStream;
 import com.starrocks.sql.parser.SqlParser;
 import com.starrocks.sql.parser.StarRocksLexer;
 import com.starrocks.sql.parser.StarRocksParser;
+import com.starrocks.sql.plan.ExecPlan;
+import com.starrocks.thrift.TResultSinkType;
 import com.starrocks.utframe.UtFrameUtils;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -94,5 +96,14 @@ public class AstBuilderTest {
         List<AlterClause> alterClauses = aStmt.getAlterClauseList();
         TruncatePartitionClause c = (TruncatePartitionClause) alterClauses.get(0);
         Assert.assertTrue(c.getPartitionNames().getPartitionNames().get(0).equals("p1"));
+    }
+
+    @Test
+    public void testGetBaseTypeWithTimestamp() {
+        String sql = "select cast('2025-09-01 11:11:11' as timestamp) as _dt";
+        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertEquals("_dt", execPlan.getColNames().get(0));
     }
 }
