@@ -531,6 +531,7 @@ public class FunctionSet {
     public static final String INT = "int";
     public static final String STRING = "string";
     public static final String DOUBLE = "double";
+    public static final String TO_JSON = "to_json";
 
     private static final Logger LOGGER = LogManager.getLogger(FunctionSet.class);
 

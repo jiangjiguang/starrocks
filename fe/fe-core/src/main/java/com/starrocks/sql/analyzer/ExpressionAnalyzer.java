@@ -1020,6 +1020,21 @@ public class ExpressionAnalyzer {
 
         @Override
         public Void visitCastExpr(CastExpr cast, Scope context) {
+            if (session.getSessionVariable().isEnablePrestoTranslation()) {
+                Expr child = cast.getChild(0);
+                if (child.getType().isMapType() && cast.getType().isStringType()) {
+                    List<Expr> params = new ArrayList<>();
+                    params.add(child);
+                    String fnName = FunctionSet.TO_JSON;
+                    FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
+                    functionCallExpr.setType(Type.JSON);
+                    Type[] argumentTypes = {child.getType()};
+                    Function fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+                    functionCallExpr.setFn(fn);
+                    cast.setChild(0, functionCallExpr);
+                }
+            }
+
             Type castType;
             // If cast expr is implicit, targetTypeDef is null
             if (cast.isImplicit()) {
@@ -1027,6 +1042,7 @@ public class ExpressionAnalyzer {
             } else {
                 castType = cast.getTargetTypeDef() == null ? cast.getType() : cast.getTargetTypeDef().getType();
             }
+
             if (!Type.canCastTo(cast.getChild(0).getType(), castType)) {
                 throw new SemanticException("Invalid type cast from " + cast.getChild(0).getType().toSql() + " to "
                         + castType.toSql() + " in sql `" +
@@ -1091,6 +1107,7 @@ public class ExpressionAnalyzer {
             }
 
             // throw exception direct
+
             checkFunction(fnName, node, argumentTypes);
             if (fnName.equalsIgnoreCase("typeof") && argumentTypes.length == 1) {
                 // For the typeof function, the parameter type of the function is the result of this function.

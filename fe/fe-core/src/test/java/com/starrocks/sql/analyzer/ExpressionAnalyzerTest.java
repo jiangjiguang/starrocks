@@ -271,4 +271,21 @@ public class ExpressionAnalyzerTest extends PlanTestBase {
         ExecPlan execPlan = getExecPlan(sql);
         Assert.assertEquals(1, execPlan.getColNames().size());
     }
+
+    @Test
+    public void testCastMapToStringExprAnalyzerForPresto() throws Exception {
+        String sql = "SELECT cast(map{1:1, 2:2, 3:3} as string)";
+        try {
+            ExecPlan execPlan = getExecPlan(sql);
+            Assert.assertEquals(1, execPlan.getColNames().size());
+        } catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("Invalid type cast from map"));
+        }
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        ExecPlan execPlan = getExecPlan(sql);
+        Assert.assertEquals(1, execPlan.getColNames().size());
+    }
 }
