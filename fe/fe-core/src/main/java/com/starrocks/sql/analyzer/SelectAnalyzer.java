@@ -33,6 +33,7 @@ import com.starrocks.analysis.SlotRef;
 import com.starrocks.analysis.StringLiteral;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.PrimitiveType;
+import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.TreeNode;
 import com.starrocks.qe.ConnectContext;
@@ -201,7 +202,9 @@ public class SelectAnalyzer {
         ImmutableList.Builder<Field> outputFields = ImmutableList.builder();
         List<Integer> outputExprInOrderByScope = new ArrayList<>();
 
-        for (SelectListItem item : selectList.getItems()) {
+
+        for (int index = 0; index < selectList.getItems().size(); index++) {
+            SelectListItem item = selectList.getItems().get(index);
             if (item.isStar()) {
                 List<Field> fields = (item.getTblName() == null ? scope.getRelationFields().getAllFields()
                         : scope.getRelationFields().resolveFieldsWithPrefix(item.getTblName()))
@@ -251,6 +254,26 @@ public class SelectAnalyzer {
                     if (item.getExpr() instanceof FunctionCallExpr) {
                         FunctionCallExpr node = (FunctionCallExpr) item.getExpr();
                         String fnName = node.getFnName().getFunction();
+                        if (FunctionSet.BIGINT.equals(fnName)) {
+                            CastExpr castExpr = new CastExpr(ScalarType.BIGINT, node.getChild(0));
+                            item.setExpr(castExpr);
+                            selectList.getItems().set(index, item);
+                        }
+                        if (FunctionSet.INT.equals(fnName)) {
+                            CastExpr castExpr = new CastExpr(ScalarType.INT, node.getChild(0));
+                            item.setExpr(castExpr);
+                            selectList.getItems().set(index, item);
+                        }
+                        if (FunctionSet.STRING.equals(fnName)) {
+                            CastExpr castExpr = new CastExpr(ScalarType.VARCHAR, node.getChild(0));
+                            item.setExpr(castExpr);
+                            selectList.getItems().set(index, item);
+                        }
+                        if (FunctionSet.DOUBLE.equals(fnName)) {
+                            CastExpr castExpr = new CastExpr(ScalarType.DOUBLE, node.getChild(0));
+                            item.setExpr(castExpr);
+                            selectList.getItems().set(index, item);
+                        }
                         // special deal with trunc for compatible presto
                         if (fnName.equals(FunctionSet.TRUNC)) {
                             rewriteTruncForPresto(node);

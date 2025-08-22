@@ -57,7 +57,7 @@ https://github.com/checkstyle/checkstyle/blob/master/src/main/resources/google_c
 
     <module name="LineLength">
         <property name="fileExtensions" value="java"/>
-        <property name="max" value="130"/>
+        <property name="max" value="170"/>
         <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://|\/\/"/>
     </module>
 

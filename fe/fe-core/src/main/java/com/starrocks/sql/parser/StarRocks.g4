@@ -2765,4 +2765,7 @@ nonReserved
     | DOTDOTDOT | NGRAMBF
     | FIELD
     | ARRAY_ELEMENT
+    | BIGINT
+    | INT
+    | DOUBLE
     ;

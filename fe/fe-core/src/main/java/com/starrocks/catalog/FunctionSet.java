@@ -527,6 +527,11 @@ public class FunctionSet {
     public static final String COLLECT_SET = "collect_set";
     public static final String COLLECT_LIST = "collect_list";
 
+    public static final String BIGINT = "bigint";
+    public static final String INT = "int";
+    public static final String STRING = "string";
+    public static final String DOUBLE = "double";
+
     private static final Logger LOGGER = LogManager.getLogger(FunctionSet.class);
 
     private static final Set<Type> STDDEV_ARG_TYPE =
