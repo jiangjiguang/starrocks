@@ -23,7 +23,6 @@ import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.metric.MetricRepo;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.HarFileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.logging.log4j.LogManager;
@@ -63,6 +62,10 @@ public class FileSystemCache {
     }
 
     public FileSystemCache() {
+        // Add a scheduled cleaning task in the constructor
+        this.scheduler.scheduleAtFixedRate(() -> {
+            zombieEntries.entrySet().removeIf(entry -> entry.getValue().tryClose());
+        }, 1, 1, TimeUnit.HOURS);
         // Register shutdown hook
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             LOG.info("Shutting down FileSystemCache");
@@ -87,12 +90,6 @@ public class FileSystemCache {
                     }
                     LOG.info("Evicting cache key: {} due to {} (refCount={})",
                             key, cause, wrapper.refCount.get());
-                    // Recycling filesystem
-                    if (ENABLE_FILE_SYSTEM_RECYCLE) {
-                        LOG.info("recycle fs will be putted into zombie by key:{}", key);
-                        zombieEntries.put(key, wrapper);
-                        return;
-                    }
                     // Failed to close (still referenced), converted to a zombie entry
                     if (!wrapper.tryClose()) {
                         LOG.info("evicted cache to close fs fail, fs will be putted into zombie by key:{}", key);
@@ -110,11 +107,19 @@ public class FileSystemCache {
                 });
     }
 
-    public FileSystemWrapper getFileSystem(String path, Configuration configuration) throws IOException {
+    public FileSystemWrapper getFileSystem(String path, Configuration newConf) throws IOException {
         long startTime = System.nanoTime();
         LOG.info("get filesystem by path: {}", path);
-        // rewrite the config
-        this.conf = configuration;
+        newConf.set("fs.hdfs.impl.disable.cache", "true");
+        newConf.set("fs.har.impl.disable.cache", "true");
+        // check if configuration changed
+        if (!newConf.equals(this.conf)) {
+            LOG.info("Configuration changed, clearing cache and updating configuration");
+            // clear all cache
+            cache.invalidateAll();
+            // update new configuration
+            this.conf = newConf;
+        }
         // initial the cache key
         String cacheKey = getCacheKey(path);
         try {
@@ -123,6 +128,12 @@ public class FileSystemCache {
                     FileSystem fs = loadFileSystem(k);
                     if (fs == null) {
                         throw new RuntimeException("Failed to create filesystem");
+                    }
+                    // Immediate validation for new connections
+                    if (!isFileSystemValid(fs, path)) {
+                        LOG.info("check filesystem invalid by cache key: {}", cacheKey);
+                        closeQuietly(fs);
+                        throw new IOException("Failed to establish valid file system connection to " + cacheKey);
                     }
                     return new FileSystemWrapper(fs);
                 } catch (IOException e) {
@@ -162,29 +173,12 @@ public class FileSystemCache {
     }
 
     private FileSystem createFileSystem(String cacheKey) throws IOException {
+        long startTime = System.currentTimeMillis();
         URI uri = new Path(cacheKey).toUri();
-        FileSystem fs = null;
-        // 1. Give priority to reusing zombie entries
-        // Atomic operations get and remove
-        if (zombieEntries.containsKey(cacheKey)) {
-            LOG.info("get filesystem from zombie entries key: {}", cacheKey);
-            FileSystemWrapper zombie = zombieEntries.remove(cacheKey);
-            if (zombie != null && !zombie.isClosed()) {
-                fs = zombie.acquire();
-            }
-        }
-
-        // 2. zombie fs is null, retry to get fs from system
-        if (fs == null) {
-            fs = HdfsEnvironment.getFileSystem(conf, uri);
-        }
-
-        // 3. Immediate validation for new connections
-        if (!isFileSystemValid(fs, cacheKey)) {
-            LOG.info("check filesystem invalid by cache key: {}", cacheKey);
-            closeQuietly(fs);
-            throw new IOException("Failed to establish valid file system connection to " + cacheKey);
-        }
+        FileSystem fs = HdfsEnvironment.getFileSystem(conf, uri);
+        long endTime = System.currentTimeMillis();
+        long elapse = endTime - startTime;
+        LOG.info("create file system elapse: {}ms", elapse);
         return fs;
     }
 
@@ -213,12 +207,13 @@ public class FileSystemCache {
             return false;
         }
         try {
-            if (fs instanceof HarFileSystem) {
-                Path harPath = new Path(checkPath);
-                return fs.exists(harPath) || fs.listStatus(harPath).length > 0;
-            }
-            fs.getDefaultBlockSize(new Path(checkPath));
-            return true;
+            long startTime = System.currentTimeMillis();
+            Path harPath = new Path(checkPath);
+            boolean valid = fs.exists(harPath) || fs.listStatus(harPath).length > 0;
+            long endTime = System.currentTimeMillis();
+            long elapse = endTime - startTime;
+            LOG.info("check file system valid elapse: {}ms", elapse);
+            return valid;
         } catch (IOException e) {
             return handleValidationException(e);
         } catch (Exception e) {
@@ -261,7 +256,7 @@ public class FileSystemCache {
          */
         public synchronized FileSystem acquire() throws IOException {
             if (isClosed()) {
-                throw new IOException("Filesystem closed");
+                throw new IOException("Filesystem closed in acquire");
             }
             refCount.incrementAndGet();
             LOG.info("Try to get filesystem, refCount = {}", refCount.get());
