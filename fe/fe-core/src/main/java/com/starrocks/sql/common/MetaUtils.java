@@ -27,6 +27,9 @@ import com.starrocks.catalog.ExternalOlapTable;
 import com.starrocks.catalog.InternalCatalog;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Table;
+import com.starrocks.catalog.system.information.InfoSchemaDb;
+import com.starrocks.catalog.system.sys.SysDb;
+import com.starrocks.common.Config;
 import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
 import com.starrocks.common.util.DebugUtil;
@@ -43,6 +46,7 @@ import com.starrocks.sql.ast.CreateMaterializedViewStmt;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.optimizer.rule.mv.MVUtils;
 import com.starrocks.sql.parser.SqlParser;
+import com.starrocks.statistic.StatsConstants;
 import com.starrocks.thrift.TUniqueId;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -193,6 +197,44 @@ public class MetaUtils {
                 throw new SemanticException("No catalog selected");
             }
             tableName.setCatalog(connectContext.getCurrentCatalog());
+        }
+        if (Strings.isNullOrEmpty(tableName.getDb())) {
+            if (Strings.isNullOrEmpty(connectContext.getDatabase())) {
+                throw new SemanticException("No database selected");
+            }
+            tableName.setDb(connectContext.getDatabase());
+        }
+
+        if (Strings.isNullOrEmpty(tableName.getTbl())) {
+            throw new SemanticException("Table name is null");
+        }
+    }
+
+    public static void normalizationTableNameOnlyQuery(ConnectContext connectContext, TableName tableName) {
+        if (Strings.isNullOrEmpty(tableName.getCatalog())) {
+            if (Strings.isNullOrEmpty(connectContext.getCurrentCatalog())) {
+                throw new SemanticException("No catalog selected");
+            }
+            // reset the catalog as unified_catalog_hms when enable presto translation
+            if (connectContext.getSessionVariable().isEnablePrestoTranslation()) {
+                if (!Strings.isNullOrEmpty(tableName.getDb())) {
+                    String db = tableName.getDb();
+                    if (!db.equalsIgnoreCase(InfoSchemaDb.DATABASE_NAME)
+                            && !db.equalsIgnoreCase(SysDb.DATABASE_NAME)
+                            && !db.equalsIgnoreCase(StatsConstants.STATISTICS_DB_NAME)
+                            && !db.equalsIgnoreCase("mysql")
+                            && !db.equalsIgnoreCase("performance_schema")
+                    ) {
+                        if (!Strings.isNullOrEmpty(tableName.getTbl())) {
+                            tableName.setCatalog(Config.default_presto_catalog);
+                        }
+                    }
+                }
+            }
+
+            if (Strings.isNullOrEmpty(tableName.getCatalog())) {
+                tableName.setCatalog(connectContext.getCurrentCatalog());
+            }
         }
         if (Strings.isNullOrEmpty(tableName.getDb())) {
             if (Strings.isNullOrEmpty(connectContext.getDatabase())) {

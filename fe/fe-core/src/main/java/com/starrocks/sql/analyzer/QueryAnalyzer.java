@@ -469,7 +469,7 @@ public class QueryAnalyzer {
                 }
 
                 TableName resolveTableName = relation.getResolveTableName();
-                MetaUtils.normalizationTableName(session, resolveTableName);
+                MetaUtils.normalizationTableNameOnlyQuery(session, resolveTableName);
                 if (aliasSet.contains(resolveTableName)) {
                     ErrorReport.reportSemanticException(ErrorCode.ERR_NONUNIQ_TABLE,
                             relation.getResolveTableName().getTbl());
@@ -1345,7 +1345,7 @@ public class QueryAnalyzer {
     public Table resolveTable(TableRelation tableRelation) {
         TableName tableName = tableRelation.getName();
         try {
-            MetaUtils.normalizationTableName(session, tableName);
+            MetaUtils.normalizationTableNameOnlyQuery(session, tableName);
             String catalogName = tableName.getCatalog();
             String dbName = tableName.getDb();
             String tbName = tableName.getTbl();

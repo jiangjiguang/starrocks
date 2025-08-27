@@ -486,10 +486,6 @@ public class StmtExecutor {
             if (parsedStmt.isExistQueryScopeHint()) {
                 processQueryScopeHint();
             }
-            if (context.getSessionVariable().isEnablePrestoTranslation()) {
-                GlobalStateMgr.getCurrentState().getVariableMgr().setSystemVariable(context.getSessionVariable(),
-                        new SystemVariable(SessionVariable.CATALOG, new StringLiteral(Config.default_presto_catalog)), true);
-            }
 
             // set warehouse for auditLog
             context.getAuditEventBuilder().setWarehouse(context.getCurrentWarehouseName());

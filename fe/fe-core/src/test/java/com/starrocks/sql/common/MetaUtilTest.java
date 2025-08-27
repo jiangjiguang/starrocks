@@ -14,6 +14,7 @@
 package com.starrocks.sql.common;
 
 import com.google.common.collect.Lists;
+import com.starrocks.analysis.TableName;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.ColumnId;
 import com.starrocks.catalog.Database;
@@ -24,8 +25,10 @@ import com.starrocks.catalog.StructField;
 import com.starrocks.catalog.StructType;
 import com.starrocks.catalog.Table;
 import com.starrocks.catalog.Type;
+import com.starrocks.catalog.system.information.InfoSchemaDb;
 import com.starrocks.common.Config;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.utframe.StarRocksAssert;
 import com.starrocks.utframe.UtFrameUtils;
@@ -130,5 +133,27 @@ public class MetaUtilTest {
                 MetaUtils.getColumnIdsByColumnNames(olapTable, Lists.newArrayList("b")).get(0));
         Assert.assertEquals(ColumnId.create("c"),
                 MetaUtils.getColumnIdsByColumnNames(olapTable, Lists.newArrayList("c")).get(0));
+    }
+
+    @Test
+    public void testGetCatalogName() {
+        TableName informationTableName = new TableName(InfoSchemaDb.DATABASE_NAME, "task_runs");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, informationTableName);
+        Assert.assertEquals(informationTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
+
+        TableName starrocksTableName = new TableName("test", "t0");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksTableName);
+        Assert.assertEquals(starrocksTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
+
+        SessionVariable sessionVariable = connectContext.getSessionVariable();
+        sessionVariable.setEnablePrestoTranslation(true);
+        connectContext.setSessionVariable(sessionVariable);
+
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, informationTableName);
+        Assert.assertEquals(informationTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
+
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksTableName);
+        Assert.assertNotEquals(starrocksTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
+        Assert.assertEquals(starrocksTableName.getCatalog(), Config.default_presto_catalog);
     }
 }
