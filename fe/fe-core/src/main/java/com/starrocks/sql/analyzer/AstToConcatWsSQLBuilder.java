@@ -103,6 +103,10 @@ public class AstToConcatWsSQLBuilder {
                 sqlBuilder.append("\n").append(hintContent).append("\n");
             }
 
+            if (stmt.getSelectList().isDistinct()) {
+                sqlBuilder.append("DISTINCT ");
+            }
+
             // make concat_ws expression
             if (isOutermostSelect && !inCTE) {
                 sqlBuilder.append("CONCAT_WS(\n").append(concatSeparator).append(",\n");
@@ -117,9 +121,6 @@ public class AstToConcatWsSQLBuilder {
                 sqlBuilder.append("\n) AS content");
                 isOutermostSelect = false;
             } else {
-                if (stmt.getSelectList().isDistinct()) {
-                    sqlBuilder.append("DISTINCT ");
-                }
                 // get select item list
                 List<String> selectListString = makeNormalSelectItem(stmt);
                 sqlBuilder.append(Joiner.on(", ").join(selectListString));
@@ -229,11 +230,14 @@ public class AstToConcatWsSQLBuilder {
                 if (field.getOriginExpression() instanceof SlotRef) {
                     SlotRef slotRef = (SlotRef) field.getOriginExpression();
                     if (slotRef.getQualifiedName() != null) {
-                        columnName = slotRef.getQualifiedName().toString();
+                        List<String> itemList = new ArrayList<>();
+                        slotRef.getQualifiedName().getParts().forEach(item -> {
+                            itemList.add(String.format("`%s`", item));
+                        });
+                        columnName = Joiner.on('.').join(itemList);
                     } else {
-                        columnName = slotRef.getColumnName();
+                        columnName = String.format("`%s`", slotRef.getColumnName());
                     }
-                    columnName = String.format("`%s`", columnName);
                     if (slotRef.getType().isMapType()
                             || slotRef.getType().isArrayType()
                             || slotRef.getType().isStructType()
@@ -273,10 +277,6 @@ public class AstToConcatWsSQLBuilder {
             throw new RuntimeException(String.format(
                     "It might be that the parser did not handle all the fields, fieldList:%s, columnList:%s",
                     fieldList, columnList));
-        }
-        if (stmt.getSelectList().isDistinct()) {
-            String newColumn = "DISTINCT " + columnList.get(0);
-            columnList.set(0, newColumn);
         }
         return columnList;
     }
@@ -375,7 +375,7 @@ public class AstToConcatWsSQLBuilder {
     }
 
     public static void initHintNodeListInStatement(StatementBase statementBase,
-                                             List<HintNode> hintNodeList) {
+                                                   List<HintNode> hintNodeList) {
         if (!(statementBase instanceof QueryStatement)) {
             return;
         }
