@@ -99,6 +99,10 @@ public class OptExpression {
         return op;
     }
 
+    public void setOp(Operator op) {
+        this.op = op;
+    }
+
     public List<OptExpression> getInputs() {
         return inputs;
     }
