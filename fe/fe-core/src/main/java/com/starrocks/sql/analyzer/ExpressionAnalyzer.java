@@ -1107,7 +1107,6 @@ public class ExpressionAnalyzer {
             }
 
             // throw exception direct
-
             checkFunction(fnName, node, argumentTypes);
             if (fnName.equalsIgnoreCase("typeof") && argumentTypes.length == 1) {
                 // For the typeof function, the parameter type of the function is the result of this function.
@@ -1630,6 +1629,13 @@ public class ExpressionAnalyzer {
                         throw new SemanticException("IS_ROLE_IN_SESSION currently only supports constant parameters");
                     }
                     break;
+                }
+
+                case FunctionSet.CSV_FORMAT: {
+                    // csv_format(separator, quote, col1, ....)
+                    if (node.getChildren().size() < 3) {
+                        throw new SemanticException(fnName + " should have at least 3 input.", node.getPos());
+                    }
                 }
             }
         }

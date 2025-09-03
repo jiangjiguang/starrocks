@@ -6235,6 +6235,21 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
 
         FunctionName fnName = FunctionName.createFnName(fullFunctionName);
         String functionName = fnName.getFunction();
+        if (fullFunctionName.equals(FunctionSet.CSV_FORMAT)) {
+            if (context.ASTERISK_SYMBOL() == null) {
+                int num = context.expression().size();
+                if (num < 3) {
+                    throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName), pos);
+                }
+                List<Expr> params = visit(context.expression(), Expr.class);
+                return new FunctionCallExpr(functionName, params, pos);
+            } else {
+                FunctionParams functionParams = FunctionParams.createStarParam();
+                FunctionCallExpr functionCallExpr = new FunctionCallExpr(
+                        functionName, functionParams, pos);
+                return functionCallExpr;
+            }
+        }
         if (functionName.equals(FunctionSet.BIGINT)
                 || functionName.equals(FunctionSet.INT)
                 || functionName.equals(FunctionSet.STRING)

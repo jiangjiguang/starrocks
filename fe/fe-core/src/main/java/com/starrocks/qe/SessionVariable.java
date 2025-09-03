@@ -783,6 +783,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public static final String INVERTED_CASE_WHEN_RULE_BRANCH_LIMIT = "inverted_case_when_rule_branch_limit";
     public static final String ENABLE_PRESTO_TRANSLATION = "enable_presto_translation";
+    public static final String ENABLE_CSV_FORMAT_BACKEND_OPERATOR = "enable_csv_format_backend_operator";
+    public static final String CSV_FORMAT_SEPARATOR = "csv_format_separator";
+    public static final String CSV_FORMAT_ENCLOSE = "csv_format_enclose";
 
     public static final List<String> DEPRECATED_VARIABLES = ImmutableList.<String>builder()
             .add(CODEGEN_LEVEL)
@@ -2049,6 +2052,15 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VarAttr(name = CBO_ENABLE_PARALLEL_PREPARE_METADATA)
     private boolean enableParallelPrepareMetadata = false;
+
+    @VariableMgr.VarAttr(name = ENABLE_CSV_FORMAT_BACKEND_OPERATOR)
+    private boolean enableCsvFormatBackendOperator = false;
+
+    @VariableMgr.VarAttr(name = CSV_FORMAT_SEPARATOR)
+    private String csvFormatSeparator = ",";
+
+    @VariableMgr.VarAttr(name = CSV_FORMAT_ENCLOSE)
+    private String csvFormatEnclose = "\"";
 
     public int getPrepareMetadataPoolSize() {
         return prepareMetadataPoolSize;
@@ -4133,6 +4145,18 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public boolean isEnablePrestoTranslation() {
         return enablePrestoTranslation;
+    }
+
+    public boolean isEnableCsvFormatBackendOperator() {
+        return enableCsvFormatBackendOperator;
+    }
+
+    public String getCsvFormatSeparator() {
+        return csvFormatSeparator;
+    }
+
+    public String getCsvFormatEnclose() {
+        return csvFormatEnclose;
     }
 
     public void setEnablePrestoTranslation(boolean enablePrestoTranslation) {

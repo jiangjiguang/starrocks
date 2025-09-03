@@ -339,6 +339,7 @@ public class SelectAnalyzer {
                     }
                 }
 
+                analyzeCsvFormat(item, scope.getRelationFields().getAllFields());
                 analyzeExpression(item.getExpr(), analyzeState, scope);
                 outputExpressionBuilder.add(item.getExpr());
 
@@ -403,6 +404,54 @@ public class SelectAnalyzer {
         analyzeState.setOutputExprInOrderByScope(outputExprInOrderByScope);
         analyzeState.setOutputScope(new Scope(RelationId.anonymous(), new RelationFields(outputFields.build())));
         return outputExpressions;
+    }
+
+    private void analyzeCsvFormat(SelectListItem item, List<Field> fieldList) {
+        if (!(item.getExpr() instanceof FunctionCallExpr)) {
+            return;
+        }
+        FunctionCallExpr functionCallExpr = (FunctionCallExpr) item.getExpr();
+        if (!functionCallExpr.getFnName().getFunction().equalsIgnoreCase(FunctionSet.CSV_FORMAT)) {
+            return;
+        }
+        boolean useBackendOperator = session.getSessionVariable().isEnableCsvFormatBackendOperator();
+        String separator = session.getSessionVariable().getCsvFormatSeparator();
+        String enclose = session.getSessionVariable().getCsvFormatEnclose();
+        boolean isStar = functionCallExpr.getParams().isStar();
+        // If * is passed in
+        if (isStar) {
+            // Create a new list of fields, including the default delimiter and quotation marks
+            List<Field> newFieldList = new ArrayList<>();
+
+            // Parameter 1: Delimiter (default comma)
+            Field separatorField = new Field(separator, Type.VARCHAR, null, null);
+            newFieldList.add(separatorField);
+
+            // Parameter 2: Quotation mark characters (default double quotation marks)
+            Field quoteField = new Field(enclose, Type.VARCHAR, null, null);
+            newFieldList.add(quoteField);
+
+            // Starting from column 3: Add all fields in the original fieldList
+            newFieldList.addAll(fieldList);
+            FunctionCallExpr node = CsvCastUtil.buildCsvFormatExpressionFromFields(newFieldList, useBackendOperator);
+            item.setExpr(node);
+            return;
+        }
+        // If * is not passed in, replace the fieldList with the parameters contained in the item
+        List<Expr> columnExprList = functionCallExpr.getChildren();
+        // Insufficient parameters. Keep as is
+        if (columnExprList.size() < 3) {
+            throw new SemanticException(
+                    "csv_format requires at least three parameters");
+        }
+        FunctionCallExpr node;
+        // No table means this is a constant query
+        if (useBackendOperator || item.getTblName() == null) {
+            node = CsvCastUtil.buildBeCsvFormatExpression(columnExprList);
+        } else {
+            node = CsvCastUtil.buildFeCsvFormatExpression(columnExprList);
+        }
+        item.setExpr(node);
     }
 
     public void rewriteTruncForPresto(FunctionCallExpr node) {

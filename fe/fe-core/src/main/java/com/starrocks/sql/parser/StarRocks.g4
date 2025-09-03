@@ -2297,7 +2297,7 @@ functionCall
     | specialFunctionExpression                                                           #specialFunction
     | aggregationFunction over?                                                           #aggregationFunctionCall
     | windowFunction over                                                                 #windowFunctionCall
-    | qualifiedName '(' (expression (',' expression)*)? ')'  over?                        #simpleFunctionCall
+    | qualifiedName '(' (expression (',' expression)* | ASTERISK_SYMBOL)? ')' over?       #simpleFunctionCall
     ;
 
 aggregationFunction
