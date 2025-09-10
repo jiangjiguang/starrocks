@@ -145,6 +145,10 @@ public class MetaUtilTest {
         MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksTableName);
         Assert.assertEquals(starrocksTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
 
+        TableName starrocksAuditTableName = new TableName("audit", "t0");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksAuditTableName);
+        Assert.assertEquals(starrocksAuditTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
+
         SessionVariable sessionVariable = connectContext.getSessionVariable();
         sessionVariable.setEnablePrestoTranslation(true);
         connectContext.setSessionVariable(sessionVariable);
@@ -155,5 +159,8 @@ public class MetaUtilTest {
         MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksTableName);
         Assert.assertNotEquals(starrocksTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
         Assert.assertEquals(starrocksTableName.getCatalog(), Config.default_presto_catalog);
+
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksAuditTableName);
+        Assert.assertEquals(starrocksAuditTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
     }
 }

@@ -27,8 +27,6 @@ import com.starrocks.catalog.ExternalOlapTable;
 import com.starrocks.catalog.InternalCatalog;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Table;
-import com.starrocks.catalog.system.information.InfoSchemaDb;
-import com.starrocks.catalog.system.sys.SysDb;
 import com.starrocks.common.Config;
 import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
@@ -46,14 +44,15 @@ import com.starrocks.sql.ast.CreateMaterializedViewStmt;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.sql.optimizer.rule.mv.MVUtils;
 import com.starrocks.sql.parser.SqlParser;
-import com.starrocks.statistic.StatsConstants;
 import com.starrocks.thrift.TUniqueId;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class MetaUtils {
 
@@ -211,31 +210,10 @@ public class MetaUtils {
     }
 
     public static void normalizationTableNameOnlyQuery(ConnectContext connectContext, TableName tableName) {
-        if (Strings.isNullOrEmpty(tableName.getCatalog())) {
-            if (Strings.isNullOrEmpty(connectContext.getCurrentCatalog())) {
-                throw new SemanticException("No catalog selected");
-            }
-            // reset the catalog as unified_catalog_hms when enable presto translation
-            if (connectContext.getSessionVariable().isEnablePrestoTranslation()) {
-                if (!Strings.isNullOrEmpty(tableName.getDb())) {
-                    String db = tableName.getDb();
-                    if (!db.equalsIgnoreCase(InfoSchemaDb.DATABASE_NAME)
-                            && !db.equalsIgnoreCase(SysDb.DATABASE_NAME)
-                            && !db.equalsIgnoreCase(StatsConstants.STATISTICS_DB_NAME)
-                            && !db.equalsIgnoreCase("mysql")
-                            && !db.equalsIgnoreCase("performance_schema")
-                    ) {
-                        if (!Strings.isNullOrEmpty(tableName.getTbl())) {
-                            tableName.setCatalog(Config.default_presto_catalog);
-                        }
-                    }
-                }
-            }
-
-            if (Strings.isNullOrEmpty(tableName.getCatalog())) {
-                tableName.setCatalog(connectContext.getCurrentCatalog());
-            }
+        if (Strings.isNullOrEmpty(tableName.getTbl())) {
+            throw new SemanticException("Table name is null");
         }
+
         if (Strings.isNullOrEmpty(tableName.getDb())) {
             if (Strings.isNullOrEmpty(connectContext.getDatabase())) {
                 throw new SemanticException("No database selected");
@@ -243,9 +221,45 @@ public class MetaUtils {
             tableName.setDb(connectContext.getDatabase());
         }
 
-        if (Strings.isNullOrEmpty(tableName.getTbl())) {
-            throw new SemanticException("Table name is null");
+        if (!Strings.isNullOrEmpty(tableName.getCatalog())) {
+            return;
         }
+        // The catalog configured in the current session is the same as the presto catalog,
+        // so just use the catalog in the session directly
+        // There is no need to distinguish between the olap scenario and the presto scenario
+        if (connectContext.getCurrentCatalog().equalsIgnoreCase(Config.default_presto_catalog)) {
+            tableName.setCatalog(connectContext.getCurrentCatalog());
+            return;
+        }
+
+        // use the default catalog when the cluster is for olap scenario
+        if (!connectContext.getSessionVariable().isEnablePrestoTranslation()) {
+            if (Strings.isNullOrEmpty(connectContext.getCurrentCatalog())) {
+                throw new SemanticException("No catalog selected");
+            }
+            tableName.setCatalog(connectContext.getCurrentCatalog());
+            return;
+        }
+
+        if (Strings.isNullOrEmpty(tableName.getDb()) || Strings.isNullOrEmpty(tableName.getTbl())) {
+            return;
+        }
+
+        // olap db need use default catalog
+        List<Long> dbIds = GlobalStateMgr.getCurrentState().getLocalMetastore().getDbIds();
+        Set<String> internalDbNameList = new HashSet<>();
+        for (Long dbId : dbIds) {
+            Database dbMeta = GlobalStateMgr.getCurrentState().getDb(dbId);
+            internalDbNameList.add(dbMeta.getFullName());
+        }
+        String currentDbName = tableName.getDb();
+        if (internalDbNameList.contains(currentDbName)) {
+            tableName.setCatalog(InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME);
+            return;
+        }
+
+        // reset the catalog as unified_catalog_hms when enable presto translation
+        tableName.setCatalog(Config.default_presto_catalog);
     }
 
     /**
