@@ -55,6 +55,15 @@ public class CsvCastUtil {
     private static final StringLiteral DEFAULT_VALUE_WHEN_NULL = new StringLiteral("");
 
     public static FunctionCallExpr buildCsvFormatExpressionFromFields(List<Field> fields, boolean useBackendOperator) {
+        // Ensure there are at least three parameters: delimiters, quotation marks, and at least one field
+        if (fields.size() < 3) {
+            throw new SemanticException("csv_format requires at least three parameters");
+        }
+
+        // The first two parameters should be string literals (delimiters and quotes)
+        if (!fields.get(0).getType().isStringType() || !fields.get(1).getType().isStringType()) {
+            throw new SemanticException("First two parameters of csv_format must be string literals");
+        }
         List<Expr> columnExprList = convertFieldListToExprList(fields);
         if (useBackendOperator) {
             return buildBeCsvFormatExpression(columnExprList);
@@ -63,6 +72,22 @@ public class CsvCastUtil {
         }
     }
 
+    public static FunctionCallExpr buildCsvFormatExpressionFromExprs(List<Expr> columnExprList, boolean useBackendOperator) {
+        // Ensure there are at least three parameters: delimiters, quotation marks, and at least one field
+        if (columnExprList.size() < 3) {
+            throw new SemanticException("csv_format requires at least three parameters");
+        }
+
+        // The first two parameters should be string literals (delimiters and quotes)
+        if (!columnExprList.get(0).getType().isStringType() || !columnExprList.get(1).getType().isStringType()) {
+            throw new SemanticException("First two parameters of csv_format must be string literals");
+        }
+        if (useBackendOperator) {
+            return buildBeCsvFormatExpression(columnExprList);
+        } else {
+            return buildFeCsvFormatExpression(columnExprList);
+        }
+    }
 
     /**
      * FE expression scheme: Use concat_ws and nested functions

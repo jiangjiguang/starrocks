@@ -339,7 +339,7 @@ public class SelectAnalyzer {
                     }
                 }
 
-                analyzeCsvFormat(item, scope.getRelationFields().getAllFields());
+                analyzeCsvFormat(item, analyzeState, scope);
                 analyzeExpression(item.getExpr(), analyzeState, scope);
                 outputExpressionBuilder.add(item.getExpr());
 
@@ -406,7 +406,7 @@ public class SelectAnalyzer {
         return outputExpressions;
     }
 
-    private void analyzeCsvFormat(SelectListItem item, List<Field> fieldList) {
+    public void analyzeCsvFormat(SelectListItem item, AnalyzeState analyzeState, Scope scope) {
         if (!(item.getExpr() instanceof FunctionCallExpr)) {
             return;
         }
@@ -421,19 +421,33 @@ public class SelectAnalyzer {
         // If * is passed in
         if (isStar) {
             // Create a new list of fields, including the default delimiter and quotation marks
-            List<Field> newFieldList = new ArrayList<>();
+            List<Expr> columnExprList = new ArrayList<>();
 
             // Parameter 1: Delimiter (default comma)
-            Field separatorField = new Field(separator, Type.VARCHAR, null, null);
-            newFieldList.add(separatorField);
+            StringLiteral separatorLiteral = new StringLiteral(separator);
+            columnExprList.add(separatorLiteral);
 
             // Parameter 2: Quotation mark characters (default double quotation marks)
-            Field quoteField = new Field(enclose, Type.VARCHAR, null, null);
-            newFieldList.add(quoteField);
+            StringLiteral quoteLiteral = new StringLiteral(enclose);
+            columnExprList.add(quoteLiteral);
 
-            // Starting from column 3: Add all fields in the original fieldList
-            newFieldList.addAll(fieldList);
-            FunctionCallExpr node = CsvCastUtil.buildCsvFormatExpressionFromFields(newFieldList, useBackendOperator);
+            // Parameter 3...n: Add all fields in the original fieldList
+            List<Field> fieldList = (item.getTblName() == null ? scope.getRelationFields().getAllFields()
+                    : scope.getRelationFields().resolveFieldsWithPrefix(item.getTblName()))
+                    .stream().filter(Field::isVisible).collect(Collectors.toList());
+            /*
+             * Generate a special "SlotRef" as FieldReference,
+             * which represents a reference to the expression in the source scope.
+             * Because the real expression cannot be obtained in star
+             * eg: "select csv_format(*) from (select count(*) from table) t"
+             */
+            for (Field field : fieldList) {
+                int fieldIndex = scope.getRelationFields().indexOf(field);
+                FieldReference fieldReference = new FieldReference(fieldIndex, item.getTblName());
+                analyzeExpression(fieldReference, analyzeState, scope);
+                columnExprList.add(fieldReference);
+            }
+            FunctionCallExpr node = CsvCastUtil.buildCsvFormatExpressionFromExprs(columnExprList, useBackendOperator);
             item.setExpr(node);
             return;
         }
@@ -444,13 +458,8 @@ public class SelectAnalyzer {
             throw new SemanticException(
                     "csv_format requires at least three parameters");
         }
-        FunctionCallExpr node;
         // No table means this is a constant query
-        if (useBackendOperator || item.getTblName() == null) {
-            node = CsvCastUtil.buildBeCsvFormatExpression(columnExprList);
-        } else {
-            node = CsvCastUtil.buildFeCsvFormatExpression(columnExprList);
-        }
+        FunctionCallExpr node = CsvCastUtil.buildCsvFormatExpressionFromExprs(columnExprList, useBackendOperator);
         item.setExpr(node);
     }
 
