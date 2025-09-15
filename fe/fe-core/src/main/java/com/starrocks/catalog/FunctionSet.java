@@ -534,6 +534,8 @@ public class FunctionSet {
     public static final String TO_JSON = "to_json";
 
     public static final String CSV_FORMAT = "csv_format";
+    public static final String CHR = "chr";
+    public static final String CHAR = "char";
 
     private static final Logger LOGGER = LogManager.getLogger(FunctionSet.class);
 

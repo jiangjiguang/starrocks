@@ -106,4 +106,13 @@ public class AstBuilderTest {
         assert execPlan != null;
         Assert.assertEquals("_dt", execPlan.getColNames().get(0));
     }
+
+    @Test
+    public void testChrFunc() {
+        String sql = "select chr(1)";
+        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertEquals("char(1)", execPlan.getColNames().get(0));
+    }
 }

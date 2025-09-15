@@ -6235,6 +6235,11 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
 
         FunctionName fnName = FunctionName.createFnName(fullFunctionName);
         String functionName = fnName.getFunction();
+        if (functionName.equalsIgnoreCase(FunctionSet.CHR)) {
+            fullFunctionName = FunctionSet.CHAR;
+            fnName = FunctionName.createFnName(fullFunctionName);
+            functionName = fnName.getFunction();
+        }
         if (fullFunctionName.equals(FunctionSet.CSV_FORMAT)) {
             if (context.ASTERISK_SYMBOL() == null) {
                 int num = context.expression().size();
