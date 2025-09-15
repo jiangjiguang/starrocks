@@ -36,6 +36,7 @@ import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.TreeNode;
+import com.starrocks.connector.parser.trino.Trino2SRFunctionCallTransformer;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.ast.FieldReference;
@@ -250,97 +251,10 @@ public class SelectAnalyzer {
                             AstToStringBuilder.getAliasName(item.getExpr(), false, false) : item.getAlias();
                 }
 
-                if (session.getSessionVariable().isEnablePrestoTranslation()) {
-                    if (item.getExpr() instanceof FunctionCallExpr) {
-                        FunctionCallExpr node = (FunctionCallExpr) item.getExpr();
-                        String fnName = node.getFnName().getFunction();
-                        if (FunctionSet.BIGINT.equals(fnName)) {
-                            CastExpr castExpr = new CastExpr(ScalarType.BIGINT, node.getChild(0));
-                            item.setExpr(castExpr);
-                            selectList.getItems().set(index, item);
-                        }
-                        if (FunctionSet.INT.equals(fnName)) {
-                            CastExpr castExpr = new CastExpr(ScalarType.INT, node.getChild(0));
-                            item.setExpr(castExpr);
-                            selectList.getItems().set(index, item);
-                        }
-                        if (FunctionSet.STRING.equals(fnName)) {
-                            CastExpr castExpr = new CastExpr(ScalarType.VARCHAR, node.getChild(0));
-                            item.setExpr(castExpr);
-                            selectList.getItems().set(index, item);
-                        }
-                        if (FunctionSet.DOUBLE.equals(fnName)) {
-                            CastExpr castExpr = new CastExpr(ScalarType.DOUBLE, node.getChild(0));
-                            item.setExpr(castExpr);
-                            selectList.getItems().set(index, item);
-                        }
-                        // special deal with trunc for compatible presto
-                        if (fnName.equals(FunctionSet.TRUNC)) {
-                            rewriteTruncForPresto(node);
-                            item.setExpr(node);
-                        }
-                        if (fnName.equalsIgnoreCase(FunctionSet.SIZE)) {
-                            fnName = FunctionSet.ARRAY_LENGTH;
-                            FunctionName newFnName = new FunctionName(fnName);
-                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
-                            if (node.getChildren().size() > 0) {
-                                for (int i = 0; i < node.getChildren().size(); i++) {
-                                    newNode.setChild(i, node.getChild(i));
-                                }
-                                item.setExpr(newNode);
-                            }
-                        }
-
-                        // if open the presto translation,we need to check approx_percentile function
-                        if (fnName.equalsIgnoreCase(FunctionSet.APPROX_PERCENTILE)) {
-                            // check child in node whether double type, if not, just cast to double
-                            ExpressionAnalyzer.castNodeToDouble(node);
-                            fnName = FunctionSet.PERCENTILE_APPROX;
-                            FunctionName newFnName = new FunctionName(fnName);
-                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
-                            if (node.getChildren().size() > 0) {
-                                for (int i = 0; i < node.getChildren().size(); i++) {
-                                    newNode.setChild(i, node.getChild(i));
-                                }
-                                item.setExpr(newNode);
-                            }
-                        }
-
-                        if (fnName.equalsIgnoreCase(FunctionSet.PERCENTILE_APPROX)) {
-                            // check child in node whether double type, if not, just cast to double
-                            ExpressionAnalyzer.castNodeToDouble(node);
-                            item.setExpr(node);
-                        }
-
-                        if (fnName.equalsIgnoreCase(FunctionSet.COLLECT_SET)) {
-                            // COLLECT_SET is not supported in presto, so we rewrite it to ARRAY_AGG_DISTINCT
-                            FunctionName newFnName = new FunctionName(FunctionSet.ARRAY_AGG_DISTINCT);
-                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
-                            if (node.getChildren().size() > 0) {
-                                for (int i = 0; i < node.getChildren().size(); i++) {
-                                    newNode.setChild(i, node.getChild(i));
-                                }
-                                item.setExpr(newNode);
-                            }
-                        }
-
-                        if (fnName.equalsIgnoreCase(FunctionSet.COLLECT_LIST)) {
-                            fnName = FunctionSet.ARRAY_AGG;
-                            FunctionName newFnName = new FunctionName(fnName);
-                            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
-                            if (node.getChildren().size() > 0) {
-                                for (int i = 0; i < node.getChildren().size(); i++) {
-                                    newNode.setChild(i, node.getChild(i));
-                                }
-                                item.setExpr(newNode);
-                            }
-                        }
-
-                    }
-                }
-
+                analyzePrestoFunction(item);
                 analyzeCsvFormat(item, analyzeState, scope);
                 analyzeExpression(item.getExpr(), analyzeState, scope);
+
                 outputExpressionBuilder.add(item.getExpr());
 
                 if (item.getExpr() instanceof SlotRef) {
@@ -404,6 +318,88 @@ public class SelectAnalyzer {
         analyzeState.setOutputExprInOrderByScope(outputExprInOrderByScope);
         analyzeState.setOutputScope(new Scope(RelationId.anonymous(), new RelationFields(outputFields.build())));
         return outputExpressions;
+    }
+
+    private void analyzePrestoFunction(SelectListItem item) {
+        if (!session.getSessionVariable().isEnablePrestoTranslation()) {
+            return;
+        }
+        if (!(item.getExpr() instanceof FunctionCallExpr)) {
+            return;
+        }
+        FunctionCallExpr node = (FunctionCallExpr) item.getExpr();
+        String fnName = node.getFnName().getFunction();
+        if (FunctionSet.BIGINT.equals(fnName)) {
+            CastExpr castExpr = new CastExpr(ScalarType.BIGINT, node.getChild(0));
+            item.setExpr(castExpr);
+        } else if (FunctionSet.INT.equals(fnName)) {
+            CastExpr castExpr = new CastExpr(ScalarType.INT, node.getChild(0));
+            item.setExpr(castExpr);
+        } else if (FunctionSet.STRING.equals(fnName)) {
+            CastExpr castExpr = new CastExpr(ScalarType.VARCHAR, node.getChild(0));
+            item.setExpr(castExpr);
+        } else if (FunctionSet.DOUBLE.equals(fnName)) {
+            CastExpr castExpr = new CastExpr(ScalarType.DOUBLE, node.getChild(0));
+            item.setExpr(castExpr);
+        } else if (fnName.equals(FunctionSet.TRUNC)) {
+            // special deal with trunc for compatible presto
+            rewriteTruncForPresto(node);
+            item.setExpr(node);
+        } else if (fnName.equalsIgnoreCase(FunctionSet.SIZE)) {
+            fnName = FunctionSet.ARRAY_LENGTH;
+            FunctionName newFnName = new FunctionName(fnName);
+            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+            if (node.getChildren().size() > 0) {
+                for (int i = 0; i < node.getChildren().size(); i++) {
+                    newNode.setChild(i, node.getChild(i));
+                }
+                item.setExpr(newNode);
+            }
+        } else if (fnName.equalsIgnoreCase(FunctionSet.APPROX_PERCENTILE)) {
+            // if open the presto translation,we need to check approx_percentile function
+            // check child in node whether double type, if not, just cast to double
+            ExpressionAnalyzer.castNodeToDouble(node);
+            fnName = FunctionSet.PERCENTILE_APPROX;
+            FunctionName newFnName = new FunctionName(fnName);
+            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+            if (node.getChildren().size() > 0) {
+                for (int i = 0; i < node.getChildren().size(); i++) {
+                    newNode.setChild(i, node.getChild(i));
+                }
+                item.setExpr(newNode);
+            }
+        } else if (fnName.equalsIgnoreCase(FunctionSet.PERCENTILE_APPROX)) {
+            // check child in node whether double type, if not, just cast to double
+            ExpressionAnalyzer.castNodeToDouble(node);
+            item.setExpr(node);
+        } else if (fnName.equalsIgnoreCase(FunctionSet.COLLECT_SET)) {
+            // COLLECT_SET is not supported in presto, so we rewrite it to ARRAY_AGG_DISTINCT
+            FunctionName newFnName = new FunctionName(FunctionSet.ARRAY_AGG_DISTINCT);
+            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+            if (node.getChildren().size() > 0) {
+                for (int i = 0; i < node.getChildren().size(); i++) {
+                    newNode.setChild(i, node.getChild(i));
+                }
+                item.setExpr(newNode);
+            }
+        } else if (fnName.equalsIgnoreCase(FunctionSet.COLLECT_LIST)) {
+            fnName = FunctionSet.ARRAY_AGG;
+            FunctionName newFnName = new FunctionName(fnName);
+            FunctionCallExpr newNode = new FunctionCallExpr(newFnName, node.getParams());
+            if (node.getChildren().size() > 0) {
+                for (int i = 0; i < node.getChildren().size(); i++) {
+                    newNode.setChild(i, node.getChild(i));
+                }
+                item.setExpr(newNode);
+            }
+        } else {
+            if (session.getSessionVariable().getSqlDialect().equalsIgnoreCase("trino")) {
+                Expr newExpr = Trino2SRFunctionCallTransformer.convert(fnName, node.getChildren());
+                if (newExpr != null) {
+                    item.setExpr(newExpr);
+                }
+            }
+        }
     }
 
     public void analyzeCsvFormat(SelectListItem item, AnalyzeState analyzeState, Scope scope) {
@@ -626,7 +622,7 @@ public class SelectAnalyzer {
     }
 
     private List<FunctionCallExpr> analyzeAggregations(AnalyzeState analyzeState, Scope sourceScope,
-                                                          List<Expr> outputAndOrderByExpressions) {
+                                                       List<Expr> outputAndOrderByExpressions) {
         List<FunctionCallExpr> aggregations = Lists.newArrayList();
         TreeNode.collect(outputAndOrderByExpressions, Expr.isAggregatePredicate()::apply, aggregations);
         aggregations.forEach(e -> analyzeExpression(e, analyzeState, sourceScope));

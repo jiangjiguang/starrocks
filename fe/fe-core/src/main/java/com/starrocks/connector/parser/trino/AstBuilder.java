@@ -723,6 +723,20 @@ public class AstBuilder extends AstVisitor<ParseNode, ParseTreeContext> {
         List<Expr> arguments = visit(node.getArguments(), context, Expr.class);
 
         Expr callExpr;
+        String functionName = node.getName().toString();
+        if (functionName.equals(FunctionSet.CSV_FORMAT)) {
+            int num = arguments.size();
+            if (num != 1) {
+                if (num < 3) {
+                    throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName));
+                }
+                callExpr = new FunctionCallExpr(functionName, arguments);
+            } else {
+                FunctionParams functionParams = FunctionParams.createStarParam();
+                callExpr = new FunctionCallExpr(functionName, functionParams);
+            }
+            return callExpr;
+        }
         Expr convertedFunctionCall = Trino2SRFunctionCallTransformer.convert(node.getName().toString(), arguments);
         if (convertedFunctionCall != null) {
             callExpr = convertedFunctionCall;
