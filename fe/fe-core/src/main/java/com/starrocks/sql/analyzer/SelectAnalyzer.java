@@ -79,6 +79,7 @@ public class SelectAnalyzer {
 
         List<Expr> outputExpressions =
                 analyzeSelect(selectList, fromRelation, groupByClause != null, analyzeState, sourceScope);
+
         Scope outputScope = analyzeState.getOutputScope();
 
         List<Expr> groupByExpressions = new ArrayList<>(
@@ -254,6 +255,7 @@ public class SelectAnalyzer {
                 analyzePrestoFunction(item);
                 analyzeCsvFormat(item, analyzeState, scope);
                 analyzeExpression(item.getExpr(), analyzeState, scope);
+                analyzerDoubleInValidRange(item);
 
                 outputExpressionBuilder.add(item.getExpr());
 
@@ -955,5 +957,25 @@ public class SelectAnalyzer {
             allFields.add(field);
         }
         return allFields;
+    }
+
+    public void analyzerDoubleInValidRange(SelectListItem item) {
+        // field real value maybe nan, if use jdbc to get result set
+        // may throw exception of 'For input string nan'
+        // so we need cast the type to string at first
+        // and then cast the type return to origin double
+        if (!session.getSessionVariable().isEnablePrestoTranslation()) {
+            return;
+        }
+        Expr expr = item.getExpr();
+        if (expr == null || expr.getType() == null) {
+            return;
+        }
+        if (!expr.getType().isDecimalOfAnyVersion() && !expr.getType().isFloatingPointType()) {
+            return;
+        }
+        Expr stringExpr = new CastExpr(Type.VARCHAR, expr);
+        Expr doubleExpr = new CastExpr(expr.getType(), stringExpr);
+        item.setExpr(doubleExpr);
     }
 }

@@ -14,16 +14,18 @@
 
 package com.starrocks.sql.analyzer;
 
+import com.starrocks.analysis.DecimalLiteral;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.sql.ast.SelectListItem;
 import com.starrocks.sql.plan.ExecPlan;
 import com.starrocks.sql.plan.PlanTestBase;
 import com.starrocks.utframe.UtFrameUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.math.BigDecimal;
+
 public class SelectAnalyzerTest extends PlanTestBase {
-
-
 
     @Test
     public void testTypeToCastExprAnalyzerForPresto() throws Exception {
@@ -41,5 +43,23 @@ public class SelectAnalyzerTest extends PlanTestBase {
         String sql = "SELECT bigint(1) as _arr";
         ExecPlan execPlan = getExecPlan(sql);
         Assert.assertEquals(1, execPlan.getColNames().size());
+    }
+
+    @Test
+    public void testAnalyzerDoubleInValidRangeForPresto() {
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        session.getSessionVariable().setEnablePrestoTranslation(false);
+        SelectAnalyzer selectAnalyzer = new SelectAnalyzer(session);
+
+        DecimalLiteral decimalLiteral = new DecimalLiteral(new BigDecimal("1.23"));
+        SelectListItem item = new SelectListItem(decimalLiteral, "test_col");
+        selectAnalyzer.analyzerDoubleInValidRange(item);
+        Assert.assertTrue(item.getExpr().toSql().contains("1.23"));
+
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        selectAnalyzer = new SelectAnalyzer(session);
+
+        selectAnalyzer.analyzerDoubleInValidRange(item);
+        Assert.assertTrue(item.getExpr().toSql().toUpperCase().contains("CAST(CAST("));
     }
 }
