@@ -288,4 +288,21 @@ public class ExpressionAnalyzerTest extends PlanTestBase {
         ExecPlan execPlan = getExecPlan(sql);
         Assert.assertEquals(1, execPlan.getColNames().size());
     }
+
+    @Test
+    public void testCastStructToStringExprAnalyzerForPresto() throws Exception {
+        String sql = "SELECT cast(struct(1, 2, 3, 4) as string)";
+        try {
+            ExecPlan execPlan = getExecPlan(sql);
+            Assert.assertEquals(1, execPlan.getColNames().size());
+        } catch (Exception e) {
+            Assert.assertTrue(e.getMessage().contains("Invalid type cast from struct"));
+        }
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        ExecPlan execPlan = getExecPlan(sql);
+        Assert.assertEquals(1, execPlan.getColNames().size());
+    }
 }

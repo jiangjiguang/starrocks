@@ -1022,7 +1022,7 @@ public class ExpressionAnalyzer {
         public Void visitCastExpr(CastExpr cast, Scope context) {
             if (session.getSessionVariable().isEnablePrestoTranslation()) {
                 Expr child = cast.getChild(0);
-                if (child.getType().isMapType() && cast.getType().isStringType()) {
+                if ((child.getType().isComplexType()) && cast.getType().isStringType()) {
                     List<Expr> params = new ArrayList<>();
                     params.add(child);
                     String fnName = FunctionSet.TO_JSON;
