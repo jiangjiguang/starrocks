@@ -344,6 +344,14 @@ public class StmtExecutor {
                 sb.append(SessionVariable.RESOURCE_GROUP).append("=").append(context.getResourceGroup().getName())
                         .append(",");
             }
+
+            if (!variables.isEnableConnectorAdaptiveIoTasks()) {
+                sb.append(SessionVariable.CONNECTOR_IO_TASKS_PER_SCAN_OPERATOR)
+                        .append("=").append(variables.getConnectorIoTasksPerScanOperator()).append(",");
+                sb.append(SessionVariable.CONNECTOR_SCAN_USE_QUERY_MEM_RATIO)
+                        .append("=").append(String.format("%.1f", variables.getConnectorScanUseQueryMemRatio())).append(",");
+            }
+
             sb.deleteCharAt(sb.length() - 1);
             summaryProfile.addInfoString(ProfileManager.VARIABLES, sb.toString());
 

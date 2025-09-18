@@ -16,6 +16,10 @@
 package com.starrocks.scheduler;
 
 public class Constants {
+    public static final String LAKE_WAREHOUSE_TO_STAR_ROCKS = "lakewarehouse2sr";
+    public static final String SUBMIT_TYPE = "submit_type";
+
+
 
     public enum TaskType {
         // For Task that can be triggered repeatedly by external.

@@ -40,6 +40,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -162,6 +163,14 @@ public class TaskRun implements Comparable<TaskRun> {
         return isKilled;
     }
 
+    public void setStatus(TaskRunStatus status) {
+        this.status = status;
+    }
+
+    public void setRunCtx(ConnectContext runCtx) {
+        this.runCtx = runCtx;
+    }
+
     public Map<String, String> refreshTaskProperties(ConnectContext ctx) {
         Map<String, String> newProperties = Maps.newHashMap();
         if (task.getSource() != Constants.TaskSource.MV) {
@@ -216,43 +225,13 @@ public class TaskRun implements Comparable<TaskRun> {
         taskRunContext.setDefinition(task.getDefinition());
         taskRunContext.setPostRun(status.getPostRun());
 
-        runCtx = new ConnectContext(null);
-        if (parentRunCtx != null) {
-            runCtx.setParentConnectContext(parentRunCtx);
+        if (runCtx == null) {
+            initRunCtx();
         }
-        runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
-        runCtx.setCurrentCatalog(task.getCatalogName());
-        runCtx.setDatabase(task.getDbName());
-        runCtx.setQualifiedUser(status.getUser());
-        if (status.getUserIdentity() != null) {
-            runCtx.setCurrentUserIdentity(status.getUserIdentity());
-        } else {
-            runCtx.setCurrentUserIdentity(UserIdentity.createAnalyzedUserIdentWithIp(status.getUser(), "%"));
-        }
-        runCtx.setCurrentRoleIds(runCtx.getCurrentUserIdentity());
-        runCtx.getState().reset();
-        runCtx.setQueryId(UUID.fromString(status.getQueryId()));
-        runCtx.setIsLastStmt(true);
-
-        // NOTE: Ensure the thread local connect context is always the same with the newest ConnectContext.
-        // NOTE: Ensure this thread local is removed after this method to avoid memory leak in JVM.
-        runCtx.setThreadLocalInfo();
 
         Map<String, String> newProperties = refreshTaskProperties(runCtx);
         properties.putAll(newProperties);
-        Map<String, String> taskRunContextProperties = Maps.newHashMap();
-        runCtx.resetSessionVariable();
-        if (properties != null) {
-            handleWarehouseProperty();
-            for (String key : properties.keySet()) {
-                try {
-                    runCtx.modifySystemVariable(new SystemVariable(key, new StringLiteral(properties.get(key))), true);
-                } catch (DdlException e) {
-                    // not session variable
-                    taskRunContextProperties.put(key, properties.get(key));
-                }
-            }
-        }
+        Map<String, String> taskRunContextProperties = resetRunCtxSession();
         LOG.info("[QueryId:{}] [ThreadLocal QueryId: {}] start to execute task run, task_id:{}, " +
                         "taskRunContextProperties:{}", runCtx.getQueryId(),
                 ConnectContext.get() == null ? "" : ConnectContext.get().getQueryId(), taskId, taskRunContextProperties);
@@ -422,4 +401,59 @@ public class TaskRun implements Comparable<TaskRun> {
                 ", extra_message =" + (status != null ? status.getExtraMessage() : "") +
                 '}';
     }
+
+    public void initRunCtx() {
+        runCtx = new ConnectContext(null);
+        if (parentRunCtx != null) {
+            runCtx.setParentConnectContext(parentRunCtx);
+        }
+        runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
+        runCtx.setCurrentCatalog(task.getCatalogName());
+        runCtx.setDatabase(task.getDbName());
+        if (runCtx.getCurrentSqlDbIds().isEmpty()) {
+            Set<Long> dbIds = new HashSet<>();
+            dbIds.add(GlobalStateMgr.getCurrentState().getDb(task.getDbName()).getId());
+            runCtx.setCurrentSqlDbIds(dbIds);
+        }
+
+        runCtx.setQualifiedUser(status.getUser());
+        if (status.getUserIdentity() != null) {
+            runCtx.setCurrentUserIdentity(status.getUserIdentity());
+        } else {
+            runCtx.setCurrentUserIdentity(UserIdentity.createAnalyzedUserIdentWithIp(status.getUser(), "%"));
+        }
+        runCtx.setCurrentRoleIds(runCtx.getCurrentUserIdentity());
+        runCtx.getState().reset();
+        runCtx.setQueryId(UUID.fromString(status.getQueryId()));
+        runCtx.setIsLastStmt(true);
+
+        // set runCtx session variable by task properties
+        // and reset task run properties
+        properties.putAll(resetRunCtxSession());
+
+
+        // NOTE: Ensure the thread local connect context is always the same with the newest ConnectContext.
+        // NOTE: Ensure this thread local is removed after this method to avoid memory leak in JVM.
+        runCtx.setThreadLocalInfo();
+    }
+
+
+    public Map<String, String> resetRunCtxSession() {
+        Map<String, String> taskRunContextProperties = Maps.newHashMap();
+        runCtx.resetSessionVariable();
+        if (properties != null) {
+            handleWarehouseProperty();
+            for (String key : properties.keySet()) {
+                try {
+                    runCtx.modifySystemVariable(new SystemVariable(key, new StringLiteral(properties.get(key))), true);
+                } catch (DdlException e) {
+                    // not session variable
+                    taskRunContextProperties.put(key, properties.get(key));
+                    runCtx.getState().reset();
+                }
+            }
+        }
+        return taskRunContextProperties;
+    }
+
 }

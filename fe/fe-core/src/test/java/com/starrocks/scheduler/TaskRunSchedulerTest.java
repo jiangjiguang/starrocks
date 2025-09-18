@@ -21,7 +21,10 @@ import com.starrocks.common.Config;
 import com.starrocks.common.FeConstants;
 import com.starrocks.persist.gson.GsonUtils;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
+import com.starrocks.sql.ast.SubmitTaskStmt;
+import com.starrocks.utframe.StarRocksAssert;
 import com.starrocks.utframe.UtFrameUtils;
 import mockit.Expectations;
 import org.assertj.core.util.Sets;
@@ -37,6 +40,9 @@ public class TaskRunSchedulerTest {
 
     private static final int N = 100;
     private static ConnectContext connectContext;
+
+    private static StarRocksAssert starRocksAssert;
+
 
     @Before
     public void setUp() {
@@ -292,4 +298,90 @@ public class TaskRunSchedulerTest {
         System.out.println(taskRunScheduler);
         Assert.assertEquals(N, pendingTaskRunsCount + runningTaskRunsCount);
     }
+
+    @Test
+    public void testBingoResourceGroupWhenSubmitTask() {
+        try {
+            createTable();
+            createResourceGroups();
+            TaskManager tm = new TaskManager();
+            TaskRunScheduler taskRunScheduler = tm.getTaskRunScheduler();
+            for (int i = 0; i < 2; i++) {
+                String taskName = "task_test_" + i;
+                submitTask(tm, taskName, i);
+            }
+            long pendingTaskRunsCount = taskRunScheduler.getPendingQueueCount();
+            Assert.assertEquals(2, pendingTaskRunsCount);
+            long runningTaskRunsCount = taskRunScheduler.getRunningTaskCount();
+            Assert.assertEquals(0, runningTaskRunsCount);
+            Assert.assertEquals(2, pendingTaskRunsCount + runningTaskRunsCount);
+
+            List<TaskRun> pendingTaskRuns = taskRunScheduler.getCopiedPendingTaskRuns();
+            taskRunScheduler.scheduledPendingTaskRun(taskRun -> {
+                Assert.assertTrue(pendingTaskRuns.contains(taskRun));
+            });
+            pendingTaskRunsCount = taskRunScheduler.getPendingQueueCount();
+            Assert.assertEquals(1, pendingTaskRunsCount);
+            runningTaskRunsCount = taskRunScheduler.getRunningTaskCount();
+            Assert.assertEquals(1, runningTaskRunsCount);
+            Assert.assertEquals(2, pendingTaskRunsCount + runningTaskRunsCount);
+        } catch (Exception e) {
+            Assert.fail("test bingo resource group failed, reason is " + e.getMessage());
+        }
+    }
+
+    private void submitTask(TaskManager taskManager, String taskName, long taskId) throws Exception {
+        String submitSQL = String.format("submit task %s " +
+                        "PROPERTIES(\"resource_group\"=\"rg_for_submit_task\", \"%s\"=\"%s\") " +
+                        "as insert overwrite test.tbl1 select * from test.tbl1", taskName,
+                Constants.SUBMIT_TYPE, Constants.LAKE_WAREHOUSE_TO_STAR_ROCKS);
+        SubmitTaskStmt submitTaskStmt = (SubmitTaskStmt) UtFrameUtils.parseStmtWithNewParser(submitSQL, connectContext);
+        Task manualTask = TaskBuilder.buildTask(submitTaskStmt, connectContext);
+        manualTask.setCreateUser("rg1_user1");
+        manualTask.setId(taskId);
+        taskManager.createTask(manualTask, true);
+
+        Assert.assertNotNull(manualTask.getProperties());
+        Assert.assertEquals(manualTask.getProperties().size(), 6);
+        Assert.assertEquals(manualTask.getProperties().get("resource_group"), "rg_for_submit_task");
+        Assert.assertEquals(manualTask.getProperties().get(Constants.SUBMIT_TYPE), Constants.LAKE_WAREHOUSE_TO_STAR_ROCKS);
+        Assert.assertEquals(manualTask.getProperties().get(SessionVariable.PIPELINE_DOP), "2");
+        Assert.assertEquals(manualTask.getProperties().get(SessionVariable.CONNECTOR_IO_TASKS_PER_SCAN_OPERATOR), "2");
+
+        TaskRun taskRun = makeTaskRun(taskId, manualTask, makeExecuteOption(true, false));
+        taskRun.setProcessor(new MockTaskRunProcessor());
+        taskManager.getTaskRunManager().submitTaskRun(taskRun, new ExecuteOption(false));
+    }
+
+    private void createTable() throws Exception {
+        starRocksAssert.withDatabase("test").useDatabase("test")
+                .withTable("CREATE TABLE test.tbl1\n" +
+                        "(\n" +
+                        "    k1 date,\n" +
+                        "    k2 int,\n" +
+                        "    v1 int sum\n" +
+                        ")\n" +
+                        "PARTITION BY RANGE(k1)\n" +
+                        "(\n" +
+                        "    PARTITION p1 values less than('2020-02-01'),\n" +
+                        "    PARTITION p2 values less than('2020-03-01')\n" +
+                        ")\n" +
+                        "DISTRIBUTED BY HASH(k2) BUCKETS 3\n" +
+                        "PROPERTIES('replication_num' = '1');");
+    }
+
+    private void createResourceGroups() throws Exception {
+        String createRgSql = "create resource group rg_for_submit_task\n" +
+                "to\n" +
+                "    (query_type in ('insert'), db='test', user='rg1_user1')\n" +
+                "with (\n" +
+                "    'cpu_core_limit' = '2',\n" +
+                "    'mem_limit' = '10%',\n" +
+                "    'concurrency_limit' = '1',\n" +
+                "    'type' = 'normal'\n" +
+                ");";
+        starRocksAssert.executeResourceGroupDdlSql(createRgSql);
+
+    }
+
 }

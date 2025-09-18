@@ -4450,4 +4450,28 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
             throw new RuntimeException(e);
         }
     }
+
+    public double getConnectorScanUseQueryMemRatio() {
+        return connectorScanUseQueryMemRatio;
+    }
+
+    public boolean isEnableConnectorAdaptiveIoTasks() {
+        return enableConnectorAdaptiveIoTasks;
+    }
+
+    public void setConnectorScanUseQueryMemRatio(double connectorScanUseQueryMemRatio) {
+        this.connectorScanUseQueryMemRatio = connectorScanUseQueryMemRatio;
+    }
+
+    public void setConnectorIoTasksPerScanOperator(int connectorIoTasksPerScanOperator) {
+        this.connectorIoTasksPerScanOperator = connectorIoTasksPerScanOperator;
+    }
+
+    public void setEnableConnectorAdaptiveIoTasks(boolean enableConnectorAdaptiveIoTasks) {
+        this.enableConnectorAdaptiveIoTasks = enableConnectorAdaptiveIoTasks;
+    }
+
+    public int getConnectorIoTasksPerScanOperator() {
+        return connectorIoTasksPerScanOperator;
+    }
 }

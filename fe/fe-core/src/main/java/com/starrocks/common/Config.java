@@ -3349,4 +3349,13 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = true)
     public static String default_presto_catalog = "unified_catalog_hms";
+
+    @ConfField(mutable = true)
+    public static boolean enable_offline_load_control = false;
+
+    @ConfField(mutable = true)
+    public static Integer default_offline_load_pipeline_dop = 1;
+
+    @ConfField(mutable = true)
+    public static Integer default_offline_load_query_timeout = 3600; // 1h
 }
