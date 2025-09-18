@@ -71,7 +71,7 @@ public class InsertAnalyzer {
         QueryRelation query = insertStmt.getQueryStatement().getQueryRelation();
         List<Table> tables = new ArrayList<>();
         try {
-            new QueryAnalyzer(session).analyze(insertStmt.getQueryStatement());
+            new QueryAnalyzer(session).analyze(insertStmt);
 
             AnalyzerUtils.collectSpecifyExternalTables(insertStmt.getQueryStatement(), tables, Table::isHiveTable);
             tables.stream().map(table -> (HiveTable) table)

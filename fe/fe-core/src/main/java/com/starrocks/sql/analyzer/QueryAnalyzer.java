@@ -65,6 +65,7 @@ import com.starrocks.sql.ast.CTERelation;
 import com.starrocks.sql.ast.ExceptRelation;
 import com.starrocks.sql.ast.FieldReference;
 import com.starrocks.sql.ast.FileTableFunctionRelation;
+import com.starrocks.sql.ast.InsertStmt;
 import com.starrocks.sql.ast.IntersectRelation;
 import com.starrocks.sql.ast.JoinRelation;
 import com.starrocks.sql.ast.NormalizedTableFunctionRelation;
@@ -112,6 +113,8 @@ public class QueryAnalyzer {
     private final ConnectContext session;
     private final MetadataMgr metadataMgr;
 
+    private InsertStmt insertStmt;
+
     public QueryAnalyzer(ConnectContext session) {
         this.session = session;
         this.metadataMgr = GlobalStateMgr.getCurrentState().getMetadataMgr();
@@ -119,6 +122,12 @@ public class QueryAnalyzer {
 
     public void analyze(StatementBase node) {
         new Visitor().process(node, new Scope(RelationId.anonymous(), new RelationFields()));
+    }
+
+    public void analyze(InsertStmt insertStmt) {
+        this.insertStmt = insertStmt;
+        QueryStatement queryStatement = insertStmt.getQueryStatement();
+        new Visitor().process(queryStatement, new Scope(RelationId.anonymous(), new RelationFields()));
     }
 
     public void analyze(StatementBase node, Scope parent) {
@@ -370,7 +379,7 @@ public class QueryAnalyzer {
             Scope sourceScope = process(resolvedRelation, scope);
             sourceScope.setParent(scope);
 
-            SelectAnalyzer selectAnalyzer = new SelectAnalyzer(session);
+            SelectAnalyzer selectAnalyzer = new SelectAnalyzer(session, insertStmt);
             selectAnalyzer.analyze(
                     analyzeState,
                     selectRelation.getSelectList(),

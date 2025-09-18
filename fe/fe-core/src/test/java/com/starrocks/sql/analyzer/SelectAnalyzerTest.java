@@ -19,6 +19,7 @@ import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.SelectListItem;
 import com.starrocks.sql.plan.ExecPlan;
 import com.starrocks.sql.plan.PlanTestBase;
+import com.starrocks.thrift.TExplainLevel;
 import com.starrocks.utframe.UtFrameUtils;
 import org.junit.Assert;
 import org.junit.Test;
@@ -62,4 +63,21 @@ public class SelectAnalyzerTest extends PlanTestBase {
         selectAnalyzer.analyzerDoubleInValidRange(item);
         Assert.assertTrue(item.getExpr().toSql().toUpperCase().contains("CAST(CAST("));
     }
+
+    @Test
+    public void testComplexTypeToCastExprAnalyzerForPresto() throws Exception {
+        String sql = "insert into files('path' = 's3://xxx/yyy', 'format' = 'parquet', 'aws.s3.access_key' = 'abc', " +
+                "'aws.s3.secret_key' = 'def', 'aws.s3.region' = 'us-west-2') " +
+                "select map<INT,INT>{\"12\": \"100\"} as _map_res";
+        ExecPlan execPlan = getExecPlan(sql);
+        Assert.assertTrue(execPlan.getExplainString(TExplainLevel.NORMAL).contains("map{12:100}"));
+
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        execPlan = getExecPlan(sql);
+        Assert.assertTrue(execPlan.getExplainString(TExplainLevel.NORMAL).contains("CAST(to_json(map{12:100}) AS VARCHAR(1048576))"));
+    }
+
 }

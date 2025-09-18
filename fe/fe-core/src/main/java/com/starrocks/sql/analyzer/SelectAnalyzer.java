@@ -31,6 +31,7 @@ import com.starrocks.analysis.OrderByElement;
 import com.starrocks.analysis.ParseNode;
 import com.starrocks.analysis.SlotRef;
 import com.starrocks.analysis.StringLiteral;
+import com.starrocks.catalog.Function;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.ScalarType;
@@ -40,6 +41,7 @@ import com.starrocks.connector.parser.trino.Trino2SRFunctionCallTransformer;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.ast.FieldReference;
+import com.starrocks.sql.ast.InsertStmt;
 import com.starrocks.sql.ast.Relation;
 import com.starrocks.sql.ast.SelectList;
 import com.starrocks.sql.ast.SelectListItem;
@@ -61,9 +63,15 @@ import static com.starrocks.sql.common.ErrorType.INTERNAL_ERROR;
 
 public class SelectAnalyzer {
     private final ConnectContext session;
+    private InsertStmt insertStmt;
 
     public SelectAnalyzer(ConnectContext session) {
         this.session = session;
+    }
+
+    public SelectAnalyzer(ConnectContext session, InsertStmt insertStmt) {
+        this.session = session;
+        this.insertStmt = insertStmt;
     }
 
     public void analyze(AnalyzeState analyzeState,
@@ -255,6 +263,7 @@ public class SelectAnalyzer {
                 analyzePrestoFunction(item);
                 analyzeCsvFormat(item, analyzeState, scope);
                 analyzeExpression(item.getExpr(), analyzeState, scope);
+                analyzeComplexTypeForInsertTableFunction(item);
                 analyzerDoubleInValidRange(item);
 
                 outputExpressionBuilder.add(item.getExpr());
@@ -978,4 +987,38 @@ public class SelectAnalyzer {
         Expr doubleExpr = new CastExpr(expr.getType(), stringExpr);
         item.setExpr(doubleExpr);
     }
+
+    private void analyzeComplexTypeForInsertTableFunction(SelectListItem item) {
+        if (!session.getSessionVariable().isEnablePrestoTranslation()) {
+            return;
+        }
+        if (insertStmt == null) {
+            return;
+        }
+        if (!insertStmt.useTableFunctionAsTargetTable()) {
+            return;
+        }
+        Expr originalExpr = item.getExpr();
+        if (originalExpr.getType() == null) {
+            return;
+        }
+        if (!originalExpr.getType().isArrayType()
+                && !originalExpr.getType().isMapType()
+                && !originalExpr.getType().isStructType()) {
+            return;
+        }
+        // Create the transformation expression:
+        // cast(to_json(map_column) as varchar(1048576))
+        List<Expr> params = new ArrayList<>();
+        params.add(originalExpr);
+        String fnName = FunctionSet.TO_JSON;
+        FunctionCallExpr functionCallExpr = new FunctionCallExpr(fnName, params);
+        functionCallExpr.setType(Type.JSON);
+        Type[] argumentTypes = {originalExpr.getType()};
+        Function fn = Expr.getBuiltinFunction(fnName, argumentTypes, Function.CompareMode.IS_NONSTRICT_SUPERTYPE_OF);
+        functionCallExpr.setFn(fn);
+        CastExpr castExpr = new CastExpr(ScalarType.createOlapMaxVarcharType(), functionCallExpr);
+        item.setExpr(castExpr);
+    }
+
 }
