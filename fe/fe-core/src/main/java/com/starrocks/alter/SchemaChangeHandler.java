@@ -1104,9 +1104,9 @@ public class SchemaChangeHandler extends AlterHandler {
         }
 
         // TODO shared-nothing needs to modify codes on BE side, and will support fast schema evolution later
-        if (newColumn.isKey() && RunMode.isSharedNothingMode()) {
+        /*if (newColumn.isKey() && RunMode.isSharedNothingMode()) {
             fastSchemaEvolution = false;
-        }
+        }*/
 
         // check if the new column already exist in base schema.
         // do not support adding new column which already exist in base schema.

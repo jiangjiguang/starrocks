@@ -565,8 +565,13 @@ Status TabletSchema::_build_current_tablet_schema(int64_t schema_id, int32_t ver
             _cols[it->second].set_is_sort_key(true);
         }
     } else {
-        for (auto cid : _sort_key_idxes) {
-            _cols[cid].set_is_sort_key(true);
+        _sort_key_idxes.clear();
+        _sort_key_idxes.reserve(_num_key_columns);
+        for (auto i = 0; i < _num_key_columns; ++i) {
+            _sort_key_idxes.push_back(i);
+            _sort_key_uids.emplace_back(_cols[i].unique_id());
+            _sort_key_uids_set.emplace(_cols[i].unique_id());
+            _cols[i].set_is_sort_key(true);
         }
     }
     if (has_bf_columns) {
