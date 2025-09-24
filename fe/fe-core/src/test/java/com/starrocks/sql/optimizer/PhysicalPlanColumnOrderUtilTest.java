@@ -14,6 +14,7 @@
 
 package com.starrocks.sql.optimizer;
 
+import com.starrocks.catalog.Type;
 import com.starrocks.sql.optimizer.operator.Operator;
 import com.starrocks.sql.optimizer.operator.physical.PhysicalValuesOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
@@ -30,12 +31,17 @@ import java.util.List;
 
 public class PhysicalPlanColumnOrderUtilTest {
     private List<String> expectedColumnNames;
+    private List<ColumnRefOperator> expectedColumnRefOperators;
     private PhysicalPlanColumnOrderUtil fixer;
 
     @Before
     public void setUp() {
         expectedColumnNames = Arrays.asList("col1", "col2", "col3");
-        fixer = new PhysicalPlanColumnOrderUtil(expectedColumnNames);
+        ColumnRefOperator columnRefOperator1 = new ColumnRefOperator(0, Type.INT, expectedColumnNames.get(0), false);
+        ColumnRefOperator columnRefOperator2 = new ColumnRefOperator(1, Type.INT, expectedColumnNames.get(1), false);
+        ColumnRefOperator columnRefOperator3 = new ColumnRefOperator(2, Type.INT, expectedColumnNames.get(2), false);
+        expectedColumnRefOperators = Arrays.asList(columnRefOperator1, columnRefOperator2, columnRefOperator3);
+        fixer = new PhysicalPlanColumnOrderUtil(expectedColumnRefOperators);
     }
 
     @Test
@@ -48,7 +54,7 @@ public class PhysicalPlanColumnOrderUtilTest {
         );
 
         // Execution
-        boolean result = fixer.needsOrderFix(currentOrder, expectedColumnNames);
+        boolean result = fixer.needsOrderFix(currentOrder);
 
         // Verification
         Assert.assertFalse(result);
@@ -64,7 +70,7 @@ public class PhysicalPlanColumnOrderUtilTest {
         );
 
         // Execution
-        boolean result = fixer.needsOrderFix(currentOrder, expectedColumnNames);
+        boolean result = fixer.needsOrderFix(currentOrder);
 
         // Verification
         Assert.assertTrue(result);
@@ -79,7 +85,7 @@ public class PhysicalPlanColumnOrderUtilTest {
         );
 
         // Execution
-        boolean result = fixer.needsOrderFix(currentOrder, expectedColumnNames);
+        boolean result = fixer.needsOrderFix(currentOrder);
 
         // Verification
         Assert.assertFalse(result);

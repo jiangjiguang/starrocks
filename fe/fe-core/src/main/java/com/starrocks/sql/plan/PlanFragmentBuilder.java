@@ -1815,7 +1815,7 @@ public class PlanFragmentBuilder {
 
         @Override
         public PlanFragment visitPhysicalValues(OptExpression optExpr, ExecPlan context) {
-            PhysicalPlanColumnOrderUtil fixer = new PhysicalPlanColumnOrderUtil(context.getColNames());
+            PhysicalPlanColumnOrderUtil fixer = new PhysicalPlanColumnOrderUtil(context.getOutputColumns());
             fixer.fixPhysicalPlan(optExpr, context);
 
             PhysicalValuesOperator valuesOperator = (PhysicalValuesOperator) optExpr.getOp();

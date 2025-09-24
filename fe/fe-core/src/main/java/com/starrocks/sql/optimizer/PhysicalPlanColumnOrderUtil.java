@@ -19,16 +19,29 @@ import com.starrocks.sql.optimizer.operator.physical.PhysicalValuesOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
 import com.starrocks.sql.plan.ExecPlan;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Utility class to fix the output column order of PhysicalValuesOperator.
+ * The order must strictly follow the expected output column list.
+ *
+ * We match columns by ColumnRefOperator.id (unique identifier),
+ * ignoring alias names, since aliases are only for SQL syntax and
+ * may not exist in the optimized plan.
+ */
 public class PhysicalPlanColumnOrderUtil {
+    private static final Logger LOG = LogManager.getLogger(PhysicalPlanColumnOrderUtil.class);
 
-    private final List<String> expectedColumnNames;
+    // column reference operator
+    private final List<ColumnRefOperator> expectedOutputColumns;
 
-    public PhysicalPlanColumnOrderUtil(List<String> expectedColumnNames) {
-        this.expectedColumnNames = expectedColumnNames;
+    public PhysicalPlanColumnOrderUtil(List<ColumnRefOperator> expectedOutputColumns) {
+        this.expectedOutputColumns = expectedOutputColumns;
     }
 
     /**
@@ -38,7 +51,7 @@ public class PhysicalPlanColumnOrderUtil {
      */
     public void fixPhysicalPlan(OptExpression optExpr, ExecPlan context) {
         // There are no fields to output
-        if (expectedColumnNames.isEmpty()) {
+        if (expectedOutputColumns.isEmpty()) {
             return;
         }
         visit(optExpr, context);
@@ -63,6 +76,17 @@ public class PhysicalPlanColumnOrderUtil {
             if (operator.getRows().isEmpty()) {
                 return;
             }
+            boolean isAllConstants = true;
+            if (operator.getProjection() != null) {
+                isAllConstants = operator.getProjection().getColumnRefMap().values().stream()
+                        .allMatch(ScalarOperator::isConstantRef);
+            } else if (CollectionUtils.isNotEmpty(operator.getRows())) {
+                isAllConstants = operator.getRows().stream().allMatch(row ->
+                        row.stream().allMatch(ScalarOperator::isConstantRef));
+            }
+            if (!isAllConstants) {
+                return;
+            }
             fixPhysicalValuesOperator(optExpr, operator, context);
         }
     }
@@ -76,7 +100,7 @@ public class PhysicalPlanColumnOrderUtil {
     public void fixPhysicalValuesOperator(OptExpression optExpr, PhysicalValuesOperator physicalValuesOperator, ExecPlan context) {
         List<ColumnRefOperator> columnRefOperatorList = physicalValuesOperator.getColumnRefSet();
         // Check if repair is needed
-        if (!needsOrderFix(columnRefOperatorList, expectedColumnNames)) {
+        if (!needsOrderFix(columnRefOperatorList)) {
             return;
         }
 
@@ -84,15 +108,25 @@ public class PhysicalPlanColumnOrderUtil {
         List<Integer> sortList = new ArrayList<>();
         List<ColumnRefOperator> newSortColumnRefList = new ArrayList<>();
 
-        for (String expectedColumn : expectedColumnNames) {
+        for (ColumnRefOperator expectedColumn : expectedOutputColumns) {
+            boolean matched = false;
             for (int i = 0; i < columnRefOperatorList.size(); i++) {
                 ColumnRefOperator columnRefOperator = columnRefOperatorList.get(i);
-                if (columnRefOperator.getName().equalsIgnoreCase(expectedColumn)) {
+                if (columnRefOperator.getId() == expectedColumn.getId()) {
                     sortList.add(i);
                     newSortColumnRefList.add(columnRefOperator);
+                    matched = true;
                     break;
                 }
             }
+            if (!matched) {
+                LOG.warn("fixPhysicalValuesOperator: cannot match expected column {} in {}",
+                        expectedColumn, columnRefOperatorList);
+            }
+        }
+        // output column name complete different with ColumnRefOperator
+        if (newSortColumnRefList.isEmpty() || newSortColumnRefList.size() != columnRefOperatorList.size()) {
+            return;
         }
 
         // If the order remains unchanged, return directly
@@ -144,11 +178,10 @@ public class PhysicalPlanColumnOrderUtil {
     /**
      * Check if the sequence needs to be repaired
      * @param currentOrder
-     * @param expectedNames
      * @return
      */
-    public boolean needsOrderFix(List<ColumnRefOperator> currentOrder, List<String> expectedNames) {
-        if (currentOrder.size() != expectedNames.size()) {
+    public boolean needsOrderFix(List<ColumnRefOperator> currentOrder) {
+        if (currentOrder.size() != expectedOutputColumns.size()) {
             return false;
         }
         for (int i = 0; i < currentOrder.size(); i++) {
@@ -156,7 +189,9 @@ public class PhysicalPlanColumnOrderUtil {
             if (currentOrder.get(i).getName().isEmpty()) {
                 return false;
             }
-            if (!currentOrder.get(i).getName().equalsIgnoreCase(expectedNames.get(i))) {
+            String realOutputName = currentOrder.get(i).getName();
+            String realColumnName = expectedOutputColumns.get(i).getName();
+            if (!realOutputName.equalsIgnoreCase(realColumnName)) {
                 return true;
             }
         }
