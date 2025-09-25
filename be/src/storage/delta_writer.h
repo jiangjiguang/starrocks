@@ -56,7 +56,6 @@ struct DeltaWriterOptions {
     // slots are in order of tablet's schema
     const std::vector<SlotDescriptor*>* slots;
     GlobalDictByNameMaps* global_dicts = nullptr;
-    Span parent_span;
     int64_t index_id;
     int64_t node_id;
     std::vector<PNetworkAddress> replicas;

@@ -72,8 +72,6 @@ LoadChannel::LoadChannel(LoadChannelMgr* mgr, LakeTabletManager* lake_tablet_mgr
           _has_chunk_meta(false),
           _mem_tracker(std::move(mem_tracker)),
           _last_updated_time(time(nullptr)) {
-    _span = Tracer::Instance().start_trace_or_add_span("load_channel", txn_trace_parent);
-    _span->SetAttribute("load_id", load_id.to_string());
     _create_time_ns = MonotonicNanos();
 
     _root_profile = std::make_shared<RuntimeProfile>("LoadChannel");
@@ -86,8 +84,6 @@ LoadChannel::LoadChannel(LoadChannelMgr* mgr, LakeTabletManager* lake_tablet_mgr
 }
 
 LoadChannel::~LoadChannel() {
-    _span->SetAttribute("num_chunk", _num_chunk);
-    _span->End();
 }
 
 void LoadChannel::set_profile_config(const PLoadChannelProfileConfig& config) {
@@ -106,8 +102,6 @@ void LoadChannel::set_profile_config(const PLoadChannelProfileConfig& config) {
 
 void LoadChannel::open(brpc::Controller* cntl, const PTabletWriterOpenRequest& request,
                        PTabletWriterOpenResult* response, google::protobuf::Closure* done) {
-    _span->AddEvent("open_index", {{"index_id", request.index_id()}});
-    auto scoped = trace::Scope(_span);
     ClosureGuard done_guard(done);
 
     _last_updated_time.store(time(nullptr), std::memory_order_relaxed);
@@ -250,8 +244,6 @@ void LoadChannel::cancel() {
 }
 
 void LoadChannel::abort() {
-    _span->AddEvent("cancel");
-    auto scoped = trace::Scope(_span);
     std::lock_guard l(_lock);
     for (auto& it : _tablets_channels) {
         it.second->abort();

@@ -118,8 +118,6 @@ public:
 
     MemTracker* mem_tracker() { return _mem_tracker.get(); }
 
-    Span get_span() { return _span; }
-
     void report_profile(PTabletWriterAddBatchResult* result, bool print_profile);
 
 private:
@@ -153,7 +151,6 @@ private:
     std::map<TabletsChannelKey, std::shared_ptr<TabletsChannel>> _tablets_channels;
     std::atomic<bool> _closed{false};
 
-    Span _span;
     size_t _num_chunk{0};
     size_t _num_segment = 0;
 

@@ -663,7 +663,6 @@ Status LocalTabletsChannel::_open_all_writers(const PTabletWriterOpenRequest& pa
         options.load_id = params.id();
         options.slots = index_slots;
         options.global_dicts = &_global_dicts;
-        options.parent_span = _load_channel->get_span();
         options.index_id = _index_id;
         options.node_id = _node_id;
         options.sink_id = params.sink_id();
@@ -871,7 +870,6 @@ Status LocalTabletsChannel::incremental_open(const PTabletWriterOpenRequest& par
         options.load_id = params.id();
         options.slots = index_slots;
         options.global_dicts = &_global_dicts;
-        options.parent_span = _load_channel->get_span();
         options.index_id = _index_id;
         options.node_id = _node_id;
         options.sink_id = params.sink_id();
