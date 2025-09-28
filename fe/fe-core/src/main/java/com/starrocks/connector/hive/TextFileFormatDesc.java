@@ -16,8 +16,8 @@
 package com.starrocks.connector.hive;
 
 import com.starrocks.common.Config;
+import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.thrift.TTextFileDesc;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -92,26 +92,10 @@ public class TextFileFormatDesc {
         if (!Config.enable_presto_field_delim) {
             return fieldDelim;
         }
-        if (StringUtils.isBlank(fieldDelim)) {
-            return fieldDelim;
-        }
         try {
-            Integer fieldDelimInt = Integer.parseInt(fieldDelim);
-            if (fieldDelimInt != null && fieldDelimInt.equals(9)) {
-                LOG.info("text file format desc fieldDelim: {} parse after value", fieldDelim);
-                return "\t";
-            }
-            LOG.info("text file format desc fieldDelim: {} parse is null: ", fieldDelim);
-            return fieldDelim;
-        } catch (NumberFormatException e) {
-            LOG.info("text file format desc fieldDelim: {} parse exception. ", fieldDelim, e);
-            if (fieldDelim.startsWith("\\x")) {
-                return "x";
-            }
-            if (fieldDelim.length() > 1) {
-                return String.valueOf(fieldDelim.charAt(0));
-            }
-            LOG.info("text file format desc fieldDelim: {} parse after value", fieldDelim);
+            return HiveFieldDelimiter.convert(fieldDelim);
+        } catch (StarRocksConnectorException e) {
+            LOG.warn("hive field.delim convert fail, reason is: ", e);
             return fieldDelim;
         }
     }

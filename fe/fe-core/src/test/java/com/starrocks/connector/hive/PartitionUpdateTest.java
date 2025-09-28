@@ -29,12 +29,14 @@ public class PartitionUpdateTest {
     public void testGetPartitionUpdate() {
         String stagingDir = "hdfs://hadoop01:9000/tmp/starrocks/queryid";
         String tableLocation = "hdfs://hadoop01:9000/user/hive/warehouse/test.db/t1";
+        String fieldDelimiter = ",";
+        String serializationFormat = "";
         THiveFileInfo fileInfo = new THiveFileInfo();
         fileInfo.setFile_name("myfile.parquet");
         fileInfo.setPartition_path("hdfs://hadoop01:9000/tmp/starrocks/queryid/k2=2");
         fileInfo.setRecord_count(10);
         fileInfo.setFile_size_in_bytes(100);
-        PartitionUpdate pu = PartitionUpdate.get(fileInfo, stagingDir, tableLocation);
+        PartitionUpdate pu = PartitionUpdate.get(fileInfo, stagingDir, tableLocation, fieldDelimiter, serializationFormat);
         pu.setUpdateMode(PartitionUpdate.UpdateMode.NEW);
         Assert.assertEquals("k2=2", pu.getName());
         Assert.assertEquals(Lists.newArrayList("myfile.parquet"), pu.getFileNames());
@@ -49,7 +51,7 @@ public class PartitionUpdateTest {
         ExceptionChecker.expectThrowsWithMsg(
                 IllegalStateException.class,
                 "Missing partition path",
-                () -> PartitionUpdate.get(fileInfo1, stagingDir, tableLocation));
+                () -> PartitionUpdate.get(fileInfo1, stagingDir, tableLocation, fieldDelimiter, serializationFormat));
     }
 
     @Test
