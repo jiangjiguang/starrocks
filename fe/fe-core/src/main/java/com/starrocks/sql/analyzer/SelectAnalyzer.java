@@ -37,7 +37,6 @@ import com.starrocks.catalog.PrimitiveType;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.TreeNode;
-import com.starrocks.connector.parser.trino.Trino2SRFunctionCallTransformer;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.AstVisitor;
 import com.starrocks.sql.ast.FieldReference;
@@ -402,13 +401,6 @@ public class SelectAnalyzer {
                     newNode.setChild(i, node.getChild(i));
                 }
                 item.setExpr(newNode);
-            }
-        } else {
-            if (session.getSessionVariable().getSqlDialect().equalsIgnoreCase("trino")) {
-                Expr newExpr = Trino2SRFunctionCallTransformer.convert(fnName, node.getChildren());
-                if (newExpr != null) {
-                    item.setExpr(newExpr);
-                }
             }
         }
     }

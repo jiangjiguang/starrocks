@@ -723,21 +723,23 @@ public class AstBuilder extends AstVisitor<ParseNode, ParseTreeContext> {
         List<Expr> arguments = visit(node.getArguments(), context, Expr.class);
 
         Expr callExpr;
+        Expr convertedFunctionCall;
         String functionName = node.getName().toString();
         if (functionName.equals(FunctionSet.CSV_FORMAT)) {
             int num = arguments.size();
-            if (num != 1) {
+            // presto parser can't parse *, so arguments size only equal 0
+            if (num == 0) {
+                FunctionParams functionParams = FunctionParams.createStarParam();
+                convertedFunctionCall = new FunctionCallExpr(functionName, functionParams);
+            } else {
                 if (num < 3) {
                     throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName));
                 }
-                callExpr = new FunctionCallExpr(functionName, arguments);
-            } else {
-                FunctionParams functionParams = FunctionParams.createStarParam();
-                callExpr = new FunctionCallExpr(functionName, functionParams);
+                convertedFunctionCall = new FunctionCallExpr(functionName, arguments);
             }
-            return callExpr;
+        } else {
+            convertedFunctionCall = Trino2SRFunctionCallTransformer.convert(node.getName().toString(), arguments);
         }
-        Expr convertedFunctionCall = Trino2SRFunctionCallTransformer.convert(node.getName().toString(), arguments);
         if (convertedFunctionCall != null) {
             callExpr = convertedFunctionCall;
         } else if (DISTINCT_FUNCTION.contains(node.getName().toString())) {
@@ -751,7 +753,7 @@ public class AstBuilder extends AstVisitor<ParseNode, ParseTreeContext> {
                 orderByElements.forEach(e -> arguments.add(e.getExpr()));
             }
             callExpr = new FunctionCallExpr(node.getName().toString(),
-                    new FunctionParams(node.isDistinct(),  arguments, orderByElements));
+                    new FunctionParams(node.isDistinct(), arguments, orderByElements));
         }
         if (node.getWindow().isPresent()) {
             return visitWindow((FunctionCallExpr) callExpr, node.getWindow().get(), context);
