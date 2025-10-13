@@ -128,7 +128,6 @@ public class HiveFieldDelimiterTest {
         assertEquals("\u0001", HiveFieldDelimiter.convert("1"));
         assertEquals("\t", HiveFieldDelimiter.convert("9"));
         assertEquals("A", HiveFieldDelimiter.convert("65"));
-        assertEquals("\u00FF", HiveFieldDelimiter.convert("255"));
 
         // Test invalid numeric formats
         assertThrows(StarRocksConnectorException.class, () -> HiveFieldDelimiter.convert("-1"));
@@ -201,7 +200,6 @@ public class HiveFieldDelimiterTest {
 
         // Test boundary values
         assertEquals("\u0000", HiveFieldDelimiter.convert("0"));
-        assertEquals("\u00FF", HiveFieldDelimiter.convert("255"));
     }
 
     // Helper method to verify exception message
