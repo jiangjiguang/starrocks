@@ -37,6 +37,7 @@ package com.starrocks.common;
 import com.starrocks.StarRocksFE;
 import com.starrocks.catalog.LocalTablet;
 import com.starrocks.catalog.Replica;
+import com.starrocks.scheduler.Constants;
 
 public class Config extends ConfigBase {
 
@@ -3358,4 +3359,8 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = true)
     public static Integer default_offline_load_query_timeout = 3600; // 1h
+
+    @ConfField(mutable = true)
+    public static String default_offline_load_flag = Constants.LAKE_WAREHOUSE_TO_STAR_ROCKS;
+
 }

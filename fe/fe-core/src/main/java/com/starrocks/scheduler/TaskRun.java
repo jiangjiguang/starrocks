@@ -410,10 +410,14 @@ public class TaskRun implements Comparable<TaskRun> {
         runCtx.setGlobalStateMgr(GlobalStateMgr.getCurrentState());
         runCtx.setCurrentCatalog(task.getCatalogName());
         runCtx.setDatabase(task.getDbName());
-        if (runCtx.getCurrentSqlDbIds().isEmpty()) {
+        if (runCtx.getCurrentSqlDbIds().isEmpty() && !StringUtils.isBlank(task.getDbName())) {
             Set<Long> dbIds = new HashSet<>();
-            dbIds.add(GlobalStateMgr.getCurrentState().getDb(task.getDbName()).getId());
-            runCtx.setCurrentSqlDbIds(dbIds);
+            Database database = GlobalStateMgr.getCurrentState().getDb(task.getDbName());
+            if (database != null) {
+                dbIds.add(database.getId());
+                runCtx.setCurrentSqlDbIds(dbIds);
+            }
+
         }
 
         runCtx.setQualifiedUser(status.getUser());

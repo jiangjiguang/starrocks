@@ -478,7 +478,7 @@ public class TaskRunScheduler {
         if (taskRun == null || taskRun.getTask() == null || taskRun.getTask().getProperties() == null) {
             return false;
         }
-        return Constants.LAKE_WAREHOUSE_TO_STAR_ROCKS.equalsIgnoreCase(
+        return Config.default_offline_load_flag.equalsIgnoreCase(
                 taskRun.getTask().getProperties().get(Constants.SUBMIT_TYPE)
         );
     }
