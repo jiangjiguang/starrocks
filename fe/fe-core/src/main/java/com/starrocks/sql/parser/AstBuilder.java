@@ -501,6 +501,7 @@ import static java.util.stream.Collectors.toList;
 public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<ParseNode> {
     private final long sqlMode;
     private boolean isPrestoDialect;
+    private boolean isEnableEliminateSortClauseWithoutLimit;
 
     private final IdentityHashMap<ParserRuleContext, List<HintNode>> hintMap;
 
@@ -549,6 +550,10 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
 
     public void setPrestoDialect(boolean prestoDialect) {
         this.isPrestoDialect = prestoDialect;
+    }
+
+    public void setEnableEliminateSortClauseWithoutLimit(boolean enableEliminateSortClauseWithoutLimit) {
+        isEnableEliminateSortClauseWithoutLimit = enableEliminateSortClauseWithoutLimit;
     }
 
     private static final AstBuilder.AstBuilderFactory INSTANCE = new AstBuilder.AstBuilderFactory();
@@ -4802,7 +4807,8 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
             resultSelectRelation.setOrderBy(new ArrayList<>());
 
             // used to indicate nested query, represent the 'from' part of outer query.
-            SubqueryRelation subqueryRelation = new SubqueryRelation(new QueryStatement(resultSelectRelation));
+            SubqueryRelation subqueryRelation = new SubqueryRelation(
+                    new QueryStatement(resultSelectRelation), isEnableEliminateSortClauseWithoutLimit, true);
 
             // use virtual table name to indicate subquery.
             TableName qualifyTableName = new TableName(null, "__QUALIFY__TABLE");
@@ -5270,13 +5276,16 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
     @Override
     public ParseNode visitQueryWithParentheses(com.starrocks.sql.parser.StarRocksParser.QueryWithParenthesesContext context) {
         QueryRelation relation = (QueryRelation) visit(context.subquery());
-        return new SubqueryRelation(new QueryStatement(relation));
+        return new SubqueryRelation(new QueryStatement(relation), isEnableEliminateSortClauseWithoutLimit);
     }
 
     @Override
     public ParseNode visitSubqueryWithAlias(com.starrocks.sql.parser.StarRocksParser.SubqueryWithAliasContext context) {
         QueryRelation queryRelation = (QueryRelation) visit(context.subquery());
-        SubqueryRelation subqueryRelation = new SubqueryRelation(new QueryStatement(queryRelation));
+        SubqueryRelation subqueryRelation = new SubqueryRelation(
+                new QueryStatement(queryRelation),
+                isEnableEliminateSortClauseWithoutLimit
+        );
 
         if (context.alias != null) {
             Identifier identifier = (Identifier) visit(context.alias);

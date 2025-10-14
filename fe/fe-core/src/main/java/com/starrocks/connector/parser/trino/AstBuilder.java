@@ -624,7 +624,7 @@ public class AstBuilder extends AstVisitor<ParseNode, ParseTreeContext> {
     @Override
     protected ParseNode visitTableSubquery(TableSubquery node, ParseTreeContext context) {
         QueryStatement queryStatement = (QueryStatement) visit(node.getQuery(), context);
-        return new SubqueryRelation(queryStatement);
+        return new SubqueryRelation(queryStatement, false);
     }
 
     protected ParseNode visitSetOperation(SetOperation node, ParseTreeContext context) {

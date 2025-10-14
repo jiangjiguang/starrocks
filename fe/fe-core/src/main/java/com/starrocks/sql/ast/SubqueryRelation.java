@@ -24,18 +24,35 @@ import java.util.Map;
 public class SubqueryRelation extends QueryRelation {
     private final QueryStatement queryStatement;
 
-    public SubqueryRelation(QueryStatement queryStatement) {
-        this(queryStatement, queryStatement.getPos());
+    public SubqueryRelation(
+            QueryStatement queryStatement,
+            boolean isEnableEliminateSortClauseWithoutLimit,
+            boolean isOuterMost
+    ) {
+        this(queryStatement, queryStatement.getPos(), isEnableEliminateSortClauseWithoutLimit, isOuterMost);
     }
 
-    public SubqueryRelation(QueryStatement queryStatement, NodePosition pos) {
+    public SubqueryRelation(QueryStatement queryStatement,
+                            NodePosition pos,
+                            boolean isEnableEliminateSortClauseWithoutLimit,
+                            boolean isOuterMost
+    ) {
         super(pos);
         this.queryStatement = queryStatement;
         QueryRelation queryRelation = this.queryStatement.getQueryRelation();
         // The order by is meaningless in subquery
-        if (!queryRelation.hasLimit()) {
-            queryRelation.clearOrder();
+        if (isEnableEliminateSortClauseWithoutLimit) {
+            // Clear all the inner ORDER BY (unless it has LIMIT)
+            if (!isOuterMost) {
+                if (!queryRelation.hasLimit()) {
+                    queryRelation.clearOrder();
+                }
+            }
         }
+    }
+
+    public SubqueryRelation(QueryStatement queryStatement, boolean isEnableEliminateSortClauseWithoutLimit) {
+        this(queryStatement, queryStatement.getPos(), isEnableEliminateSortClauseWithoutLimit, false);
     }
 
     @Override

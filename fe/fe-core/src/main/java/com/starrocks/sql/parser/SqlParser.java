@@ -155,6 +155,7 @@ public class SqlParser {
             AstBuilder astBuilder = GlobalStateMgr.getCurrentState().getSqlParser().astBuilderFactory
                     .create(sessionVariable.getSqlMode(), collector.getContextWithHintMap());
             astBuilder.setPrestoDialect(sessionVariable.isEnablePrestoTranslation());
+            astBuilder.setEnableEliminateSortClauseWithoutLimit(sessionVariable.isEnableEliminateSortClauseWithoutLimit());
             StatementBase statement = (StatementBase) astBuilder.visitSingleStatement(singleStatementContexts.get(idx));
             if (astBuilder.getParameters() != null && astBuilder.getParameters().size() != 0
                     && !(statement instanceof PrepareStmt)) {

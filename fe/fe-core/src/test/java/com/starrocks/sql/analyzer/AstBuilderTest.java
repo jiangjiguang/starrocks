@@ -15,8 +15,10 @@
 
 package com.starrocks.sql.analyzer;
 
+import com.starrocks.catalog.Database;
 import com.starrocks.common.util.UUIDUtil;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.sql.StatementPlanner;
 import com.starrocks.sql.ast.AlterClause;
 import com.starrocks.sql.ast.AlterTableStmt;
@@ -31,6 +33,7 @@ import com.starrocks.sql.parser.StarRocksLexer;
 import com.starrocks.sql.parser.StarRocksParser;
 import com.starrocks.sql.plan.ExecPlan;
 import com.starrocks.thrift.TResultSinkType;
+import com.starrocks.utframe.StarRocksAssert;
 import com.starrocks.utframe.UtFrameUtils;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -44,6 +47,9 @@ import java.util.List;
 public class AstBuilderTest {
 
     private static ConnectContext connectContext;
+    private static StarRocksAssert starRocksAssert;
+    private static Database testDb;
+    private static GlobalStateMgr currentState;
 
 
     @BeforeClass
@@ -53,6 +59,25 @@ public class AstBuilderTest {
         // create connect context
         connectContext = UtFrameUtils.createDefaultCtx();
         connectContext.setQueryId(UUIDUtil.genUUID());
+        starRocksAssert = new StarRocksAssert(connectContext);
+        starRocksAssert.withDatabase("test").useDatabase("test")
+                .withTable("CREATE TABLE test.tbl1\n" +
+                        "(\n" +
+                        "    k1 date,\n" +
+                        "    k2 int,\n" +
+                        "    v1 int sum\n" +
+                        ")\n" +
+                        "PARTITION BY RANGE(k1)\n" +
+                        "(\n" +
+                        "    PARTITION p1 values [('2020-01-01'),('2020-02-01')),\n" +
+                        "    PARTITION p2 values [('2020-02-01'),('2020-03-01'))\n" +
+                        ")\n" +
+                        "DISTRIBUTED BY HASH(k2) BUCKETS 3\n" +
+                        "PROPERTIES('replication_num' = '1');");
+        currentState = GlobalStateMgr.getCurrentState();
+        testDb = currentState.getDb("test");
+
+        UtFrameUtils.setUpForPersistTest();
     }
 
     @Test
@@ -114,5 +139,16 @@ public class AstBuilderTest {
         ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
         assert execPlan != null;
         Assert.assertEquals("char(1)", execPlan.getColNames().get(0));
+    }
+
+
+    @Test
+    public void testEliminateSortClauseWithoutLimit() {
+        connectContext.getSessionVariable().setEnableEliminateSortClauseWithoutLimit(false);
+        String sql = "select * (select k2 from test.tbl1 order by k2) as _temp limit 10";
+        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertTrue(execPlan.toString().contains("TOP-N"));
     }
 }
