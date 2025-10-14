@@ -19,14 +19,24 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.starrocks.analysis.CaseExpr;
 import com.starrocks.analysis.CaseWhenClause;
+import com.starrocks.analysis.CastExpr;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.FunctionCallExpr;
+import com.starrocks.analysis.FunctionParams;
 import com.starrocks.analysis.IntLiteral;
 import com.starrocks.analysis.StringLiteral;
 import com.starrocks.analysis.VariableExpr;
+import com.starrocks.catalog.FunctionSet;
+import com.starrocks.catalog.ScalarType;
+import com.starrocks.catalog.Type;
+import com.starrocks.common.Config;
+import com.starrocks.sql.parser.ParsingException;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static com.starrocks.sql.common.ErrorMsgProxy.PARSER_ERROR_MSG;
 
 /**
  * This Class is the entry to to convert a Trino function to StarRocks built-in function, we use
@@ -44,11 +54,132 @@ public class Trino2SRFunctionCallTransformer {
     }
 
     public static Expr convert(String fnName, List<Expr> children) {
-        Expr result = convertRegisterFn(fnName, children);
+        Expr result = convertComplexFunction(fnName, children);
+        if (result == null) {
+            result = convertRegisterFn(fnName, children);
+        }
         if (result == null) {
             result = ComplexFunctionCallTransformer.transform(fnName, children.toArray(new Expr[0]));
         }
         return result;
+    }
+
+    public static Expr convertComplexFunction(String fnName, List<Expr> children) {
+        Expr result = rewriteTruncFunction(fnName, children);
+        if (result == null) {
+            result = rewriteCsvFormatFunction(fnName, children);
+        }
+        if (result == null) {
+            result = rewriteTypeFunction(fnName, children);
+        }
+        if (result == null) {
+            result = rewriteChrFunction(fnName, children);
+        }
+        return result;
+    }
+
+    public static Expr rewriteTruncFunction(String functionName, List<Expr> arguments) {
+        if (!Config.enable_rewrite_trunc_in_parser_step) {
+            return null;
+        }
+        int num = arguments.size();
+        if (!functionName.equalsIgnoreCase(FunctionSet.TRUNC)) {
+            return null;
+        }
+        if (num != 2) {
+            throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName));
+        }
+        // 1. rewrite trunc(dt, 'month') -> date_trunc('month', dt)
+        functionName = FunctionSet.DATE_TRUNC;
+        Expr column = arguments.get(0);
+        Expr fmt = arguments.get(1);
+        if (!(fmt instanceof StringLiteral)) {
+            throw new ParsingException("trunc function need string format, but the format is " + fmt);
+        }
+        String formatParam = ((StringLiteral) fmt).getStringValue();
+        if (formatParam.equals("MONTH") || formatParam.equals("MON") || formatParam.equals("MM")) {
+            formatParam = "month";
+        }
+        if (formatParam.equals("YEAR") || formatParam.equals("YYYY")
+                || formatParam.equals("YY") || formatParam.equals("yyyy")) {
+            formatParam = "year";
+        }
+        formatParam = formatParam.toLowerCase();
+        fmt = new StringLiteral(formatParam);
+        List<Expr> newParams = new ArrayList<>();
+        newParams.add(fmt);
+
+        if (Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
+            // 2. rewrite date_trunc('hour', dt) -> date_trunc('hour', cast(dt as datetime))
+            CastExpr castExpr = new CastExpr(Type.DATETIME, column);
+            newParams.add(castExpr);
+            return new FunctionCallExpr(functionName, newParams);
+        }
+
+        // 3. rewrite date_trunc('month', dt) -> date_trunc('month', cast(dt as date))
+        CastExpr castExpr = new CastExpr(Type.DATE, column);
+        newParams.add(castExpr);
+        return new FunctionCallExpr(functionName, newParams);
+    }
+
+    public static Expr rewriteTypeFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (functionName.equals(FunctionSet.BIGINT)
+                || functionName.equals(FunctionSet.INT)
+                || functionName.equals(FunctionSet.STRING)
+                || functionName.equals(FunctionSet.DOUBLE)
+        ) {
+            if (num > 1) {
+                throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(num, functionName + "()",
+                        "The " + functionName + " function only supports one parameter"), 0);
+            }
+
+            if (functionName.equals(FunctionSet.BIGINT)) {
+                return new CastExpr(ScalarType.BIGINT, arguments.get(0));
+            }
+
+            if (functionName.equals(FunctionSet.INT)) {
+                return new CastExpr(ScalarType.INT, arguments.get(0));
+            }
+
+            if (functionName.equals(FunctionSet.STRING)) {
+                return new CastExpr(ScalarType.VARCHAR, arguments.get(0));
+            }
+
+            if (functionName.equals(FunctionSet.DOUBLE)) {
+                return new CastExpr(ScalarType.DOUBLE, arguments.get(0));
+            }
+        }
+        return null;
+    }
+
+    private static Expr rewriteCsvFormatFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (functionName.equals(FunctionSet.CSV_FORMAT)) {
+            // presto parser can't parse *, so arguments size only equal 0
+            // starrocks parser can parse *, so arguments size only equal 1
+            if (num == 0 || num == 1) {
+                FunctionParams functionParams = FunctionParams.createStarParam();
+                return new FunctionCallExpr(functionName, functionParams);
+            } else {
+                if (num < 3) {
+                    throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName));
+                }
+                return new FunctionCallExpr(functionName, arguments);
+            }
+        }
+        return null;
+    }
+
+    private static Expr rewriteChrFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (functionName.equalsIgnoreCase(FunctionSet.CHR)) {
+            if (num != 1) {
+                throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName));
+            }
+            return new FunctionCallExpr(FunctionSet.CHAR, arguments);
+        }
+        return null;
     }
 
     public static Expr convertRegisterFn(String fnName, List<Expr> children) {

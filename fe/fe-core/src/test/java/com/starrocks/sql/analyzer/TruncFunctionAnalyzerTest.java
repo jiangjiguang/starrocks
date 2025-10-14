@@ -75,7 +75,7 @@ public class TruncFunctionAnalyzerTest {
         Assert.assertEquals(node.toSql(), "trunc('20250101', 'MM')");
 
         selectAnalyzer.rewriteTruncForPresto(node);
-        Assert.assertEquals(node.toSql(), "trunc(to_date('20250101'), 'MM')");
+        Assert.assertEquals(node.toSql(), "trunc(cast('20250101' as date), 'MM')");
     }
 
 
@@ -104,7 +104,7 @@ public class TruncFunctionAnalyzerTest {
         Assert.assertEquals(node.toSql(), "trunc('2025-01-01 10:10:10', 'hour')");
 
         selectAnalyzer.rewriteTruncForPresto(node);
-        Assert.assertEquals(node.toSql(), "trunc(timestamp('2025-01-01 10:10:10'), 'hour')");
+        Assert.assertEquals(node.toSql(), "trunc(cast('2025-01-01 10:10:10' as datetime), 'hour')");
     }
 }
 

@@ -506,4 +506,36 @@ public class TrinoFunctionTransformTest extends TrinoTestBase {
         String sql = "select collect_list(v1) from t0; ";
         assertPlanContains(sql, "output: array_agg");
     }
+
+
+    @Test
+    public void testTruncFunction() throws Exception {
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select trunc(th, 'MM') from tall";
+        assertPlanContains(sql, "date_trunc");
+        assertPlanContains(sql, "cast");
+    }
+
+    @Test
+    public void testChrFunction() throws Exception {
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select chr(ta) from tall";
+        assertPlanContains(sql, "char");
+    }
+
+    @Test
+    public void testBigintFunction() throws Exception {
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select bigint(tb) from tall";
+        assertPlanContains(sql, "cast");
+    }
 }

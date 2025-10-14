@@ -484,20 +484,17 @@ public class SelectAnalyzer {
             return;
         }
         String formatParam = ((StringLiteral) fmt).getValue().trim().toLowerCase();
-        FunctionName convertFunctionName;
         if (!Lists.newArrayList("hour", "minute", "second").contains(formatParam)) {
             // if fmt not in (hour, minute, second)
-            // trunc('20250101', 'month') -> trunc(to_date('20250101'), 'month')
-            convertFunctionName = new FunctionName(FunctionSet.TO_DATE);
+            // trunc('20250101', 'month') -> trunc(cast('20250101' as date), 'month')
+            CastExpr castExpr = new CastExpr(Type.DATE, dt);
+            node.setChild(0, castExpr);
         } else {
             // if fmt in (hour, minute, second)
-            // trunc('20250101', 'month') -> trunc(timestamp('20250101'), 'month')
-            convertFunctionName = new FunctionName(FunctionSet.TIMESTAMP);
+            // trunc('20250101', 'hour') -> trunc(cast('20250101' as datetime), 'hour')
+            CastExpr castExpr = new CastExpr(Type.DATETIME, dt);
+            node.setChild(0, castExpr);
         }
-        List<Expr> toDateFunctionParams = ImmutableList.of(dt);
-        FunctionCallExpr toDateFunctionExpr = new FunctionCallExpr(convertFunctionName,
-                toDateFunctionParams);
-        node.setChild(0, toDateFunctionExpr);
     }
 
     private List<OrderByElement> analyzeOrderBy(List<OrderByElement> orderByElements, AnalyzeState analyzeState,

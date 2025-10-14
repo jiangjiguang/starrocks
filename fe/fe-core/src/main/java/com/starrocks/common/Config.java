@@ -3363,4 +3363,6 @@ public class Config extends ConfigBase {
     @ConfField(mutable = true)
     public static String default_offline_load_flag = Constants.LAKE_WAREHOUSE_TO_STAR_ROCKS;
 
+    @ConfField(mutable = true)
+    public static boolean enable_rewrite_trunc_in_parser_step = true;
 }

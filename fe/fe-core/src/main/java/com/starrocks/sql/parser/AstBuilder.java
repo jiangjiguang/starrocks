@@ -103,6 +103,7 @@ import com.starrocks.common.Pair;
 import com.starrocks.common.profile.Tracers;
 import com.starrocks.common.util.DateUtils;
 import com.starrocks.common.util.TimeUtils;
+import com.starrocks.connector.parser.trino.Trino2SRFunctionCallTransformer;
 import com.starrocks.mysql.MysqlPassword;
 import com.starrocks.qe.SqlModeHelper;
 import com.starrocks.scheduler.persist.TaskSchedule;
@@ -6227,6 +6228,7 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
         }
     }
 
+
     @Override
     public ParseNode visitSimpleFunctionCall(com.starrocks.sql.parser.StarRocksParser.SimpleFunctionCallContext context) {
 
@@ -6235,50 +6237,12 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
 
         FunctionName fnName = FunctionName.createFnName(fullFunctionName);
         String functionName = fnName.getFunction();
-        if (functionName.equalsIgnoreCase(FunctionSet.CHR)) {
-            fullFunctionName = FunctionSet.CHAR;
-            fnName = FunctionName.createFnName(fullFunctionName);
-            functionName = fnName.getFunction();
-        }
-        if (fullFunctionName.equals(FunctionSet.CSV_FORMAT)) {
-            if (context.ASTERISK_SYMBOL() == null) {
-                int num = context.expression().size();
-                if (num < 3) {
-                    throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName), pos);
-                }
-                List<Expr> params = visit(context.expression(), Expr.class);
-                return new FunctionCallExpr(functionName, params, pos);
-            } else {
-                FunctionParams functionParams = FunctionParams.createStarParam();
-                FunctionCallExpr functionCallExpr = new FunctionCallExpr(
-                        functionName, functionParams, pos);
-                return functionCallExpr;
-            }
-        }
-        if (functionName.equals(FunctionSet.BIGINT)
-                || functionName.equals(FunctionSet.INT)
-                || functionName.equals(FunctionSet.STRING)
-                || functionName.equals(FunctionSet.DOUBLE)
-        ) {
-            int num = context.expression().size();
-            if (num > 1) {
-                throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(num, functionName + "()",
-                        "The " + functionName + " function only supports one parameter"), 0);
-            }
-            if (functionName.equals(FunctionSet.BIGINT)) {
-                return new CastExpr(ScalarType.BIGINT, (Expr) visit(context.expression().get(0)), pos);
-            }
-            if (functionName.equals(FunctionSet.INT)) {
-                return new CastExpr(ScalarType.INT, (Expr) visit(context.expression().get(0)), pos);
-            }
 
-            if (functionName.equals(FunctionSet.STRING)) {
-                return new CastExpr(ScalarType.VARCHAR, (Expr) visit(context.expression().get(0)), pos);
-            }
+        List<Expr> arguments = visit(context.expression(), Expr.class);
 
-            if (functionName.equals(FunctionSet.DOUBLE)) {
-                return new CastExpr(ScalarType.DOUBLE, (Expr) visit(context.expression().get(0)), pos);
-            }
+        Expr complexfunctionCallExpr = Trino2SRFunctionCallTransformer.convertComplexFunction(functionName, arguments);
+        if (complexfunctionCallExpr != null) {
+            return complexfunctionCallExpr;
         }
 
         if (functionName.equals(FunctionSet.TIME_SLICE) || functionName.equals(FunctionSet.DATE_SLICE)) {
