@@ -725,6 +725,34 @@ public class AstBuilder extends AstVisitor<ParseNode, ParseTreeContext> {
         Expr callExpr;
         Expr convertedFunctionCall;
         String functionName = node.getName().toString();
+        if (functionName.equals(FunctionSet.BIGINT)
+                || functionName.equals(FunctionSet.INT)
+                || functionName.equals(FunctionSet.STRING)
+                || functionName.equals(FunctionSet.DOUBLE)
+        ) {
+            int num = arguments.size();
+            if (num > 1) {
+                throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(num, functionName + "()",
+                        "The " + functionName + " function only supports one parameter"), 0);
+            }
+
+            if (functionName.equals(FunctionSet.BIGINT)) {
+                return new CastExpr(ScalarType.BIGINT, arguments.get(0));
+            }
+
+            if (functionName.equals(FunctionSet.INT)) {
+                return new CastExpr(ScalarType.INT, arguments.get(0));
+            }
+
+            if (functionName.equals(FunctionSet.STRING)) {
+                return new CastExpr(ScalarType.VARCHAR, arguments.get(0));
+            }
+
+            if (functionName.equals(FunctionSet.DOUBLE)) {
+                return new CastExpr(ScalarType.DOUBLE, arguments.get(0));
+            }
+        }
+
         if (functionName.equals(FunctionSet.CSV_FORMAT)) {
             int num = arguments.size();
             // presto parser can't parse *, so arguments size only equal 0

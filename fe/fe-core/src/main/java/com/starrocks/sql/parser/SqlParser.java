@@ -96,13 +96,11 @@ public class SqlParser {
         } catch (ParsingException e) {
             // In Trino parser AstBuilder, it could throw ParsingException for unexpected exception,
             // use StarRocks parser to parse now.
-            LOG.warn("Trino parse sql [{}] error, cause by {}", sql, e);
+            tryLogError(sql, e);
             return tryParseWithStarRocksDialect(sql, sessionVariable, e);
         } catch (io.trino.sql.parser.ParsingException e) {
             // This sql does not use Trino syntax，use StarRocks parser to parse now.
-            if (sql.toLowerCase().contains("select")) {
-                LOG.warn("Trino parse sql [{}] error, cause by {}", sql, e);
-            }
+            tryLogError(sql, e);
             return tryParseWithStarRocksDialect(sql, sessionVariable, e);
         } catch (TrinoParserUnsupportedException e) {
             // We only support Trino partial syntax now, and for Trino parser unsupported statement,
@@ -118,6 +116,14 @@ public class SqlParser {
             return parseWithStarRocksDialect(sql, sessionVariable);
         }
         return statements;
+    }
+
+    private static void tryLogError(String sql, Exception e) {
+        if (sql.toLowerCase().contains("select") || sql.toLowerCase().contains("with")) {
+            if (!sql.toLowerCase().contains("@@")) {
+                LOG.warn("Trino parse sql [{}] error, cause by {}", sql, e);
+            }
+        }
     }
 
     private static List<StatementBase> tryParseWithStarRocksDialect(String sql, SessionVariable sessionVariable,

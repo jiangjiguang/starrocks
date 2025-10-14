@@ -6262,8 +6262,8 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
         ) {
             int num = context.expression().size();
             if (num > 1) {
-                throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(num, "bigint()",
-                        "The bigint function only supports one parameter"), pos);
+                throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(num, functionName + "()",
+                        "The " + functionName + " function only supports one parameter"), 0);
             }
             if (functionName.equals(FunctionSet.BIGINT)) {
                 return new CastExpr(ScalarType.BIGINT, (Expr) visit(context.expression().get(0)), pos);

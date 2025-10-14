@@ -182,4 +182,12 @@ public class HiveViewTest extends PlanTestBase {
                 "from\n" +
                 "    test_all_type;", viewDdl);
     }
+
+    @Test
+    public void testHiveViewUseBigintFunction() throws Exception {
+        connectContext.getSessionVariable().setSqlDialect("trino");
+        String sql = "select bigint(c_custkey) from hive0.tpch.customer_case_insensitive_view";
+        String sqlPlan = getFragmentPlan(sql);
+        assertContains(sqlPlan, "cast");
+    }
 }
