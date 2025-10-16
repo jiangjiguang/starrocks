@@ -130,6 +130,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                         } else {
                             blockIterator = listFilesRecursive(fileSystem, expandedPath);
                         }
+                        long startTime = System.nanoTime();
                         while (blockIterator.hasNext()) {
                             LocatedFileStatus locatedFileStatus = blockIterator.next();
                             if (!isValidDataFile(locatedFileStatus)) {
@@ -147,6 +148,10 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                             }
                             fileDescs.add(fileDesc);
                         }
+                        long endTime = System.nanoTime();
+                        long elapsed = endTime - startTime;
+                        long elapsedMs = elapsed / 1_000_000;
+                        LOG.info("block iterator elapse [{}] ms", elapsedMs);
                     }
 
                 } catch (FileNotFoundException e) {
@@ -175,23 +180,33 @@ public class HiveRemoteFileIO implements RemoteFileIO {
     }
 
     private RemoteIterator<LocatedFileStatus> listFilesRecursive(FileSystem fileSystem, Path f)
-        throws FileNotFoundException, IOException {
-        return new RemoteIterator<LocatedFileStatus>() {
+        throws IOException {
+        long startTime = System.nanoTime();
+        RemoteIterator<LocatedFileStatus> remoteIterator = new RemoteIterator<>() {
             private Stack<RemoteIterator<LocatedFileStatus>> itors = new Stack<>();
             private RemoteIterator<LocatedFileStatus> curItor = fileSystem.listLocatedStatus(f);
             private LocatedFileStatus curFile;
 
             @Override
             public boolean hasNext() throws IOException {
+                long startTime = System.nanoTime();
                 while (curFile == null) {
                     if (curItor.hasNext()) {
                         handleFileStat(curItor.next());
                     } else if (!itors.empty()) {
                         curItor = itors.pop();
                     } else {
+                        long endTime = System.nanoTime();
+                        long elapsed = endTime - startTime;
+                        long elapsedMs = elapsed / 1_000_000;
+                        LOG.info("recursive empty file state  elapse [{}] ms", elapsedMs);
                         return false;
                     }
                 }
+                long endTime = System.nanoTime();
+                long elapsed = endTime - startTime;
+                long elapsedMs = elapsed / 1_000_000;
+                LOG.info("recursive file state elapse [{}] ms", elapsedMs);
                 return true;
             }
 
@@ -199,6 +214,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
             // If it is a file, return the file stat.
             // If it is a valid directory, traverse it.
             private void handleFileStat(LocatedFileStatus stat) throws IOException {
+                long startTime = System.nanoTime();
                 if (stat.isFile()) {
                     curFile = stat;
                 } else if (isValidDirectory(stat)) {
@@ -210,6 +226,10 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                         LOG.debug("Directory {} deleted while attempting for recursive listing", stat.getPath());
                     }
                 }
+                long endTime = System.nanoTime();
+                long elapsed = endTime - startTime;
+                long elapsedMs = elapsed / 1_000_000;
+                LOG.info("use filesystem to process file state elapse [{}] ms", elapsedMs);
             }
 
             @Override
@@ -222,7 +242,13 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                 throw new java.util.NoSuchElementException("No more entry in " + f);
             }
         };
+        long endTime = System.nanoTime();
+        long elapsed = endTime - startTime;
+        long elapsedMs = elapsed / 1_000_000;
+        LOG.info("list files recursive elapse [{}] ms", elapsedMs);
+        return remoteIterator;
     }
+
     private boolean isValidDataFile(FileStatus fileStatus) {
         if (!fileStatus.isFile()) {
             return false;

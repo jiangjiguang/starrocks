@@ -108,6 +108,7 @@ public class RemoteFileOperations {
     }
 
     public List<RemoteFileInfo> getRemoteFiles(List<Partition> partitions, Optional<String> hudiTableLocation, boolean useCache) {
+        long startTime = System.nanoTime();
         Map<RemotePathKey, Partition> pathKeyToPartition = Maps.newHashMap();
         for (Partition partition : partitions) {
             RemotePathKey key = RemotePathKey.of(partition.getFullPath(), isRecursive, hudiTableLocation);
@@ -163,6 +164,11 @@ public class RemoteFileOperations {
             resultRemoteFiles.addAll(fillFileInfo(pathToDesc, pathKeyToPartition));
         }
 
+        long endTime = System.nanoTime();
+        long elapsed = endTime - startTime;
+        long elapsedMs = elapsed / 1_000_000;
+        LOG.info("get remote files elapse [{}] ms", elapsedMs);
+
         return resultRemoteFiles;
     }
 
@@ -172,6 +178,8 @@ public class RemoteFileOperations {
      * @return ExecutorService
      */
     public ExecutorService getPullRemoteFileExecutor(String pathKey) {
+        long startTime = System.nanoTime();
+
         // 1. Extract namenode information from the pathKey
         String namenode = extractNameNodeFromPath(pathKey).orElse(null);
 
@@ -191,6 +199,11 @@ public class RemoteFileOperations {
                 }
             }
         }
+
+        long endTime = System.nanoTime();
+        long elapsed = endTime - startTime;
+        long elapsedMs = elapsed / 1_000_000;
+        LOG.info("get pull remote file executor elapse [{}] ms", elapsedMs);
 
         // 5. Returns the corresponding thread pool
         return MULTIPLE_EXECUTOR_MAP.get(namenode);
