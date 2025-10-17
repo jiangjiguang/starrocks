@@ -786,6 +786,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String ENABLE_CSV_FORMAT_BACKEND_OPERATOR = "enable_csv_format_backend_operator";
     public static final String CSV_FORMAT_SEPARATOR = "csv_format_separator";
     public static final String CSV_FORMAT_ENCLOSE = "csv_format_enclose";
+    public static final String ENABLE_JDBC_COMPATIBLE_NAN = "enable_jdbc_compatible_nan";
 
     public static final List<String> DEPRECATED_VARIABLES = ImmutableList.<String>builder()
             .add(CODEGEN_LEVEL)
@@ -2038,6 +2039,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VariableMgr.VarAttr(name = ENABLE_PRESTO_TRANSLATION)
     private boolean enablePrestoTranslation = false;
+
+    @VariableMgr.VarAttr(name = ENABLE_JDBC_COMPATIBLE_NAN)
+    private boolean enableJdbcCompatibleNan = false;
 
     private int exprChildrenLimit = -1;
 
@@ -4161,6 +4165,14 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public void setEnablePrestoTranslation(boolean enablePrestoTranslation) {
         this.enablePrestoTranslation = enablePrestoTranslation;
+    }
+
+    public boolean isEnableJdbcCompatibleNan() {
+        return enableJdbcCompatibleNan;
+    }
+
+    public void setEnableJdbcCompatibleNan(boolean enableJdbcCompatibleNan) {
+        this.enableJdbcCompatibleNan = enableJdbcCompatibleNan;
     }
 
     // Serialize to thrift object

@@ -965,6 +965,11 @@ public class SelectAnalyzer {
         if (!session.getSessionVariable().isEnablePrestoTranslation()) {
             return;
         }
+
+        if (!session.getSessionVariable().isEnableJdbcCompatibleNan()) {
+            return;
+        }
+
         Expr expr = item.getExpr();
         if (expr == null || expr.getType() == null) {
             return;

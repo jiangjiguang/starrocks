@@ -58,6 +58,7 @@ public class SelectAnalyzerTest extends PlanTestBase {
         Assert.assertTrue(item.getExpr().toSql().contains("1.23"));
 
         session.getSessionVariable().setEnablePrestoTranslation(true);
+        session.getSessionVariable().setEnableJdbcCompatibleNan(true);
         selectAnalyzer = new SelectAnalyzer(session);
 
         selectAnalyzer.analyzerDoubleInValidRange(item);
