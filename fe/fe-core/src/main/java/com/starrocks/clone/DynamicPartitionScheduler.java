@@ -690,7 +690,7 @@ public class DynamicPartitionScheduler extends FrontendDaemon {
             if (db == null) {
                 continue;
             }
-            if (db.isSystemDatabase() || db.isStatisticsDatabase()) {
+            if (db.isSystemDatabase()) {
                 continue;
             }
 
