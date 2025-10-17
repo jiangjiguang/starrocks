@@ -1632,4 +1632,15 @@ public class ScalarOperatorFunctionsTest {
             assertEquals(String.format("test case failed: %s, result = %d", tc, result), tc.value, result);
         }
     }
+
+    @Test
+    public void testRegexpReplaceFunction() {
+        ConstantOperator constantOperator = ScalarOperatorFunctions.regexpReplace(
+                new ConstantOperator("LCC 073C04 7P 03813622", Type.VARCHAR),
+                new ConstantOperator("[\\\\s]+|[\\\\u3000]+", Type.VARCHAR),
+                new ConstantOperator("", Type.VARCHAR)
+        );
+
+        assertEquals("LCC073C047P03813622", constantOperator.getVarchar());
+    }
 }

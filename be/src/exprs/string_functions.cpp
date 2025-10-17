@@ -3446,6 +3446,10 @@ StatusOr<ColumnPtr> StringFunctions::regexp_extract_all(FunctionContext* context
 }
 
 static ColumnPtr regexp_replace_general(FunctionContext* context, re2::RE2::Options* options, const Columns& columns) {
+    if (options) {
+        options->set_encoding(re2::RE2::Options::EncodingUTF8);
+    }
+
     auto str_viewer = ColumnViewer<TYPE_VARCHAR>(columns[0]);
     auto ptn_viewer = ColumnViewer<TYPE_VARCHAR>(columns[1]);
     auto rpl_viewer = ColumnViewer<TYPE_VARCHAR>(columns[2]);

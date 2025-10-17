@@ -109,4 +109,27 @@ TEST_F(StringFunctionRegexpReplaceTest, testHyperscanVec) {
     }
 }
 
+TEST_F(StringFunctionRegexpReplaceTest, testUnicodeSupport) {
+    // Test the matching of full-width Spaces \u3000
+    Columns columns;
+    auto str = BinaryColumn::create();
+    auto pattern = BinaryColumn::create();
+    auto replace = BinaryColumn::create();
+
+    // Test data: Includes full-width Spaces
+    str->append("LCC　073C04　7P　03813622");
+    pattern->append("[\\s]+|[\\u3000]+");
+    replace->append("");
+
+    columns.push_back(str);
+    columns.push_back(pattern);
+    columns.push_back(replace);
+
+    auto result = StringFunctions::regexp_replace(_context, columns);
+    auto binary_result = ColumnHelper::as_column<BinaryColumn>(result);
+
+    ASSERT_EQ("LCC073C047P03813622", binary_result->get_slice(0).to_string());
+}
+
+
 } // namespace starrocks

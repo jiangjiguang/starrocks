@@ -1512,5 +1512,30 @@ public class ScalarOperatorFunctions {
         return ConstantOperator.createVarchar(resultBuilder.toString());
     }
 
+    @ConstantFunction(name = "regexp_replace", returnType = VARCHAR, argTypes = {VARCHAR, VARCHAR, VARCHAR})
+    public static ConstantOperator regexpReplace(ConstantOperator value, ConstantOperator pattern, ConstantOperator replace) {
+        if (value.isNull() || pattern.isNull() || replace.isNull()) {
+            return ConstantOperator.createVarchar(null);
+        }
+
+        String input = value.getVarchar();
+        String regex = pattern.getVarchar();
+        String replacement = replace.getVarchar();
+
+        // If the input is empty or the regular expression is empty, return the input directly
+        if (input == null || input.isEmpty() || regex == null || regex.isEmpty()) {
+            return ConstantOperator.createVarchar(input);
+        }
+
+        try {
+            // Use regular expressions for replacement
+            String result = input.replaceAll(regex, replacement);
+            return ConstantOperator.createVarchar(result);
+        } catch (Exception e) {
+            // If the regular expression compilation fails or there are other exceptions, return the original input
+            return ConstantOperator.createVarchar(input);
+        }
+    }
+
 }
 
