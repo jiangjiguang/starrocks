@@ -118,15 +118,29 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                     if (!expandWildCards) {
                         expandedPaths.add(new Path(uri.getPath()));
                     } else {
+                        long startTime = System.nanoTime();
                         FileStatus[] status = fileSystem.globStatus(new Path(uri.getPath()));
                         for (FileStatus s : status) {
                             expandedPaths.add(s.getPath());
+                        }
+                        long endTime = System.nanoTime();
+                        long elapsed = endTime - startTime;
+                        long elapsedMs = elapsed / 1_000_000;
+                        if (elapsedMs / 1000 > 1) {
+                            LOG.info("filesystem glob status elapse [{}] ms", elapsedMs);
                         }
                     }
                     for (Path expandedPath : expandedPaths) {
                         RemoteIterator<LocatedFileStatus> blockIterator;
                         if (!pathKey.isRecursive()) {
+                            long startTime = System.nanoTime();
                             blockIterator = fileSystem.listLocatedStatus(expandedPath);
+                            long endTime = System.nanoTime();
+                            long elapsed = endTime - startTime;
+                            long elapsedMs = elapsed / 1_000_000;
+                            if (elapsedMs / 1000 > 1) {
+                                LOG.info("filesystem list located status without recursive elapse [{}] ms", elapsedMs);
+                            }
                         } else {
                             blockIterator = listFilesRecursive(fileSystem, expandedPath);
                         }
@@ -151,7 +165,9 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                         long endTime = System.nanoTime();
                         long elapsed = endTime - startTime;
                         long elapsedMs = elapsed / 1_000_000;
-                        LOG.info("block iterator elapse [{}] ms", elapsedMs);
+                        if (elapsedMs / 1000 > 1) {
+                            LOG.info("block iterator elapse [{}] ms", elapsedMs);
+                        }
                     }
 
                 } catch (FileNotFoundException e) {
@@ -170,7 +186,9 @@ public class HiveRemoteFileIO implements RemoteFileIO {
         } finally {
             long elapsed = System.nanoTime() - start;
             long elapsedMs = elapsed / 1_000_000;
-            LOG.debug("Get hive remote files on path: {}, elapsed: {} ms", pathKey, elapsedMs);
+            if (elapsedMs / 1000 > 1) {
+                LOG.info("Get hive remote files on path: {}, elapsed: {} ms", pathKey, elapsedMs);
+            }
             if (MetricRepo.hasInit) {
                 MetricRepo.HISTO_LIST_LOCATED_STATUS_QUERY_LATENCY.update(elapsedMs);
             }
@@ -199,14 +217,18 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                         long endTime = System.nanoTime();
                         long elapsed = endTime - startTime;
                         long elapsedMs = elapsed / 1_000_000;
-                        LOG.info("recursive empty file state  elapse [{}] ms", elapsedMs);
+                        if (elapsedMs / 1000 > 1) {
+                            LOG.info("recursive empty file state  elapse [{}] ms", elapsedMs);
+                        }
                         return false;
                     }
                 }
                 long endTime = System.nanoTime();
                 long elapsed = endTime - startTime;
                 long elapsedMs = elapsed / 1_000_000;
-                LOG.info("recursive file state elapse [{}] ms", elapsedMs);
+                if (elapsedMs / 1000 > 1) {
+                    LOG.info("recursive file state elapse [{}] ms", elapsedMs);
+                }
                 return true;
             }
 
@@ -229,7 +251,9 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                 long endTime = System.nanoTime();
                 long elapsed = endTime - startTime;
                 long elapsedMs = elapsed / 1_000_000;
-                LOG.info("use filesystem to process file state elapse [{}] ms", elapsedMs);
+                if (elapsedMs / 1000 > 1) {
+                    LOG.info("use filesystem to process file state elapse [{}] ms", elapsedMs);
+                }
             }
 
             @Override
@@ -245,7 +269,9 @@ public class HiveRemoteFileIO implements RemoteFileIO {
         long endTime = System.nanoTime();
         long elapsed = endTime - startTime;
         long elapsedMs = elapsed / 1_000_000;
-        LOG.info("list files recursive elapse [{}] ms", elapsedMs);
+        if (elapsedMs / 1000 > 1) {
+            LOG.info("list files recursive elapse [{}] ms", elapsedMs);
+        }
         return remoteIterator;
     }
 

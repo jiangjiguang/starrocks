@@ -150,7 +150,9 @@ public class FileSystemCache {
             long elapsed = endTime - startTime;
             long elapsedMs = elapsed / 1_000_000;
             MetricRepo.HISTO_GET_FILE_SYSTEM_CACHE_LATENCY.update(elapsedMs);
-            LOG.info("get filesystem elapse [{}] ms", elapsedMs);
+            if (elapsedMs / 1000 > 1) {
+                LOG.info("get filesystem elapse [{}] ms", elapsedMs);
+            }
             return wrapper;
         } catch (RuntimeException e) {
             if (e.getCause() instanceof IOException) {
@@ -178,7 +180,7 @@ public class FileSystemCache {
         FileSystem fs = HdfsEnvironment.getFileSystem(conf, uri);
         long endTime = System.currentTimeMillis();
         long elapse = endTime - startTime;
-        LOG.info("create file system elapse: {}ms", elapse);
+        LOG.info("create file system elapse: {}ms, cacheKey: {}", elapse, cacheKey);
         return fs;
     }
 
@@ -212,7 +214,9 @@ public class FileSystemCache {
             boolean valid = fs.exists(harPath) || fs.listStatus(harPath).length > 0;
             long endTime = System.currentTimeMillis();
             long elapse = endTime - startTime;
-            LOG.info("check file system valid elapse: {}ms", elapse);
+            if (elapse / 1000 > 1) {
+                LOG.info("check file system valid elapse: {}ms", elapse);
+            }
             return valid;
         } catch (IOException e) {
             return handleValidationException(e);

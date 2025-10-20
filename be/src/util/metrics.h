@@ -449,7 +449,6 @@ public:
     }
 
     void update(double value) noexcept {
-        LOG(INFO) << "Updating histogram with value: " << value;
         _sum.fetch_add(value, std::memory_order_relaxed);
         _count.fetch_add(1, std::memory_order_relaxed);
 
@@ -464,7 +463,6 @@ public:
         for (size_t i = index; i < _buckets.size(); ++i) {
             _bucket_counts[i].add(1);
         }
-        debug_print();
     }
 
     HistogramSnapshot precise_snapshot() const {

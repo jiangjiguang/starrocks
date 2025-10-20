@@ -101,7 +101,14 @@ public class HdfsEnvironment {
 
         return UGI_CACHE.computeIfAbsent(cacheKey, k -> {
             try {
+                long startTime = System.nanoTime();
                 UserGroupInformation ugi = UserGroupInformation.createRemoteUser(username, password);
+                long endTime = System.nanoTime();
+                long elapsed = endTime - startTime;
+                long elapsedMs = elapsed / 1_000_000;
+                if (elapsedMs / 1000 > 1) {
+                    LOG.info("create remote user:[{}:{}] elapse [{}] ms", username, password, elapsedMs);
+                }
                 return ugi;
             } catch (Exception e) {
                 throw new RuntimeException("Create UGI failed", e);

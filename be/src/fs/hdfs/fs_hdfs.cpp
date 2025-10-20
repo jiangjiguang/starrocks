@@ -278,7 +278,6 @@ void HdfsInputStream::set_size(int64_t value) {
 }
 
 StatusOr<std::unique_ptr<io::NumericStatistics>> HdfsInputStream::get_numeric_statistics() {
-    LOG(INFO) << "==HdfsInputStream::get_numeric_statistics==";
     // `GetReadStatistics` is only supported in HDFS input stream
     if (!fs::is_hdfs_uri(_handle->getPath())) {
         return nullptr;

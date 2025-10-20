@@ -167,7 +167,9 @@ public class RemoteFileOperations {
         long endTime = System.nanoTime();
         long elapsed = endTime - startTime;
         long elapsedMs = elapsed / 1_000_000;
-        LOG.info("get remote files elapse [{}] ms", elapsedMs);
+        if (elapsedMs / 1000 > 1) {
+            LOG.info("get remote files elapse [{}] ms", elapsedMs);
+        }
 
         return resultRemoteFiles;
     }
@@ -203,7 +205,9 @@ public class RemoteFileOperations {
         long endTime = System.nanoTime();
         long elapsed = endTime - startTime;
         long elapsedMs = elapsed / 1_000_000;
-        LOG.info("get pull remote file executor elapse [{}] ms", elapsedMs);
+        if (elapsedMs / 1000 > 1) {
+            LOG.info("get pull remote file executor elapse [{}] ms", elapsedMs);
+        }
 
         // 5. Returns the corresponding thread pool
         return MULTIPLE_EXECUTOR_MAP.get(namenode);
