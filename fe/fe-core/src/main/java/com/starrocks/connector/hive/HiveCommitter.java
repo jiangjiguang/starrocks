@@ -445,6 +445,19 @@ public class HiveCommitter {
     }
 
     private HivePartition buildHivePartition(PartitionUpdate partitionUpdate) {
+        ImmutableMap.Builder<String, String> paramsBuilder = ImmutableMap.builder();
+
+        paramsBuilder.put("starrocks_version", Version.STARROCKS_VERSION + "-" + Version.STARROCKS_COMMIT_HASH);
+        paramsBuilder.put(STARROCKS_QUERY_ID, ConnectContext.get().getQueryId().toString());
+
+        if (partitionUpdate.getFieldDelimiter() != null) {
+            paramsBuilder.put(FIELD_DELIMITOR, partitionUpdate.getFieldDelimiter());
+        }
+
+        if (partitionUpdate.getSerializationFormat() != null) {
+            paramsBuilder.put(SERIALIZATION_FORMAT, partitionUpdate.getSerializationFormat());
+        }
+
         return HivePartition.builder()
                 .setDatabaseName(table.getDbName())
                 .setTableName(table.getTableName())
@@ -452,12 +465,7 @@ public class HiveCommitter {
                         .map(table::getColumn)
                         .collect(Collectors.toList()))
                 .setValues(toPartitionValues(partitionUpdate.getName()))
-                .setParameters(ImmutableMap.<String, String>builder()
-                        .put("starrocks_version", Version.STARROCKS_VERSION + "-" + Version.STARROCKS_COMMIT_HASH)
-                        .put(STARROCKS_QUERY_ID, ConnectContext.get().getQueryId().toString())
-                        .put(FIELD_DELIMITOR, partitionUpdate.getFieldDelimiter())
-                        .put(SERIALIZATION_FORMAT, partitionUpdate.getSerializationFormat())
-                        .buildOrThrow())
+                .setParameters(paramsBuilder.buildOrThrow())
                 .setStorageFormat(table.getStorageFormat())
                 .setLocation(partitionUpdate.getTargetPath().toString())
                 .build();
