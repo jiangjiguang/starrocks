@@ -204,6 +204,151 @@ DriverRawPtr SubQuerySharedDriverQueue::take(const bool block) {
     return nullptr;
 }
 
+
+/// PrioritySharedDriverQueue
+void PrioritySharedDriverQueue::close() {
+    std::lock_guard<std::mutex> lock(_global_mutex);
+    _is_closed = true;
+    _cv.notify_all();
+}
+
+void PrioritySharedDriverQueue::put_back(const DriverRawPtr driver) {
+    auto priority = driver->get_query_priority();
+    {
+        std::lock_guard<std::mutex> lock(_global_mutex);
+        _queues[priority].put(driver);
+        driver->set_in_ready_queue(true);
+        driver->set_in_queue(this);
+        _cv.notify_one();
+        ++_num_drivers;
+    }
+}
+
+void PrioritySharedDriverQueue::put_back(const std::vector<DriverRawPtr>& drivers) {
+    std::vector<int> priorities(drivers.size());
+    for (int i = 0; i < drivers.size(); i++) {
+        priorities[i] = drivers[i]->get_query_priority();
+    }
+    std::lock_guard<std::mutex> lock(_global_mutex);
+    for (int i = 0; i < drivers.size(); i++) {
+        _queues[priorities[i]].put(drivers[i]);
+        drivers[i]->set_in_ready_queue(true);
+        drivers[i]->set_in_queue(this);
+        _cv.notify_one();
+    }
+    _num_drivers += drivers.size();
+}
+
+void PrioritySharedDriverQueue::put_back_from_executor(const DriverRawPtr driver) {
+    put_back(driver);
+}
+
+void PrioritySharedDriverQueue::update_statistics(const DriverRawPtr driver) {
+    std::lock_guard<std::mutex> lock(_global_mutex);
+
+    _queues[driver->get_query_priority()].update_accu_time(driver);
+}
+
+// Return cancelled status, if the queue is closed.
+StatusOr<DriverRawPtr> PrioritySharedDriverQueue::take(const bool block) {
+    // -1 means no candidates; else has candidate.
+    int queue_idx = -1;
+    DriverRawPtr driver_ptr;
+
+    {
+        std::unique_lock<std::mutex> lock(_global_mutex);
+        while (true) {
+            if (_is_closed) {
+                return Status::Cancelled("Shutdown");
+            }
+
+            // Find the queue with the smallest execution time.
+            for (int i = QUEUE_SIZE - 1; i >= 0; --i) {
+                // we just search for queue has element
+                if (!_queues[i].empty()) {
+                    queue_idx = i;
+                    break;
+                }
+            }
+
+            if (queue_idx >= 1) {
+                break;
+            }
+
+            if (!block) {
+                return nullptr;
+            }
+
+            _cv.wait(lock);
+        }
+        // record queue's index to accumulate time for it.
+        driver_ptr = _queues[queue_idx].take(block);
+        driver_ptr->set_in_ready_queue(false);
+
+        --_num_drivers;
+    }
+
+    // next pipeline driver to execute.
+    return driver_ptr;
+}
+
+void PrioritySharedDriverQueue::cancel(DriverRawPtr driver) {
+    std::lock_guard<std::mutex> lock(_global_mutex);
+    if (_is_closed) {
+        return;
+    }
+    if (!driver->is_in_ready_queue()) {
+        return;
+    }
+    _queues[driver->get_query_priority()].cancel(driver);
+    _cv.notify_one();
+}
+
+size_t PrioritySharedDriverQueue::size() const {
+    std::lock_guard<std::mutex> lock(_global_mutex);
+    return _num_drivers;
+}
+
+void SubPrioritySharedDriverQueue::put(const DriverRawPtr driver) {
+    queue.emplace(driver);
+    num_drivers++;
+}
+
+void SubPrioritySharedDriverQueue::cancel(const DriverRawPtr driver) {
+    if (cancelled_set.count(driver) == 0) {
+        DCHECK(driver->is_in_ready_queue());
+        pending_cancel_queue.emplace(driver);
+    }
+}
+
+DriverRawPtr SubPrioritySharedDriverQueue::take(const bool block) {
+    DCHECK(!empty());
+    DCHECK(!block);
+
+    if (!pending_cancel_queue.empty()) {
+        DriverRawPtr driver = pending_cancel_queue.front();
+        pending_cancel_queue.pop();
+        cancelled_set.insert(driver);
+        --num_drivers;
+        return driver;
+    }
+
+    while (!queue.empty()) {
+        DriverRawPtr driver = queue.top();
+        queue.pop();
+        auto iter = cancelled_set.find(driver);
+        if (iter != cancelled_set.end()) {
+            cancelled_set.erase(iter);
+        } else {
+            --num_drivers;
+            return driver;
+        }
+    }
+    return nullptr;
+}
+
+
+
 /// WorkGroupDriverQueue.
 bool WorkGroupDriverQueue::WorkGroupDriverSchedEntityComparator::operator()(
         const WorkGroupDriverSchedEntityPtr& lhs_ptr, const WorkGroupDriverSchedEntityPtr& rhs_ptr) const {

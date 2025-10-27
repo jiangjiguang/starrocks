@@ -165,6 +165,47 @@ PARALLEL_TEST(QuerySharedDriverQueueTest, test_take_close) {
     consumer_thread->join();
 }
 
+
+
+
+PARALLEL_TEST(PrioritySharedDriverQueueTest, test_prority_task) {
+    PrioritySharedDriverQueue queue;
+
+    // Prepare drivers.
+    QueryContext query_context;
+    auto driver1 = std::make_shared<PipelineDriver>(_gen_operators(), &query_context, nullptr, nullptr, 1);
+    driver1->set_query_priority(1);
+    driver1->driver_acct().update_last_time_spent(100);
+    queue.put_back(driver1.get());
+
+    auto driver2 = std::make_shared<PipelineDriver>(_gen_operators(), &query_context, nullptr, nullptr, 2);
+    driver2->set_query_priority(1);
+    driver2->driver_acct().update_last_time_spent(200);
+    queue.put_back(driver2.get());
+
+    auto driver3 = std::make_shared<PipelineDriver>(_gen_operators(), &query_context, nullptr, nullptr, 3);
+    driver3->set_query_priority(5);
+    driver3->driver_acct().update_last_time_spent(300);
+    queue.put_back(driver3.get());
+
+    auto driver4 = std::make_shared<PipelineDriver>(_gen_operators(), &query_context, nullptr, nullptr, 4);
+    driver4->set_query_priority(9);
+    driver4->driver_acct().update_last_time_spent(400);
+    queue.put_back(driver4.get());
+
+    auto task_driver_1 = queue.take();
+    ASSERT_EQ(task_driver_1.value()->driver_id(), driver4->driver_id());
+    auto task_driver_2 = queue.take();
+    ASSERT_EQ(task_driver_2.value()->driver_id(), driver3->driver_id());
+    auto task_driver_3 = queue.take();
+    ASSERT_EQ(task_driver_3.value()->driver_id(), driver1->driver_id());
+    auto task_driver_4 = queue.take();
+    ASSERT_EQ(task_driver_4.value()->driver_id(), driver2->driver_id());
+}
+
+
+
+
 class WorkGroupDriverQueueTest : public ::testing::Test {
 public:
     void SetUp() override {

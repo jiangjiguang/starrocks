@@ -143,6 +143,80 @@ private:
     bool _is_closed = false;
 };
 
+
+class SubPrioritySharedDriverQueue {
+public:
+    void update_accu_time(const DriverRawPtr driver) {
+        _accu_consume_time.fetch_add(driver->driver_acct().get_last_time_spent());
+    }
+
+    void put(const DriverRawPtr driver);
+    void cancel(const DriverRawPtr driver);
+    DriverRawPtr take(const bool block);
+    inline bool empty() const { return num_drivers == 0; }
+
+    inline size_t size() const { return num_drivers; }
+
+    std::queue<DriverRawPtr> pending_cancel_queue;
+    std::unordered_set<DriverRawPtr> cancelled_set;
+    size_t num_drivers = 0;
+
+private:
+    struct DriverRuntimeComparator {
+        bool operator()(const DriverRawPtr lhs_ptr, const DriverRawPtr rhs_ptr) const {
+            if (lhs_ptr->driver_state() == CANCELED && rhs_ptr->driver_state() != CANCELED) {
+                return true;
+            }
+            int64_t lhs_val = lhs_ptr->driver_acct().get_accumulated_time_spent();
+            int64_t rhs_val = rhs_ptr->driver_acct().get_accumulated_time_spent();
+            if (lhs_val != rhs_val) {
+                return lhs_val > rhs_val;
+            }
+            return lhs_ptr < rhs_ptr;
+        }
+    };
+    std::priority_queue<DriverRawPtr, vector<DriverRawPtr>, DriverRuntimeComparator> queue;
+    std::atomic<int64_t> _accu_consume_time = 0;
+};
+
+class PrioritySharedDriverQueue : public FactoryMethod<DriverQueue, PrioritySharedDriverQueue> {
+    friend class FactoryMethod<DriverQueue, PrioritySharedDriverQueue>;
+
+public:
+    ~PrioritySharedDriverQueue() override = default;
+    void close() override;
+    void put_back(const DriverRawPtr driver) override;
+    void put_back(const std::vector<DriverRawPtr>& drivers) override;
+    void put_back_from_executor(const DriverRawPtr driver) override;
+
+    void update_statistics(const DriverRawPtr driver) override;
+
+    // Return cancelled status, if the queue is closed.
+    StatusOr<DriverRawPtr> take(const bool block) override;
+
+    void cancel(DriverRawPtr driver) override;
+
+    size_t size() const override;
+
+    bool should_yield(const workgroup::WorkGroup* wg, int64_t unaccounted_runtime_ns) const override { return false; }
+
+private:
+    // The time slice of the i-th level is (i+1)*LEVEL_TIME_SLICE_BASE ns,
+    // so when a driver's execution time exceeds 0.2s, 0.6s, 1.2s, 2s, 3s, 4.2s, 5.6s, and 7.2s,
+    // it will move to next level.
+    static constexpr size_t QUEUE_SIZE = 10;
+    SubPrioritySharedDriverQueue _queues[QUEUE_SIZE];
+    // The time slice of the i-th level is (i+1)*LEVEL_TIME_SLICE_BASE ns.
+
+    size_t _num_drivers = 0;
+
+    mutable std::mutex _global_mutex;
+    std::condition_variable _cv;
+    bool _is_closed = false;
+};
+
+
+
 // WorkGroupDriverQueue contains two levels of queues.
 // The first level is the work group queue, and the second level is the driver queue in a work group.
 class WorkGroupDriverQueue : public FactoryMethod<DriverQueue, WorkGroupDriverQueue> {

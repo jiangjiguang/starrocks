@@ -42,6 +42,26 @@
 
 namespace starrocks::pipeline {
 
+
+PipelineDriver::PipelineDriver(const Operators& operators, QueryContext* query_ctx, FragmentContext* fragment_ctx,
+             Pipeline* pipeline, int32_t driver_id)
+        : _operators(operators),
+         _query_ctx(query_ctx),
+         _fragment_ctx(fragment_ctx),
+         _pipeline(pipeline),
+         _source_node_id(operators[0]->get_plan_node_id()),
+         _driver_id(driver_id) {
+    _runtime_profile = std::make_shared<RuntimeProfile>(strings::Substitute("PipelineDriver (id=$0)", _driver_id));
+    for (auto& op : _operators) {
+        _operator_stages[op->get_id()] = OperatorStage::INIT;
+    }
+    _driver_name = fmt::sprintf("driver_%d_%d", _source_node_id, _driver_id);
+    if (_fragment_ctx != nullptr && _fragment_ctx->runtime_state() != nullptr) {
+        _query_priority = _fragment_ctx->runtime_state()->query_options().query_priority;
+    }
+}
+
+
 PipelineDriver::~PipelineDriver() noexcept {
     if (_workgroup != nullptr) {
         _workgroup->decr_num_running_drivers();

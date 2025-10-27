@@ -196,19 +196,7 @@ class PipelineDriver {
 
 public:
     PipelineDriver(const Operators& operators, QueryContext* query_ctx, FragmentContext* fragment_ctx,
-                   Pipeline* pipeline, int32_t driver_id)
-            : _operators(operators),
-              _query_ctx(query_ctx),
-              _fragment_ctx(fragment_ctx),
-              _pipeline(pipeline),
-              _source_node_id(operators[0]->get_plan_node_id()),
-              _driver_id(driver_id) {
-        _runtime_profile = std::make_shared<RuntimeProfile>(strings::Substitute("PipelineDriver (id=$0)", _driver_id));
-        for (auto& op : _operators) {
-            _operator_stages[op->get_id()] = OperatorStage::INIT;
-        }
-        _driver_name = fmt::sprintf("driver_%d_%d", _source_node_id, _driver_id);
-    }
+                   Pipeline* pipeline, int32_t driver_id);
 
     PipelineDriver(const PipelineDriver& driver)
             : PipelineDriver(driver._operators, driver._query_ctx, driver._fragment_ctx, driver._pipeline,
@@ -230,6 +218,9 @@ public:
     void finalize(RuntimeState* runtime_state, DriverState state, int64_t schedule_count, int64_t execution_time);
     DriverAcct& driver_acct() { return _driver_acct; }
     DriverState driver_state() const { return _state; }
+    size_t get_query_priority() const { return _query_priority; }
+    void set_query_priority(size_t priority) { _query_priority = priority; }
+
 
     void increment_schedule_times();
 
@@ -528,6 +519,7 @@ protected:
     // The index of QuerySharedDriverQueue._queues which this driver belongs to.
     size_t _driver_queue_level = 0;
     std::atomic<bool> _in_ready_queue{false};
+    size_t _query_priority = 0;
 
     std::atomic<bool> _has_log_cancelled{false};
 

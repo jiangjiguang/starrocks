@@ -221,6 +221,9 @@ public:
     std::shared_ptr<QueryStatisticsRecvr> maintained_query_recv();
     bool is_final_sink() const { return _is_final_sink; }
     void set_final_sink() { _is_final_sink = true; }
+    size_t get_query_priority() const { return query_priority; }
+    void set_query_priority(size_t priority) { query_priority = priority; }
+
 
     QueryContextPtr get_shared_ptr() { return shared_from_this(); }
 
@@ -301,6 +304,7 @@ private:
     int64_t _scan_limit = 0;
     workgroup::RunningQueryTokenPtr _wg_running_query_token_ptr;
     std::atomic<workgroup::RunningQueryToken*> _wg_running_query_token_atomic_ptr = nullptr;
+    size_t query_priority = 1;
 
     // STREAM MV
     std::shared_ptr<StreamEpochManager> _stream_epoch_manager;

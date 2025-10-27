@@ -569,6 +569,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public static final String ENABLE_ARRAY_DISTINCT_AFTER_AGG_OPT = "enable_array_distinct_after_agg_opt";
 
+    public static final String QUERY_PRIORITY = "query_priority";
+
     public enum MaterializedViewRewriteMode {
         DISABLE,            // disable materialized view rewrite
         DEFAULT,            // default, choose the materialized view or not by cost optimizer
@@ -2076,6 +2078,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     @VariableMgr.VarAttr(name = ENABLE_ELIMINATE_SORT_CLAUSE_WITHOUT_LIMIT)
     private boolean enableEliminateSortClauseWithoutLimit = true;
 
+    @VarAttr(name = QUERY_PRIORITY)
+    private int queryPriority = 1;
 
 
     public boolean isEnableEliminateSortClauseWithoutLimit() {
@@ -4355,6 +4359,16 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         tResult.setConnector_max_split_size(connectorMaxSplitSize);
         tResult.setOrc_use_column_names(orcUseColumnNames);
         tResult.setEnable_presto_translation(enablePrestoTranslation);
+
+        if (queryPriority < 0) {
+            tResult.setQuery_priority(0);
+        } else if (queryPriority > 9) {
+            tResult.setQuery_priority(9);
+        } else {
+            tResult.setQuery_priority(queryPriority);
+        }
+
+
         return tResult;
     }
 

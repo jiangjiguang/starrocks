@@ -1479,4 +1479,6 @@ CONF_mBool(non_blocking_stream_load_scan, "true");
 // if turn on, system will auto report namenode and datanode metrics
 CONF_mBool(enable_report_hdfs_metrics, "false");
 
+CONF_Bool(enable_workgroup_priority_queue, "false");
+
 } // namespace starrocks::config
