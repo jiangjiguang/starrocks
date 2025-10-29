@@ -523,19 +523,6 @@ public class ExpressionAnalyzer {
                 if (!subscript.getType().isNumericType()) {
                     throw new SemanticException("array subscript must have type integer", subscript.getPos());
                 }
-                if (session.getSessionVariable().isEnablePrestoTranslation()) {
-                    if (subscript instanceof IntLiteral) {
-                        IntLiteral newSubscript = (IntLiteral) subscript;
-                        long idx = newSubscript.getValue();
-                        if (idx < 0) {
-                            throw new SemanticException("The array subscript must be greater than or equal to 1");
-                        }
-                        idx = idx + 1;
-                        IntLiteral fitPrestoSubscript = new IntLiteral(idx);
-                        node.setChild(1, fitPrestoSubscript);
-                        subscript = node.getChild(1);
-                    }
-                }
                 try {
                     if (subscript.getType().getPrimitiveType() != PrimitiveType.INT) {
                         node.castChild(Type.INT, 1);

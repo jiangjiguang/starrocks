@@ -6887,6 +6887,17 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
     public ParseNode visitCollectionSubscript(com.starrocks.sql.parser.StarRocksParser.CollectionSubscriptContext context) {
         Expr value = (Expr) visit(context.value);
         Expr index = (Expr) visit(context.index);
+        if (isPrestoDialect) {
+            if (index instanceof IntLiteral) {
+                IntLiteral newSubscript = (IntLiteral) index;
+                long idx = newSubscript.getValue();
+                if (idx < 0) {
+                    throw new SemanticException("The array subscript must be greater than or equal to 1");
+                }
+                idx = idx + 1;
+                index = new IntLiteral(idx);
+            }
+        }
         return new CollectionElementExpr(value, index, false);
     }
 

@@ -30,6 +30,7 @@ import com.starrocks.qe.SqlModeHelper;
 import com.starrocks.qe.VariableMgr;
 import com.starrocks.sql.analyzer.Analyzer;
 import com.starrocks.sql.analyzer.AstToSQLBuilder;
+import com.starrocks.sql.analyzer.AstToStringBuilder;
 import com.starrocks.sql.ast.JoinRelation;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectList;
@@ -587,6 +588,20 @@ class ParserTest {
         return arguments.stream();
     }
 
+
+    @Test
+    void testSubscriptIndexInPresto() {
+        String sql = "explain select [0, 1, 2][2];";
+        ConnectContext ctx = UtFrameUtils.createDefaultCtx();
+        ctx.setThreadLocalInfo();
+        SessionVariable sessionVariable = ctx.getSessionVariable();
+        sessionVariable.setEnablePrestoTranslation(true);
+        QueryStatement stmt = (QueryStatement) SqlParser.parse(sql, sessionVariable).get(0);
+        Analyzer.analyze(stmt, ctx);
+        Assert.assertEquals(
+                "select [0, 1, 2][3]",
+                AstToStringBuilder.toString(stmt));
+    }
 }
 
 

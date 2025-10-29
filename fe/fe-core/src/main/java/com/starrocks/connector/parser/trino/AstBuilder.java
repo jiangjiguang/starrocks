@@ -65,6 +65,7 @@ import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
 import com.starrocks.qe.SqlModeHelper;
 import com.starrocks.sql.analyzer.RelationId;
+import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.ast.ArrayExpr;
 import com.starrocks.sql.ast.CTERelation;
 import com.starrocks.sql.ast.CreateTableAsSelectStmt;
@@ -715,6 +716,15 @@ public class AstBuilder extends AstVisitor<ParseNode, ParseTreeContext> {
     protected ParseNode visitSubscriptExpression(SubscriptExpression node, ParseTreeContext context) {
         Expr value = (Expr) visit(node.getBase(), context);
         Expr index = (Expr) visit(node.getIndex(), context);
+        if (index instanceof IntLiteral) {
+            IntLiteral newSubscript = (IntLiteral) index;
+            long idx = newSubscript.getValue();
+            if (idx < 0) {
+                throw new SemanticException("The array subscript must be greater than or equal to 1");
+            }
+            idx = idx + 1;
+            index = new IntLiteral(idx);
+        }
         return new CollectionElementExpr(value, index, true);
     }
 
