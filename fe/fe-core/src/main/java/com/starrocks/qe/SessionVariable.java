@@ -787,6 +787,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public static final String CSV_FORMAT_SEPARATOR = "csv_format_separator";
     public static final String CSV_FORMAT_ENCLOSE = "csv_format_enclose";
     public static final String ENABLE_JDBC_COMPATIBLE_NAN = "enable_jdbc_compatible_nan";
+    public static final String ENABLE_ADD_HIVE_PARTITION_BY_EMPTY_QUERY_IN_INSERT_OVERWRITE = "enable_add_hive_partition_by_empty_query_in_insert_overwrite";
 
     public static final List<String> DEPRECATED_VARIABLES = ImmutableList.<String>builder()
             .add(CODEGEN_LEVEL)
@@ -2065,6 +2066,13 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VariableMgr.VarAttr(name = CSV_FORMAT_ENCLOSE)
     private String csvFormatEnclose = "\"";
+
+    @VariableMgr.VarAttr(name = ENABLE_ADD_HIVE_PARTITION_BY_EMPTY_QUERY_IN_INSERT_OVERWRITE)
+    private boolean enableAddHivePartitionByEmptyQueryInInsertOverwrite = false;
+
+    public boolean getEnableAddHivePartitionByEmptyQueryInInsertOverwrite() {
+        return enableAddHivePartitionByEmptyQueryInInsertOverwrite;
+    }
 
     public int getPrepareMetadataPoolSize() {
         return prepareMetadataPoolSize;

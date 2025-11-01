@@ -74,7 +74,7 @@ public class HiveMetaClient {
         this.conf = conf;
     }
 
-    public static HiveMetaClient createHiveMetaClient(HdfsEnvironment env, Map<String, String> properties) {
+    public static HiveConf initConfig(HdfsEnvironment env, Map<String, String> properties) {
         HiveConf conf = new HiveConf();
         conf.addResource(env.getConfiguration());
         properties.forEach(conf::set);
@@ -83,6 +83,11 @@ public class HiveMetaClient {
         }
         String hmsTimeout = properties.getOrDefault(HIVE_METASTORE_TIMEOUT, String.valueOf(Config.hive_meta_store_timeout_s));
         conf.set(MetastoreConf.ConfVars.CLIENT_SOCKET_TIMEOUT.getHiveName(), hmsTimeout);
+        return conf;
+    }
+
+    public static HiveMetaClient createHiveMetaClient(HdfsEnvironment env, Map<String, String> properties) {
+        HiveConf conf = initConfig(env, properties);
         return new HiveMetaClient(conf);
     }
 

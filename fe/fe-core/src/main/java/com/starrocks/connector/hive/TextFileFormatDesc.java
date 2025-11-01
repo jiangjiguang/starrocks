@@ -95,7 +95,7 @@ public class TextFileFormatDesc {
         try {
             return HiveFieldDelimiter.convert(fieldDelim);
         } catch (StarRocksConnectorException e) {
-            LOG.warn("hive field.delim convert fail, reason is: ", e);
+            LOG.debug("hive field.delim convert fail, reason is: ", e);
             return fieldDelim;
         }
     }

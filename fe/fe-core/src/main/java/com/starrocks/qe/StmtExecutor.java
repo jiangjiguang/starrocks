@@ -54,6 +54,7 @@ import com.starrocks.analysis.UserVariableHint;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.Database;
 import com.starrocks.catalog.ExternalOlapTable;
+import com.starrocks.catalog.HiveTable;
 import com.starrocks.catalog.InternalCatalog;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.ResourceGroup;
@@ -79,6 +80,7 @@ import com.starrocks.common.profile.Timer;
 import com.starrocks.common.profile.Tracers;
 import com.starrocks.common.util.CompressionUtils;
 import com.starrocks.common.util.DebugUtil;
+import com.starrocks.common.util.HiveMetaStoreUtils;
 import com.starrocks.common.util.ProfileManager;
 import com.starrocks.common.util.ProfilingExecPlan;
 import com.starrocks.common.util.RuntimeProfile;
@@ -2362,6 +2364,11 @@ public class StmtExecutor {
                         // schema table and iceberg table does not need txn
                         mgr.abortTransaction(database.getId(), transactionId, ERR_NO_PARTITIONS_HAVE_DATA_LOAD.formatErrorMsg(),
                                 Coordinator.getCommitInfos(coord), Coordinator.getFailInfos(coord), null);
+                    }
+                    if (context.getSessionVariable().getEnableAddHivePartitionByEmptyQueryInInsertOverwrite()) {
+                        if ((targetTable instanceof HiveTable) && stmt instanceof InsertStmt) {
+                            HiveMetaStoreUtils.addPartition(targetTable, (InsertStmt) stmt);
+                        }
                     }
                     context.getState().setOk();
                     insertError = true;
