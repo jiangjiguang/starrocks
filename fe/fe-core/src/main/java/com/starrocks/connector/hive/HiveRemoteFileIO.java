@@ -218,7 +218,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                         long elapsed = endTime - startTime;
                         long elapsedMs = elapsed / 1_000_000;
                         if (elapsedMs / 1000 > 1) {
-                            LOG.info("recursive empty file state  elapse [{}] ms", elapsedMs);
+                            LOG.info("recursive empty file state  elapse [{}] ms, hdfs path: {}", elapsedMs, f.toString());
                         }
                         return false;
                     }
@@ -227,7 +227,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                 long elapsed = endTime - startTime;
                 long elapsedMs = elapsed / 1_000_000;
                 if (elapsedMs / 1000 > 1) {
-                    LOG.info("recursive file state elapse [{}] ms", elapsedMs);
+                    LOG.info("recursive file state elapse [{}] ms, hdfs path: {}", elapsedMs, f.toString());
                 }
                 return true;
             }
@@ -252,7 +252,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
                 long elapsed = endTime - startTime;
                 long elapsedMs = elapsed / 1_000_000;
                 if (elapsedMs / 1000 > 1) {
-                    LOG.info("use filesystem to process file state elapse [{}] ms", elapsedMs);
+                    LOG.info("use filesystem to process file state elapse [{}] ms, hdfs path: {}", elapsedMs, f.toString());
                 }
             }
 
@@ -270,7 +270,7 @@ public class HiveRemoteFileIO implements RemoteFileIO {
         long elapsed = endTime - startTime;
         long elapsedMs = elapsed / 1_000_000;
         if (elapsedMs / 1000 > 1) {
-            LOG.info("list files recursive elapse [{}] ms", elapsedMs);
+            LOG.info("list files recursive elapse [{}] ms, hdfs path: {}", elapsedMs, f.toString());
         }
         return remoteIterator;
     }
