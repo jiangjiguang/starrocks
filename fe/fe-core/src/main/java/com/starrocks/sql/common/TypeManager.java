@@ -258,10 +258,16 @@ public class TypeManager {
             return ScalarType.getAssigmentCompatibleTypeOfDecimalV3((ScalarType) decimalType, (ScalarType) otherType);
         }
 
-        BiFunction<Type, Type, Boolean> isDataAndString =
-                (a, b) -> a.isDateType() && (b.isStringType() || b.isDateType());
-        if (isDataAndString.apply(type1, type2) || isDataAndString.apply(type2, type1)) {
+        BiFunction<Type, Type, Boolean> isDateTimeAndString =
+                (a, b) -> a.isDatetime() && (b.isStringType() || b.isDatetime());
+        if (isDateTimeAndString.apply(type1, type2) || isDateTimeAndString.apply(type2, type1)) {
             return Type.DATETIME;
+        }
+
+        BiFunction<Type, Type, Boolean> isDateAndString =
+                (a, b) -> a.isDate() && (b.isStringType() || b.isDate());
+        if (isDateAndString.apply(type1, type2) || isDateAndString.apply(type2, type1)) {
+            return Type.DATE;
         }
 
         // number type

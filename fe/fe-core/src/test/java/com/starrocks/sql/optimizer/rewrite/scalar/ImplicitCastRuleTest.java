@@ -124,6 +124,30 @@ public class ImplicitCastRuleTest {
         assertEquals(PrimitiveType.VARCHAR, result.getChild(1).getType().getPrimitiveType());
 
         assertTrue(result.getChild(1).getChild(0).getType().isInt());
+
+
+        // date_col = to_date(xx)
+        ColumnRefOperator leftStringOperator = new ColumnRefOperator(1, Type.DATE, "date_col", true);
+        ColumnRefOperator dateX = new ColumnRefOperator(0, Type.VARCHAR, "xx", false);
+        List<ScalarOperator> argumentList = new ArrayList<>();
+        argumentList.add(dateX);
+        CallOperator rightToDateOperator = new CallOperator(FunctionSet.TO_DATE, Type.DATE, argumentList);
+
+        BinaryPredicateOperator op1 = new BinaryPredicateOperator(
+                BinaryType.EQ,
+                leftStringOperator,
+                rightToDateOperator
+        );
+
+        ScalarOperatorRewriteContext context = new ScalarOperatorRewriteContext();
+        ConnectContext session = new ConnectContext();
+
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        context.setSession(session);
+
+        ImplicitCastRule rule1 = new ImplicitCastRule();
+        ScalarOperator result1 = rule1.apply(op1, context);
+        assertTrue(result1.getChild(0).getChild(0).getType().isDate());
     }
 
     @Test
