@@ -75,7 +75,30 @@ public class Trino2SRFunctionCallTransformer {
         if (result == null) {
             result = rewriteChrFunction(fnName, children);
         }
+        if (result == null) {
+            result = rewriteDateFormatFunction(fnName, children);
+        }
         return result;
+    }
+
+    public static Expr rewriteDateFormatFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (!functionName.equalsIgnoreCase(FunctionSet.DATE_FORMAT)) {
+            return null;
+        }
+        if (num != 2) {
+            throw new ParsingException(PARSER_ERROR_MSG.wrongNumOfArgs(functionName));
+        }
+        Expr column = arguments.get(0);
+        Expr fmt = arguments.get(1);
+        if (!(fmt instanceof StringLiteral)) {
+            throw new ParsingException(String.format("%s function need string format, but the format is %s", functionName, fmt));
+        }
+        String formatParam = ((StringLiteral) fmt).getStringValue();
+        formatParam = TimeFormatConvert.convertFormat(formatParam);
+        fmt = new StringLiteral(formatParam);
+        arguments.set(1, fmt);
+        return new FunctionCallExpr(functionName, arguments);
     }
 
     public static Expr rewriteTruncFunction(String functionName, List<Expr> arguments) {

@@ -151,4 +151,14 @@ public class AstBuilderTest {
         assert execPlan != null;
         Assert.assertTrue(execPlan.toString().contains("TOP-N"));
     }
+
+    @Test
+    public void testDateFormat() {
+        connectContext.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select date_format(k1, 'yyyy-10-01') as _dt from test.tbl1  limit 10";
+        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertTrue(execPlan.toString().contains("%Y"));
+    }
 }
