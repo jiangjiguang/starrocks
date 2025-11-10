@@ -163,16 +163,6 @@ public class AstBuilderTest {
     }
 
     @Test
-    public void testAddMonth() {
-        connectContext.getSessionVariable().setEnablePrestoTranslation(true);
-        String sql = "select ADD_MONTHS(date_sub(to_date('2025-10-27 00:00:00'),1),-1)";
-        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
-        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
-        assert execPlan != null;
-        Assert.assertTrue(execPlan.toString().toLowerCase().contains("2025-09-26"));
-    }
-
-    @Test
     public void testDateAdd() {
         connectContext.getSessionVariable().setEnablePrestoTranslation(true);
         String sql = "select date_add('day', -1, '2025-11-11');";
@@ -191,6 +181,16 @@ public class AstBuilderTest {
         ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
         assert execPlan != null;
         Assert.assertTrue(execPlan.toString().toLowerCase().contains("regexp"));
+    }
+
+    @Test
+    public void testAddMonth() {
+        connectContext.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select ADD_MONTHS(date_sub(to_date('2025-10-27 00:00:00'),1),-1)";
+        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertTrue(execPlan.toString().toLowerCase().contains("2025-09-26"));
     }
 
 }

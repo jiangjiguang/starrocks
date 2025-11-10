@@ -816,6 +816,8 @@ public class ExpressionAnalyzer {
                     funcOpName = String.format("%sS_%s", node.getTimeUnitIdent(), "add");
                 } else if (SUB_DATE_FUNCTIONS.contains(node.getFuncName())) {
                     funcOpName = String.format("%sS_%s", node.getTimeUnitIdent(), "sub");
+                } else if (node.getFuncName().equalsIgnoreCase(FunctionSet.ADD_MONTHS)) {
+                    funcOpName = node.getFuncName();
                 } else {
                     node.setChild(1, TypeManager.addCastExpr(node.getChild(1), Type.DATETIME));
                     funcOpName = String.format("%sS_%s", node.getTimeUnitIdent(), "diff");

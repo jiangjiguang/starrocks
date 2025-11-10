@@ -515,15 +515,21 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
             new BigInteger("170141183460469231731687303715884105728"); // 2^127
 
     private static final List<String> DATE_FUNCTIONS =
-            Lists.newArrayList(FunctionSet.DATE_ADD,
+            Lists.newArrayList(
                     FunctionSet.ADDDATE,
-                    FunctionSet.DATE_ADD, FunctionSet.DATE_SUB,
+                    FunctionSet.DATE_ADD,
+                    FunctionSet.DATE_SUB,
                     FunctionSet.SUBDATE,
-                    FunctionSet.DAYS_SUB);
+                    FunctionSet.DAYS_SUB,
+                    FunctionSet.ADD_MONTHS
+            );
 
     private static final List<String> PRESTO_TRANSLATE_FUNCTIONS =
-            Lists.newArrayList(FunctionSet.DATE_ADD,
-                    FunctionSet.DATE_SUB);
+            Lists.newArrayList(
+                    FunctionSet.DATE_ADD,
+                    FunctionSet.DATE_SUB,
+                    FunctionSet.ADD_MONTHS
+            );
 
     private static final List<String> PARTITION_FUNCTIONS =
             Lists.newArrayList(FunctionSet.SUBSTR, FunctionSet.SUBSTRING,
@@ -6324,9 +6330,7 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
                             intervalLiteral.getUnitIdentifier().getDescription());
 
             if (isPrestoDialect && PRESTO_TRANSLATE_FUNCTIONS.contains(functionName)) {
-                FunctionName toDate = FunctionName.createFnName(FunctionSet.TO_DATE);
-                List<Expr> params = ImmutableList.of(timestampArithmeticExpr);
-                return new FunctionCallExpr(toDate, params);
+                return new CastExpr(Type.DATE, timestampArithmeticExpr);
             } else {
                 return timestampArithmeticExpr;
             }
