@@ -2078,7 +2078,6 @@ Status TimeFunctions::format_prepare(FunctionContext* context, FunctionContext::
             {"mm", "%i"},
             {"ss", "%s"},
             {"u", "u"},
-            {"01", "%F"},
     };
 
     std::string input_format(slice.data, slice.size);
