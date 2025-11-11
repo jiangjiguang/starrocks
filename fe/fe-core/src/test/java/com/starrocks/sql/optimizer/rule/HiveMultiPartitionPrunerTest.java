@@ -26,6 +26,7 @@ import com.starrocks.catalog.Type;
 import com.starrocks.common.AnalysisException;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
+import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
@@ -464,5 +465,25 @@ public class HiveMultiPartitionPrunerTest {
         pruner = initPruner(conjuncts);
         prunedPartIds = pruner.prune();
         Assert.assertEquals(Lists.newArrayList(1L, 2L, 3L, 4L), prunedPartIds);
+    }
+
+
+    @Test
+    public void testConcatBinaryPredicateInCallOperator() throws AnalysisException {
+        // concat(cast(yea as decimal), '-', month, '-', day) = "2021-01-01"
+        List<ScalarOperator> conjuncts = new ArrayList<>();
+        CastOperator castOperator = new CastOperator(Type.DECIMAL32, yearColumn);
+        CallOperator concatDateColumn = new CallOperator(FunctionSet.CONCAT, Type.STRING,
+                Lists.newArrayList(
+                        castOperator,
+                        ConstantOperator.createVarchar("-"),
+                        monthColumn,
+                        ConstantOperator.createVarchar("-"),
+                        dayColumn)
+        );
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.EQ, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 1, 0, 0, 0))));
+        HiveMultiPartitionPruner pruner = initPruner(conjuncts);
+        Assert.assertEquals(Lists.newArrayList(0L), pruner.prune());
     }
 }

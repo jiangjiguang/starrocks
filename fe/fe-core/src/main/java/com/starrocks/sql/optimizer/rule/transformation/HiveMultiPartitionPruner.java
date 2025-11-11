@@ -187,6 +187,14 @@ public class HiveMultiPartitionPruner implements PartitionPruner {
         if (operator instanceof CallOperator) {
             CallOperator funcOperator = (CallOperator) operator;
             if (validFunctions.contains(funcOperator.getFnName().toLowerCase())) {
+                // concat_ws(-, substr(dt, 0, 4), substr(dt, 5, 2), substr(dt, 7, 2))
+                if (!funcOperator.getChildren().isEmpty()) {
+                    for (ScalarOperator child : funcOperator.getChildren()) {
+                        if (child instanceof CallOperator) {
+                            return null;
+                        }
+                    }
+                }
                 return funcOperator;
             }
         }
