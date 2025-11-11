@@ -5,6 +5,7 @@ import com.didi.datainfra.platform.auth.sdk.constant.Constants;
 import com.didi.datainfra.platform.auth.sdk.entity.TableRowAuthDTO;
 import com.didi.datainfra.platform.auth.sdk.entity.v2.ColumnItem;
 import com.didi.datainfra.platform.auth.sdk.entity.v2.ConditionNode;
+import com.didi.datainfra.platform.auth.sdk.entity.v2.ExpressionNode;
 import com.didi.datainfra.platform.auth.sdk.entity.v2.LogicalNode;
 import com.didi.datainfra.platform.auth.sdk.entity.v2.NonEquConditionNode;
 import com.didi.datainfra.platform.auth.sdk.entity.v2.SQLNode;
@@ -13,6 +14,7 @@ import com.starrocks.analysis.TableName;
 import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReportException;
 import com.starrocks.sql.optimizer.operator.scalar.BinaryPredicateOperator;
+import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CastOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ColumnRefOperator;
 import com.starrocks.sql.optimizer.operator.scalar.CompoundPredicateOperator;
@@ -107,6 +109,52 @@ public class RemoteAuthChecker {
             return SQLNode.conditionNode(conditionNode);
         }
 
+        private SQLNode expressionNode(String fnName, List<ColumnRefOperator> columns, List<ConstantOperator> constants) {
+            List<ColumnItem> columnItems = convertColumns(columns);
+            List<String> values = constants.stream().map(ConstantOperator::toString).collect(Collectors.toList());
+            ExpressionNode expressionNode = new ExpressionNode();
+            expressionNode.setFunctionName(fnName);
+            expressionNode.setColumns(columnItems);
+            expressionNode.setValues(values);
+            expressionNode.setLiteral(true);
+            return SQLNode.expressionNode(expressionNode);
+        }
+
+        // must = or in
+        private SQLNode functionCallNode(ScalarOperator left, List<ScalarOperator> right) {
+            if (left.isCast()) {
+                CastOperator castOperator = (CastOperator) left;
+                left = castOperator.getChild(0);
+            }
+            if (!(left instanceof CallOperator)) {
+                return null;
+            }
+            CallOperator call = (CallOperator) left;
+
+            boolean convertable = true;
+            List<ColumnRefOperator> args = new ArrayList<>();
+            for (ScalarOperator argument : call.getArguments()) {
+                ColumnRefOperator argColumnRef = getSimpleColumn(argument);
+                if (argColumnRef != null) {
+                    args.add(argColumnRef);
+                }
+                ConstantOperator argConst = getSimpleConst(argument);
+                if (argColumnRef == null && argConst == null) {
+                    // not columnRef AND const, can't convert to expression
+                    convertable = false;
+                    break;
+                }
+            }
+            if (!convertable) {
+                return null;
+            }
+            List<ConstantOperator> constants = allConst(right);
+            if (constants == null) {
+                return null;
+            }
+            return expressionNode(call.getFnName(), args, constants);
+        }
+
         private List<ColumnItem> convertColumns(List<ColumnRefOperator> columns) {
             return columns.stream()
                     .map(this::convertColumn)
@@ -115,6 +163,18 @@ public class RemoteAuthChecker {
 
         private ColumnItem convertColumn(ColumnRefOperator column) {
             return new ColumnItem().setTblId(id).setDbName(dbName).setTableName(tblName).setColumnName(column.getName());
+        }
+
+        private List<ConstantOperator> allConst(List<ScalarOperator> operators) {
+            List<ConstantOperator> constants = new ArrayList<>();
+            for (ScalarOperator operator : operators) {
+                ConstantOperator constant = getSimpleConst(operator);
+                if (constant == null) {
+                    return null;
+                }
+                constants.add(constant);
+            }
+            return constants;
         }
 
         @Override
@@ -138,10 +198,14 @@ public class RemoteAuthChecker {
             return sqlNode;
         }
 
+
+
         @Override
         public SQLNode visitBinaryPredicate(BinaryPredicateOperator predicate, Void context) {
             ScalarOperator left = predicate.getChild(0);
+            left = removeCast(left);
             ScalarOperator right = predicate.getChild(1);
+            right = removeCast(right);
 
             ConstantOperator simpleConst = getSimpleConst(right);
             if (simpleConst != null && predicate.getBinaryType().isEqual()) {
@@ -149,6 +213,10 @@ public class RemoteAuthChecker {
                 if (colRef != null) {
                     List<ConstantOperator> constants = Collections.singletonList((simpleConst));
                     return equalNode(colRef, constants);
+                }
+                SQLNode expressionNode = functionCallNode(left, Collections.singletonList(right));
+                if (expressionNode != null) {
+                    return expressionNode;
                 }
             }
 
@@ -163,12 +231,17 @@ public class RemoteAuthChecker {
 
         @Override
         public SQLNode visitInPredicate(InPredicateOperator predicate, Void context) {
-            
+            ScalarOperator left = predicate.getChild(0);
+            left = removeCast(left);
             List<ScalarOperator> values = predicate.getChildren().stream().skip(1).collect(Collectors.toList());
             if (!predicate.isNotIn() && values.stream().allMatch(ScalarOperator::isConstantRef)) {
-                ColumnRefOperator column = getSimpleColumn(predicate.getChild(0));
+                ColumnRefOperator column = getSimpleColumn(left);
                 if (column != null) {
                     return equalNode(column, values.stream().map(a-> ((ConstantOperator) a)).collect(Collectors.toList()));
+                }
+                SQLNode expressionNode = functionCallNode(left, values);
+                if (expressionNode != null) {
+                    return expressionNode;
                 }
             }
             Set<ColumnRefOperator> columns = new HashSet<>();
@@ -180,26 +253,26 @@ public class RemoteAuthChecker {
 
     }
 
+    private static ScalarOperator removeCast(ScalarOperator operator) {
+        while (operator.isCast()) {
+            CastOperator castOperator = (CastOperator) operator;
+            operator = castOperator.getChild(0);
+        }
+        return operator;
+    }
+
     private static ColumnRefOperator getSimpleColumn(ScalarOperator operator) {
+        operator = removeCast(operator);
         if (operator.isColumnRef()) {
             return ((ColumnRefOperator) operator);
-        } else if (operator.isCast()) {
-            CastOperator castOperator = (CastOperator) operator;
-            if (castOperator.getChild(0).isColumnRef()) {
-                return (ColumnRefOperator) castOperator.getChild(0);
-            }
         }
         return null;
     }
 
     private static ConstantOperator getSimpleConst(ScalarOperator operator) {
+        operator = removeCast(operator);
         if (operator.isConstantRef()) {
             return ((ConstantOperator) operator);
-        } else if (operator.isCast()) {
-            CastOperator castOperator = (CastOperator) operator;
-            if (castOperator.getChild(0).isConstantRef()) {
-                return (ConstantOperator) castOperator.getChild(0);
-            }
         }
         return null;
     }
