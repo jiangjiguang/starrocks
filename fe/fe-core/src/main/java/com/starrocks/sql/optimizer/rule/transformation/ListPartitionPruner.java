@@ -496,9 +496,16 @@ public class ListPartitionPruner implements PartitionPruner {
 
         for (Map.Entry<LiteralExpr, Set<Long>> entry : partitionValueMap.entrySet()) {
             LiteralExpr key = entry.getKey();
-            LiteralExpr literalExpr = castLiteralExpr(key, castOperator.getType());
-            Set<Long> partitions = newPartitionValueMap.computeIfAbsent(literalExpr, k -> Sets.newHashSet());
-            partitions.addAll(entry.getValue());
+            // I think the failure of castLiteralExpr indicates that even the format of this partition value is incorrect.
+            // Therefore, this partition value is definitely not a condition for a BinaryPredicate hit
+            try {
+                LiteralExpr literalExpr = castLiteralExpr(key, castOperator.getType());
+                Set<Long> partitions = newPartitionValueMap.computeIfAbsent(literalExpr, k -> Sets.newHashSet());
+                partitions.addAll(entry.getValue());
+            } catch (Exception e) {
+                LOG.error("cast literal expr fail: ", e);
+            }
+
         }
         return newPartitionValueMap;
     }

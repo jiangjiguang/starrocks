@@ -168,6 +168,15 @@ public class ListPartitionPrunerTest {
         conjuncts.add(new BinaryPredicateOperator(BinaryType.LT, intColumn,
                 ConstantOperator.createInt(2)));
         Assert.assertEquals(Lists.newArrayList(3L, 4L, 6L, 7L), pruner.prune());
+
+
+        // date_col >= date_sub('2021-01-03',1) and int_col < 2
+        conjuncts.clear();
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.GE, dateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 2, 0, 0, 0))));
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.LT, intColumn,
+                ConstantOperator.createInt(2)));
+        Assert.assertEquals(Lists.newArrayList(3L, 4L, 6L, 7L), pruner.prune());
     }
 
     @Test
