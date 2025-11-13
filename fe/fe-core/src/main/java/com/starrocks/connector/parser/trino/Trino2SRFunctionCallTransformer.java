@@ -25,11 +25,14 @@ import com.starrocks.analysis.FunctionCallExpr;
 import com.starrocks.analysis.FunctionParams;
 import com.starrocks.analysis.IntLiteral;
 import com.starrocks.analysis.StringLiteral;
+import com.starrocks.analysis.TimestampArithmeticExpr;
 import com.starrocks.analysis.VariableExpr;
 import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Config;
+import com.starrocks.sql.ast.IntervalLiteral;
+import com.starrocks.sql.ast.UnitIdentifier;
 import com.starrocks.sql.parser.ParsingException;
 
 import java.util.ArrayList;
@@ -48,6 +51,14 @@ import static com.starrocks.sql.common.ErrorMsgProxy.PARSER_ERROR_MSG;
 public class Trino2SRFunctionCallTransformer {
     // function name -> list of function transformer
     public static Map<String, List<FunctionCallTransformer>> TRANSFORMER_MAP = Maps.newHashMap();
+
+    private static final List<String> KEEP_RETURN_DATETIME =
+            Lists.newArrayList(
+                    "HOUR",
+                    "MINUTE",
+                    "SECOND",
+                    "MILLISECOND"
+            );
 
     static {
         registerAllFunctionTransformer();
@@ -78,8 +89,50 @@ public class Trino2SRFunctionCallTransformer {
         if (result == null) {
             result = rewriteDateFormatFunction(fnName, children);
         }
+        if (result == null) {
+            result = rewriteDateAddFunction(fnName, children);
+        }
         return result;
     }
+
+    public static Expr rewriteDateAddFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (!functionName.equalsIgnoreCase(FunctionSet.DATE_ADD)) {
+            return null;
+        }
+        if (num != 3) {
+            return null;
+        }
+        // date_add('day', -368, current_date) rewrite to date_add(current_date, INTERVAL -368 DAY)
+        Expr unit = arguments.get(0);
+        Expr interval = arguments.get(1);
+        Expr column = arguments.get(2);
+        if (unit == null || interval == null || column == null) {
+            return null;
+        }
+        if (!(unit instanceof StringLiteral)) {
+            throw new ParsingException(String.format("%s function need string unit, but the unit is %s", functionName, unit));
+        }
+        if (!(interval instanceof IntLiteral)) {
+            throw new ParsingException(String.format("%s function need string int interval, but the interval is %s", functionName, interval));
+        }
+        String unitParam = ((StringLiteral) unit).getStringValue().toUpperCase();
+        UnitIdentifier unitIdentifier = new UnitIdentifier(unitParam);
+        IntervalLiteral intervalLiteral = new IntervalLiteral(interval, unitIdentifier);
+        TimestampArithmeticExpr timestampArithmeticExpr =
+                new TimestampArithmeticExpr(
+                        functionName,
+                        column,
+                        intervalLiteral.getValue(),
+                        intervalLiteral.getUnitIdentifier().getDescription()
+                );
+
+        if (KEEP_RETURN_DATETIME.contains(unitParam)) {
+            return timestampArithmeticExpr;
+        }
+        return new CastExpr(Type.DATE, timestampArithmeticExpr);
+    }
+
 
     public static Expr rewriteDateFormatFunction(String functionName, List<Expr> arguments) {
         int num = arguments.size();

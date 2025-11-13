@@ -6249,9 +6249,11 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
 
         List<Expr> arguments = visit(context.expression(), Expr.class);
 
-        Expr complexfunctionCallExpr = Trino2SRFunctionCallTransformer.convertComplexFunction(functionName, arguments);
-        if (complexfunctionCallExpr != null) {
-            return complexfunctionCallExpr;
+        if (isPrestoDialect) {
+            Expr complexfunctionCallExpr = Trino2SRFunctionCallTransformer.convertComplexFunction(functionName, arguments);
+            if (complexfunctionCallExpr != null) {
+                return complexfunctionCallExpr;
+            }
         }
 
         if (functionName.equals(FunctionSet.TIME_SLICE) || functionName.equals(FunctionSet.DATE_SLICE)) {
