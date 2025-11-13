@@ -1643,4 +1643,16 @@ public class ScalarOperatorFunctionsTest {
 
         assertEquals("LCC073C047P03813622", constantOperator.getVarchar());
     }
+
+    @Test
+    public void testLastDay() {
+        ConstantOperator testDate = ConstantOperator.createDatetime(LocalDateTime.of(2025, 11, 3, 13, 4, 5));
+        assertEquals("2025-11-30",
+                ScalarOperatorFunctions.lastDay(testDate).getDate().toString());
+
+        testDate = ConstantOperator.createDatetime(LocalDateTime.of(2025, 8, 4, 13, 4, 5));
+        ConstantOperator unit = ConstantOperator.createVarchar("year");
+        assertEquals("2025-12-31",
+                ScalarOperatorFunctions.lastDay(testDate, unit).getDate().toString());
+    }
 }

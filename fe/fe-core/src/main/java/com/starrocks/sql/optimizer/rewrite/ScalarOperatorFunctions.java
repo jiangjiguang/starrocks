@@ -939,6 +939,51 @@ public class ScalarOperatorFunctions {
         return ConstantOperator.createDatetimeOrNull(TIME_SLICE_START.plus(epoch, timeUnit));
     }
 
+
+
+    @ConstantFunction.List(list = {
+            @ConstantFunction(name = "last_day", argTypes = {DATETIME, VARCHAR}, returnType = DATE),
+            @ConstantFunction(name = "last_day", argTypes = {DATE, VARCHAR}, returnType = DATE)
+    })
+    public static ConstantOperator lastDay(ConstantOperator datetime, ConstantOperator unit)
+            throws IllegalArgumentException {
+        // Parameter verification
+        if (datetime.isNull()) {
+            return ConstantOperator.createNull(Type.DATE);
+        }
+        if (unit.isNull()) {
+            throw new IllegalArgumentException("Unit parameter cannot be NULL");
+        }
+        try {
+            LocalDate date = TimeUtils.getLocalDate(datetime);
+            // Verification and processing time units
+            String unitStr = unit.getVarchar();
+            String normalizedUnit = TimeUtils.validateAndNormalizeUnit(unitStr);
+            LocalDate lastDay = TimeUtils.getLastDayByUnit(date, normalizedUnit);
+            // Convert LocalDate to LocalDateTime (with a time of 00:00:00)
+            LocalDateTime resultDateTime = lastDay.atStartOfDay();
+            // Returns a ConstantOperator of type DATE
+            return ConstantOperator.createDate(resultDateTime);
+        } catch (Exception e) {
+            throw new IllegalArgumentException("Failed to calculate last_day: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * If no unit is specified, "month" is used by default
+     */
+    @ConstantFunction.List(list = {
+            @ConstantFunction(name = "last_day", argTypes = {DATETIME}, returnType = DATE),
+            @ConstantFunction(name = "last_day", argTypes = {DATE}, returnType = DATE)
+    })
+    public static ConstantOperator lastDay(ConstantOperator datetime) {
+        // By default, "month" is used as the time unit
+        ConstantOperator defaultUnit = ConstantOperator.createVarchar("month");
+        return lastDay(datetime, defaultUnit);
+    }
+
+
+
     /**
      * Math function
      */

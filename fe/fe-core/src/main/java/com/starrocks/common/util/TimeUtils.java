@@ -45,6 +45,7 @@ import com.starrocks.common.ErrorReport;
 import com.starrocks.common.FeConstants;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.server.GlobalStateMgr;
+import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.threeten.extra.PeriodDuration;
@@ -54,8 +55,12 @@ import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.time.Clock;
 import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Date;
 import java.util.SimpleTimeZone;
 import java.util.TimeZone;
@@ -97,6 +102,9 @@ public class TimeUtils {
 
     public static Date MIN_DATETIME = null;
     public static Date MAX_DATETIME = null;
+
+    public static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    public static final DateTimeFormatter DATETIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // It's really hard to define max unix timestamp because of timezone.
     // so this value is 253402329599(UTC 9999-12-31 23:59:59) - 24 * 3600(for all timezones)
@@ -357,4 +365,86 @@ public class TimeUtils {
         }
         return timezone;
     }
+
+
+    /**
+     * Verify and standardize time units
+     */
+    public static String validateAndNormalizeUnit(String unit) throws IllegalArgumentException {
+        // A null value returns month by default
+        if (unit == null || unit.trim().isEmpty()) {
+            return "month";
+        }
+
+        String trimmedUnit = unit.trim().toLowerCase();
+
+        // only support month, quarter, year
+        switch (trimmedUnit) {
+            case "month":
+            case "quarter":
+            case "year":
+                return trimmedUnit;
+            default:
+                throw new IllegalArgumentException("Invalid time unit: '" + unit +
+                        "'. Supported units are: month, quarter, year");
+        }
+    }
+
+    /**
+     * Obtain the last day based on the time unit
+     */
+    public static LocalDate getLastDayByUnit(LocalDate date, String unit) {
+        switch (unit) {
+            case "month":
+                // The last day of the month
+                return date.with(TemporalAdjusters.lastDayOfMonth());
+
+            case "year":
+                // The last day of the year
+                return date.with(TemporalAdjusters.lastDayOfYear());
+
+            case "quarter":
+                // The last day of the quarter
+                return getLastDayOfQuarter(date);
+
+            default:
+                // By default, return the last day of the month
+                return date.with(TemporalAdjusters.lastDayOfMonth());
+        }
+    }
+
+    /**
+     * Get the last day of the quarter
+     */
+    public static LocalDate getLastDayOfQuarter(LocalDate date) {
+        int month = date.getMonthValue();
+        // Quarterly Index 0-3
+        int quarter = (month - 1) / 3;
+
+        // The last month of the quarter
+        int lastMonthOfQuarter = (quarter + 1) * 3;
+
+        return LocalDate.of(date.getYear(), lastMonthOfQuarter, 1)
+                .with(TemporalAdjusters.lastDayOfMonth());
+    }
+
+
+    public static LocalDate getLocalDate(ConstantOperator datetime) {
+        LocalDate date;
+
+        // Parse the date based on the input type
+        if (datetime.getType().isDate()) {
+            // For the DATE type, directly obtain LocalDateTime and then convert it to LocalDate
+            LocalDateTime dateTime = datetime.getDatetime();
+            date = dateTime.toLocalDate();
+        } else if (datetime.getType().isDatetime()) {
+            // For the DATETIME type, directly obtain LocalDateTime and then convert it to LocalDate
+            LocalDateTime dateTime = datetime.getDatetime();
+            date = dateTime.toLocalDate();
+        } else {
+            throw new IllegalArgumentException("Unsupported datetime type: " + datetime.getType());
+        }
+        return date;
+    }
+
 }
