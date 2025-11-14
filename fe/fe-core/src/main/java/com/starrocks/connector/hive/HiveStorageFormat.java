@@ -22,6 +22,8 @@ import static com.starrocks.connector.hive.HiveClassNames.AVRO_INPUT_FORMAT_CLAS
 import static com.starrocks.connector.hive.HiveClassNames.AVRO_OUTPUT_FORMAT_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.AVRO_SERDE_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.COLUMNAR_SERDE_CLASS;
+import static com.starrocks.connector.hive.HiveClassNames.CUSTOM_INPUT_FORMAT_CLASS;
+import static com.starrocks.connector.hive.HiveClassNames.CUSTOM_OUTPUT_FORMAT_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.HIVE_IGNORE_KEY_OUTPUT_FORMAT_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.LAZY_BINARY_COLUMNAR_SERDE_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.LAZY_SIMPLE_SERDE_CLASS;
@@ -72,6 +74,10 @@ public enum HiveStorageFormat {
             SEQUENCE_INPUT_FORMAT_CLASS,
             SEQUENCE_OUTPUT_FORMAT_CLASS
     ),
+    CUSTOM(
+            LAZY_SIMPLE_SERDE_CLASS,
+            CUSTOM_INPUT_FORMAT_CLASS,
+            CUSTOM_OUTPUT_FORMAT_CLASS),
     UNSUPPORTED("UNSUPPORTED", "UNSUPPORTED", "UNSUPPORTED");
 
     private final String serde;

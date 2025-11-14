@@ -56,6 +56,7 @@ import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.connector.hive.HiveStorageFormat;
 import com.starrocks.persist.ModifyTableColumnOperationLog;
 import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.CatalogMgr;
 import com.starrocks.server.GlobalStateMgr;
 import com.starrocks.thrift.TColumn;
@@ -196,6 +197,10 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
         return storageFormat;
     }
 
+    public void setStorageFormat(HiveStorageFormat storageFormat) {
+        this.storageFormat = storageFormat;
+    }
+
     public boolean isUseMetadataCache() {
         if (ConnectContext.get() != null &&
                 ConnectContext.get().getSessionVariable().isEnableHiveMetadataCacheWithInsert()) {
@@ -266,8 +271,16 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
         return hiveProperties == null ? new HashMap<>() : hiveProperties;
     }
 
+    public void setHiveProperties(Map<String, String> hiveProperties) {
+        this.hiveProperties = hiveProperties;
+    }
+
     public Map<String, String> getSerdeProperties() {
         return serdeProperties;
+    }
+
+    public void setSerdeProperties(Map<String, String> serdeProperties) {
+        this.serdeProperties = serdeProperties;
     }
 
     public boolean hasBooleanTypePartitionColumn() {
@@ -360,14 +373,15 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
             long partitionId = info.getId();
 
             THdfsPartition tPartition = new THdfsPartition();
-            tPartition.setFile_format(hivePartitions.get(i).getFormat().toThrift());
+            RemoteFileInfo remoteFileInfo = hivePartitions.get(i);
+            tPartition.setFile_format(remoteFileInfo.getFormat().toThrift());
 
             List<LiteralExpr> keys = key.getKeys();
             tPartition.setPartition_key_exprs(keys.stream().map(Expr::treeToThrift).collect(Collectors.toList()));
 
             THdfsPartitionLocation tPartitionLocation = new THdfsPartitionLocation();
             tPartitionLocation.setPrefix_index(-1);
-            tPartitionLocation.setSuffix(hivePartitions.get(i).getFullPath());
+            tPartitionLocation.setSuffix(remoteFileInfo.getFullPath());
             tPartition.setLocation(tPartitionLocation);
             tHdfsTable.putToPartitions(partitionId, tPartition);
         }
@@ -384,6 +398,35 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
         tTableDescriptor.setHdfsTable(tHdfsTable);
         return tTableDescriptor;
     }
+
+    public static void rewriteHiveTableCustomStorageFormat(Table table) {
+        if (!(table instanceof HiveTable)) {
+            return;
+        }
+        HiveTable hiveTable = (HiveTable) table;
+        if (ConnectContext.get() == null) {
+            return;
+        }
+        SessionVariable sessionVariable = ConnectContext.get().getSessionVariable();
+        if (sessionVariable == null) {
+            return;
+        }
+        if (!sessionVariable.isEnableHiveUDFCustomFormat()) {
+            return;
+        }
+        if (sessionVariable.getHiveUdfCustomFormatFieldDelimiter() == null) {
+            return;
+        }
+        String delimiter = sessionVariable.getHiveUdfCustomFormatFieldDelimiter();
+        if (hiveTable.getStorageFormat().equals(HiveStorageFormat.CUSTOM)) {
+            hiveTable.setStorageFormat(HiveStorageFormat.TEXTFILE);
+            Map<String, String> properties = hiveTable.getProperties();
+            properties.put("field.delim", delimiter);
+            properties.put("hive.table.input.format", hiveTable.getStorageFormat().getInputFormat());
+            hiveTable.setHiveProperties(properties);
+        }
+    }
+
 
     @Override
     public void onReload() {

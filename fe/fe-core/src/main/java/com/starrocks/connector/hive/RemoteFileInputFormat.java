@@ -15,9 +15,12 @@
 package com.starrocks.connector.hive;
 
 import com.google.common.collect.ImmutableMap;
+import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.thrift.THdfsFileFormat;
 
 import static com.starrocks.connector.hive.HiveClassNames.AVRO_INPUT_FORMAT_CLASS;
+import static com.starrocks.connector.hive.HiveClassNames.CUSTOM_INPUT_FORMAT_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.HUDI_PARQUET_INPUT_FORMAT;
 import static com.starrocks.connector.hive.HiveClassNames.MAPRED_PARQUET_INPUT_FORMAT_CLASS;
 import static com.starrocks.connector.hive.HiveClassNames.ORC_INPUT_FORMAT_CLASS;
@@ -33,12 +36,14 @@ public enum RemoteFileInputFormat {
     RCBINARY,
     RCTEXT,
     SEQUENCE,
+    CUSTOM,
     UNKNOWN;
     private static final ImmutableMap<String, RemoteFileInputFormat> CLASS_NAME_TO_INPUT_FORMAT =
             new ImmutableMap.Builder<String, RemoteFileInputFormat>()
                     .put(MAPRED_PARQUET_INPUT_FORMAT_CLASS, PARQUET)
                     .put(ORC_INPUT_FORMAT_CLASS, ORC)
                     .put(TEXT_INPUT_FORMAT_CLASS, TEXTFILE)
+                    .put(CUSTOM_INPUT_FORMAT_CLASS, CUSTOM)
                     .put(AVRO_INPUT_FORMAT_CLASS, AVRO)
                     .put(RCFILE_INPUT_FORMAT_CLASS, RCBINARY)
                     .put(SEQUENCE_INPUT_FORMAT_CLASS, SEQUENCE)
@@ -49,6 +54,7 @@ public enum RemoteFileInputFormat {
                     .put(HUDI_PARQUET_INPUT_FORMAT, true)
                     .put(ORC_INPUT_FORMAT_CLASS, true)
                     .put(TEXT_INPUT_FORMAT_CLASS, true)
+                    .put(CUSTOM_INPUT_FORMAT_CLASS, true)
                     .put(AVRO_INPUT_FORMAT_CLASS, true)
                     .put(RCFILE_INPUT_FORMAT_CLASS, true)
                     .put(SEQUENCE_INPUT_FORMAT_CLASS, true)
@@ -72,6 +78,23 @@ public enum RemoteFileInputFormat {
         return INPUT_FORMAT_BACKEND_SPLITTABLE.getOrDefault(this, false);
     }
 
+    public THdfsFileFormat rewriteHiveTablePartitionCustomStorageFormat() {
+        if (ConnectContext.get() == null) {
+            return THdfsFileFormat.UNKNOWN;
+        }
+        SessionVariable sessionVariable = ConnectContext.get().getSessionVariable();
+        if (sessionVariable == null) {
+            return THdfsFileFormat.UNKNOWN;
+        }
+        if (!sessionVariable.isEnableHiveUDFCustomFormat()) {
+            return THdfsFileFormat.UNKNOWN;
+        }
+        if (sessionVariable.getHiveUdfCustomFormatFieldDelimiter() == null) {
+            return THdfsFileFormat.UNKNOWN;
+        }
+        return THdfsFileFormat.TEXT;
+    }
+
     public THdfsFileFormat toThrift() {
         switch (this) {
             case PARQUET:
@@ -88,6 +111,8 @@ public enum RemoteFileInputFormat {
                 return THdfsFileFormat.RC_TEXT;
             case SEQUENCE:
                 return THdfsFileFormat.SEQUENCE_FILE;
+            case CUSTOM:
+                return rewriteHiveTablePartitionCustomStorageFormat();
             default:
                 return THdfsFileFormat.UNKNOWN;
         }

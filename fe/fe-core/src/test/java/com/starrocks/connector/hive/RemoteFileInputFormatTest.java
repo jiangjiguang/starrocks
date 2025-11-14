@@ -18,6 +18,8 @@ import com.starrocks.thrift.THdfsFileFormat;
 import org.junit.Assert;
 import org.junit.Test;
 
+import static com.starrocks.connector.hive.HiveClassNames.CUSTOM_INPUT_FORMAT_CLASS;
+
 public class RemoteFileInputFormatTest {
     @Test
     public void testParquetFormat() {
@@ -31,5 +33,11 @@ public class RemoteFileInputFormatTest {
     public void testUnknownFormat() {
         RemoteFileInputFormat format = RemoteFileInputFormat.UNKNOWN;
         Assert.assertEquals(THdfsFileFormat.UNKNOWN, format.toThrift());
+    }
+
+    @Test
+    public void testCustomFormat() {
+        RemoteFileInputFormat fileInputFormat = RemoteFileInputFormat.fromHdfsInputFormatClass(CUSTOM_INPUT_FORMAT_CLASS);
+        Assert.assertEquals(THdfsFileFormat.TEXT, fileInputFormat.toThrift());
     }
 }

@@ -819,6 +819,9 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public static final String ENABLE_DERIVE_TABLE_AUTO_FILL_ALIAS = "enable_derive_table_auto_fill_alias";
 
+    public static final String ENABLE_HIVE_UDF_CUSTOM_FORMAT = "enable_hive_udf_custom_format";
+    public static final String HIVE_UDF_CUSTOM_FORMAT_FIELD_DELIMITER = "hive_udf_custom_format_field_delimiter";
+
     @VariableMgr.VarAttr(name = ENABLE_PIPELINE, alias = ENABLE_PIPELINE_ENGINE, show = ENABLE_PIPELINE_ENGINE)
     private boolean enablePipelineEngine = true;
 
@@ -4547,5 +4550,27 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     public int getConnectorIoTasksPerScanOperator() {
         return connectorIoTasksPerScanOperator;
+    }
+
+    @VariableMgr.VarAttr(name = ENABLE_HIVE_UDF_CUSTOM_FORMAT)
+    private boolean enableHiveUDFCustomFormat = false;
+
+    @VariableMgr.VarAttr(name = HIVE_UDF_CUSTOM_FORMAT_FIELD_DELIMITER)
+    private String hiveUdfCustomFormatFieldDelimiter = "\001";
+
+    public boolean isEnableHiveUDFCustomFormat() {
+        return enableHiveUDFCustomFormat;
+    }
+
+    public void setEnableHiveUDFCustomFormat(boolean enableHiveUDFCustomFormat) {
+        this.enableHiveUDFCustomFormat = enableHiveUDFCustomFormat;
+    }
+
+    public String getHiveUdfCustomFormatFieldDelimiter() {
+        return hiveUdfCustomFormatFieldDelimiter;
+    }
+
+    public void setHiveUdfCustomFormatFieldDelimiter(String hiveUdfCustomFormatFieldDelimiter) {
+        this.hiveUdfCustomFormatFieldDelimiter = hiveUdfCustomFormatFieldDelimiter;
     }
 }

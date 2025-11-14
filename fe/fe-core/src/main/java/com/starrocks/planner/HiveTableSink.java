@@ -26,7 +26,6 @@ import com.starrocks.connector.hive.TextFileFormatDesc;
 import com.starrocks.credential.CloudConfiguration;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.server.GlobalStateMgr;
-import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.thrift.TCloudConfiguration;
 import com.starrocks.thrift.TCompressionType;
 import com.starrocks.thrift.TDataSink;
@@ -35,9 +34,9 @@ import com.starrocks.thrift.TExplainLevel;
 import com.starrocks.thrift.THiveTableSink;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-import static com.starrocks.analysis.OutFileClause.PARQUET_COMPRESSION_TYPE_MAP;
 import static com.starrocks.connector.hive.HiveMetastoreApiConverter.toTextFileFormatDesc;
 
 public class HiveTableSink extends DataSink {
@@ -64,7 +63,19 @@ public class HiveTableSink extends DataSink {
         HiveStorageFormat format = hiveTable.getStorageFormat();
         if (format != HiveStorageFormat.PARQUET && format != HiveStorageFormat.ORC
                 && format != HiveStorageFormat.TEXTFILE) {
-            throw new StarRocksConnectorException("Writing to hive table in [%s] format is not supported.", format.name());
+            if (format == HiveStorageFormat.CUSTOM) {
+                if (!sessionVariable.isEnableHiveUDFCustomFormat()) {
+                    throw new StarRocksConnectorException("Writing to hive table in [%s] format is not supported.", format.name());
+                } else {
+                    format = HiveStorageFormat.TEXTFILE;
+                    hiveTable.setStorageFormat(format);
+                    Map<String, String> textFileParameters = hiveTable.getSerdeProperties();
+                    textFileParameters.put("field.delim", sessionVariable.getHiveUdfCustomFormatFieldDelimiter());
+                    hiveTable.setSerdeProperties(textFileParameters);
+                }
+            } else {
+                throw new StarRocksConnectorException("Writing to hive table in [%s] format is not supported.", format.name());
+            }
         }
         this.fileFormat = hiveTable.getStorageFormat().name().toLowerCase();
         if (format == HiveStorageFormat.TEXTFILE) {

@@ -17,6 +17,8 @@ package com.starrocks.connector.hive;
 
 import com.starrocks.common.Config;
 import com.starrocks.connector.exception.StarRocksConnectorException;
+import com.starrocks.qe.ConnectContext;
+import com.starrocks.qe.SessionVariable;
 import com.starrocks.thrift.TTextFileDesc;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -72,8 +74,9 @@ public class TextFileFormatDesc {
 
     public TTextFileDesc toThrift() {
         TTextFileDesc desc = new TTextFileDesc();
-        if (fieldDelim != null) {
-            desc.setField_delim(fieldDelim);
+        String newFieldDelimiter = rewriteHiveTablePartitionCustomDelimiter(fieldDelim);
+        if (newFieldDelimiter != null) {
+            desc.setField_delim(newFieldDelimiter);
         }
         if (lineDelim != null) {
             desc.setLine_delim(lineDelim);
@@ -86,6 +89,23 @@ public class TextFileFormatDesc {
         }
         desc.setSkip_header_line_count(skipHeaderLineCount);
         return desc;
+    }
+
+    public String rewriteHiveTablePartitionCustomDelimiter(String fieldDelimiter) {
+        if (ConnectContext.get() == null) {
+            return fieldDelimiter;
+        }
+        SessionVariable sessionVariable = ConnectContext.get().getSessionVariable();
+        if (sessionVariable == null) {
+            return fieldDelimiter;
+        }
+        if (!sessionVariable.isEnableHiveUDFCustomFormat()) {
+            return fieldDelimiter;
+        }
+        if (sessionVariable.getHiveUdfCustomFormatFieldDelimiter() == null) {
+            return fieldDelimiter;
+        }
+        return parseFieldDelim(sessionVariable.getHiveUdfCustomFormatFieldDelimiter());
     }
 
     public String parseFieldDelim(String fieldDelim) {
