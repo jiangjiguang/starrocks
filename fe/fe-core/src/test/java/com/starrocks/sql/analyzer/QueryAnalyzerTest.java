@@ -14,6 +14,7 @@
 
 package com.starrocks.sql.analyzer;
 
+import com.starrocks.connector.parser.trino.TrinoTestBase;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.ast.StatementBase;
 import com.starrocks.utframe.UtFrameUtils;
@@ -51,4 +52,17 @@ public class QueryAnalyzerTest {
     }
 
 
+    @Test
+    public void testSubQueryNoAlias() throws Exception {
+        String ctasSql = " select * from ( select 1, 2, 3 )";
+        try {
+            connectContext.getSessionVariable().setEnableDeriveTableAutoFillAlias(true);
+            TrinoTestBase.analyzeSuccess(ctasSql);
+
+            connectContext.getSessionVariable().setEnableDeriveTableAutoFillAlias(false);
+            TrinoTestBase.analyzeFail(ctasSql, "Every derived table must have its own alias");
+        } finally {
+            connectContext.getSessionVariable().setEnableDeriveTableAutoFillAlias(false);
+        }
+    }
 }

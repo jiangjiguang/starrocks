@@ -813,6 +813,8 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     // query timeout cannot greater than one month
     public static final int MAX_QUERY_TIMEOUT = 259200;
 
+    public static final String ENABLE_DERIVE_TABLE_AUTO_FILL_ALIAS = "enable_derive_table_auto_fill_alias";
+
     @VariableMgr.VarAttr(name = ENABLE_PIPELINE, alias = ENABLE_PIPELINE_ENGINE, show = ENABLE_PIPELINE_ENGINE)
     private boolean enablePipelineEngine = true;
 
@@ -2308,6 +2310,17 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
 
     @VarAttr(name = CUSTOM_QUERY_ID, flag = VariableMgr.SESSION_ONLY)
     private String customQueryId = "";
+
+    @VariableMgr.VarAttr(name = ENABLE_DERIVE_TABLE_AUTO_FILL_ALIAS)
+    private boolean enableDeriveTableAutoFillAlias = false;
+
+    public boolean isEnableDeriveTableAutoFillAlias() {
+        return enableDeriveTableAutoFillAlias;
+    }
+
+    public void setEnableDeriveTableAutoFillAlias(boolean enableDeriveTableAutoFillAlias) {
+        this.enableDeriveTableAutoFillAlias = enableDeriveTableAutoFillAlias;
+    }
 
     public int getExprChildrenLimit() {
         return exprChildrenLimit;

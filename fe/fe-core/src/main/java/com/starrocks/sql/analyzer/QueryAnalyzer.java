@@ -100,6 +100,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static com.starrocks.sql.analyzer.AstToStringBuilder.getAliasName;
@@ -110,6 +111,8 @@ import static com.starrocks.thrift.PlanNodesConstants.BINLOG_TIMESTAMP_COLUMN_NA
 import static com.starrocks.thrift.PlanNodesConstants.BINLOG_VERSION_COLUMN_NAME;
 
 public class QueryAnalyzer {
+    private static final AtomicLong SUBQUERY_COUNTER = new AtomicLong(0);
+
     private final ConnectContext session;
     private final MetadataMgr metadataMgr;
 
@@ -913,7 +916,17 @@ public class QueryAnalyzer {
         @Override
         public Scope visitSubquery(SubqueryRelation subquery, Scope context) {
             if (subquery.getResolveTableName() != null && subquery.getResolveTableName().getTbl() == null) {
-                ErrorReport.reportSemanticException(ErrorCode.ERR_DERIVED_MUST_HAVE_ALIAS);
+                if (ConnectContext.get().getSessionVariable().isEnableDeriveTableAutoFillAlias()) {
+                    String autoAlias = String.format(
+                            "subquery_%s_%s_%s",
+                            SUBQUERY_COUNTER.incrementAndGet(),
+                            System.currentTimeMillis(),
+                            Thread.currentThread().getId()
+                    );
+                    subquery.getResolveTableName().setTbl(autoAlias);
+                } else {
+                    ErrorReport.reportSemanticException(ErrorCode.ERR_DERIVED_MUST_HAVE_ALIAS);
+                }
             }
 
             Scope queryOutputScope = process(subquery.getQueryStatement(), context);
