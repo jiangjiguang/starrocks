@@ -66,7 +66,9 @@ public abstract class StatementBase implements ParseNode {
         OPTIMIZER,
         REWRITE,
         SCHEDULER,
-        TYPE;
+        TYPE,
+        DIGEST,
+        ;
 
         public static ExplainLevel defaultValue() {
             return NORMAL;

@@ -471,6 +471,23 @@ public class StmtExecutor {
         return parsedStmt;
     }
 
+    private boolean sendSqlDigestByExplain() throws IOException {
+        if (parsedStmt.getExplainLevel() != StatementBase.ExplainLevel.DIGEST) {
+            return false;
+        }
+        String digest = ConnectProcessor.computeStatementDigest(parsedStmt);
+        ShowResultSetMetaData metaData =
+                ShowResultSetMetaData.builder()
+                        .addColumn(new Column("Explain Digest", ScalarType.createVarchar(20)))
+                        .build();
+        sendMetaData(metaData);
+        serializer.reset();
+        serializer.writeLenEncodedString(digest);
+        context.getMysqlChannel().sendOnePacket(serializer.toByteBuffer());
+        context.getState().setEof();
+        return true;
+    }
+
     // Execute one statement.
     // Exception:
     //  IOException: talk with client failed.
@@ -503,6 +520,9 @@ public class StmtExecutor {
 
             if (parsedStmt.isExplain()) {
                 context.setExplainLevel(parsedStmt.getExplainLevel());
+                if (sendSqlDigestByExplain()) {
+                    return;
+                }
             } else {
                 // reset the explain level to avoid the previous explain level affect the current query.
                 context.setExplainLevel(null);
