@@ -45,6 +45,7 @@ import com.starrocks.common.AnalysisException;
 import com.starrocks.common.Config;
 import com.starrocks.common.Pair;
 import com.starrocks.common.util.DateUtils;
+import com.starrocks.common.util.RegexpUtils;
 import com.starrocks.common.util.TimeUtils;
 import com.starrocks.privilege.AuthorizationMgr;
 import com.starrocks.qe.ConnectContext;
@@ -1579,6 +1580,26 @@ public class ScalarOperatorFunctions {
         } catch (Exception e) {
             // If the regular expression compilation fails or there are other exceptions, return the original input
             return ConstantOperator.createVarchar(input);
+        }
+    }
+
+    @ConstantFunction(name = "regexp", returnType = BOOLEAN, argTypes = {VARCHAR, VARCHAR})
+    public static ConstantOperator regexp(ConstantOperator expr, ConstantOperator pattern) {
+        if (expr.isNull() || pattern.isNull()) {
+            return ConstantOperator.createVarchar(null);
+        }
+        String input = expr.getVarchar();
+        String regex = pattern.getVarchar();
+        // If the input is empty or the regular expression is empty, return the input directly
+        if (input == null || input.isEmpty() || regex == null || regex.isEmpty()) {
+            throw new IllegalArgumentException("regex function has empty or null parameters");
+        }
+        try {
+            boolean isMatch = RegexpUtils.tryRegexp(input, regex);
+            return ConstantOperator.createBoolean(isMatch);
+        } catch (Exception e) {
+            // If the regular expression compilation fails or there are other exceptions, return the original input
+            throw new IllegalArgumentException("regex function parse error, ", e);
         }
     }
 

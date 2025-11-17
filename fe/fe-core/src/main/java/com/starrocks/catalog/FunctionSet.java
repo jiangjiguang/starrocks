@@ -228,6 +228,7 @@ public class FunctionSet {
     public static final String ILIKE = "ilike";
     public static final String LIKE = "like";
     public static final String REGEXP = "regexp";
+    public static final String REGEXP_LIKE = "regexp_like";
 
     // Utility functions:
     public static final String CURRENT_VERSION = "current_version";

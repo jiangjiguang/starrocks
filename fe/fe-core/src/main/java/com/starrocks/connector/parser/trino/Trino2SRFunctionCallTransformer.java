@@ -92,7 +92,27 @@ public class Trino2SRFunctionCallTransformer {
         if (result == null) {
             result = rewriteDateAddFunction(fnName, children);
         }
+        if (result == null) {
+            result = rewriteRegexpLikeFunction(fnName, children);
+        }
         return result;
+    }
+
+    public static Expr rewriteRegexpLikeFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (!functionName.equalsIgnoreCase(FunctionSet.REGEXP_LIKE)) {
+            return null;
+        }
+        if (num != 2) {
+            return null;
+        }
+        Expr column = arguments.get(0);
+        Expr pattern = arguments.get(1);
+        if (!(pattern instanceof StringLiteral)) {
+            throw new ParsingException(String.format("%s function need string pattern, but the pattern is %s", functionName, pattern));
+        }
+        functionName = FunctionSet.REGEXP;
+        return new FunctionCallExpr(functionName, arguments);
     }
 
     public static Expr rewriteDateAddFunction(String functionName, List<Expr> arguments) {
