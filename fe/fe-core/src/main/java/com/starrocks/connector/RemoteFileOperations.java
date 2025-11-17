@@ -25,7 +25,6 @@ import com.starrocks.connector.hive.HiveWriteUtils;
 import com.starrocks.connector.hive.Partition;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
-import jline.internal.Log;
 import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
@@ -341,40 +340,33 @@ public class RemoteFileOperations {
             Path writePath,
             Path targetPath,
             List<String> fileNames) {
-        try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, writePath.toUri())) {
-            for (String fileName : fileNames) {
-                Path source = new Path(writePath, fileName);
-                Path target = new Path(targetPath, fileName);
-                renameFileFutures.add(CompletableFuture.runAsync(() -> {
-                    if (cancelled.get()) {
-                        return;
-                    }
-                    try {
-                        if (fileSystem.exists(target)) {
-                            throw new StarRocksConnectorException("Failed to move data files from %s " +
-                                    "to target location %s. msg: target location already exists",
-                                    source, target);
-                        }
-
-                        if (!fileSystem.rename(source, target)) {
-                            throw new StarRocksConnectorException("Failed to move data files from %s " +
-                                    "to target location %s. msg: rename operation failed",
-                                    source, target);
-                        }
-                    } catch (IOException e) {
-                        LOG.error("Failed to rename data files", e);
+        for (String fileName : fileNames) {
+            Path source = new Path(writePath, fileName);
+            Path target = new Path(targetPath, fileName);
+            renameFileFutures.add(CompletableFuture.runAsync(() -> {
+                if (cancelled.get()) {
+                    return;
+                }
+                try (FileSystem fileSystem = HdfsEnvironment.getFileSystem(conf, writePath.toUri())) {
+                    if (fileSystem.exists(target)) {
                         throw new StarRocksConnectorException("Failed to move data files from %s " +
-                                "to final location %s. msg: %s",
-                                source, target, e.getMessage());
+                                "to target location %s. msg: target location already exists",
+                                source, target);
                     }
-                }, updateRemoteFilesExecutor));
-            }
-        } catch (IOException e) {
-            Log.error("Failed to get fileSystem", e);
-            throw new StarRocksConnectorException("Failed to move data files to target location. " +
-                    "Failed to get file system on path %s. msg: %s", writePath, e.getMessage());
-        }
 
+                    if (!fileSystem.rename(source, target)) {
+                        throw new StarRocksConnectorException("Failed to move data files from %s " +
+                                "to target location %s. msg: rename operation failed",
+                                source, target);
+                    }
+                } catch (IOException e) {
+                    LOG.error("Failed to rename data files", e);
+                    throw new StarRocksConnectorException("Failed to move data files from %s " +
+                            "to final location %s. msg: %s",
+                            source, target, e.getMessage());
+                }
+            }, updateRemoteFilesExecutor));
+        }
 
     }
 
