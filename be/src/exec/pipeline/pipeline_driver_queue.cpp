@@ -253,7 +253,7 @@ void PrioritySharedDriverQueue::update_statistics(const DriverRawPtr driver) {
 StatusOr<DriverRawPtr> PrioritySharedDriverQueue::take(const bool block) {
     // -1 means no candidates; else has candidate.
     int queue_idx = -1;
-    DriverRawPtr driver_ptr;
+    DriverRawPtr driver_ptr = nullptr;
 
     {
         std::unique_lock<std::mutex> lock(_global_mutex);
@@ -271,21 +271,23 @@ StatusOr<DriverRawPtr> PrioritySharedDriverQueue::take(const bool block) {
                 }
             }
 
-            if (queue_idx >= 1) {
+            if (queue_idx >= 0) {
                 break;
             }
 
             if (!block) {
-                return nullptr;
+               break;
             }
 
             _cv.wait(lock);
         }
-        // record queue's index to accumulate time for it.
-        driver_ptr = _queues[queue_idx].take(block);
-        driver_ptr->set_in_ready_queue(false);
+        if (queue_idx >= 0) {
+            // record queue's index to accumulate time for it.
+            driver_ptr = _queues[queue_idx].take(false);
+            driver_ptr->set_in_ready_queue(false);
 
-        --_num_drivers;
+            --_num_drivers;
+        }
     }
 
     // next pipeline driver to execute.
