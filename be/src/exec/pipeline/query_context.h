@@ -304,7 +304,7 @@ private:
     int64_t _scan_limit = 0;
     workgroup::RunningQueryTokenPtr _wg_running_query_token_ptr;
     std::atomic<workgroup::RunningQueryToken*> _wg_running_query_token_atomic_ptr = nullptr;
-    size_t query_priority = 1;
+    size_t query_priority = 0;
 
     // STREAM MV
     std::shared_ptr<StreamEpochManager> _stream_epoch_manager;

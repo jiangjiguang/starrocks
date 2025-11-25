@@ -2087,7 +2087,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     private boolean enableEliminateSortClauseWithoutLimit = true;
 
     @VarAttr(name = QUERY_PRIORITY)
-    private int queryPriority = 1;
+    private int queryPriority = 0;
 
 
     public boolean isEnableEliminateSortClauseWithoutLimit() {

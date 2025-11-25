@@ -321,7 +321,7 @@ struct TQueryOptions {
 
   141: optional i32 datacache_evict_probability;
 
-  998: optional i32 query_priority = 1;
+  998: optional i32 query_priority = 0;
   999: optional bool enable_presto_translation = false;
 }
 
