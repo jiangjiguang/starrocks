@@ -95,7 +95,22 @@ public class Trino2SRFunctionCallTransformer {
         if (result == null) {
             result = rewriteRegexpLikeFunction(fnName, children);
         }
+        if (result == null) {
+            result = rewriteLengthFunction(fnName, children);
+        }
         return result;
+    }
+
+    public static Expr rewriteLengthFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (!functionName.equalsIgnoreCase(FunctionSet.LENGTH)) {
+            return null;
+        }
+        if (num != 1) {
+            return null;
+        }
+        functionName = FunctionSet.CHAR_LENGTH;
+        return new FunctionCallExpr(functionName, arguments);
     }
 
     public static Expr rewriteRegexpLikeFunction(String functionName, List<Expr> arguments) {
