@@ -1233,10 +1233,10 @@ public class Config extends ConfigBase {
     public static int task_runs_queue_length = 500;
     /**
      * Limitation of the running TaskRun.
-     * Default is 4.
+     * Default is 50.
      */
     @ConfField(mutable = true)
-    public static int task_runs_concurrency = 4;
+    public static int task_runs_concurrency = 50;
 
     /**
      * max num of thread to handle task runs in task runs executor thread-pool.

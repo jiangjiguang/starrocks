@@ -160,7 +160,7 @@ public class TaskRunScheduler {
                     // put it back to pending queue
                     pendingTaskRunQueue.add(taskRun);
                     // exit the loop, because the task run is not ready to run
-                    break;
+                    continue;
                 }
                 // check the resource group concurrency limit
                 long currentResourceGroupRunning = getCurrentRunningTaskRunCount(tWorkGroup);
@@ -172,7 +172,7 @@ public class TaskRunScheduler {
                     // put it back to pending queue
                     pendingTaskRunQueue.add(taskRun);
                     // exit the loop, because the task run is not ready to run
-                    break;
+                    continue;
                 }
                 // increment the running task run count for the resource group
                 addRunningTaskRunResourceGroupName(tWorkGroup.getName(), taskRun.getTask().getName());
