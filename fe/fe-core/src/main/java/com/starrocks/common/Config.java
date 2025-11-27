@@ -3365,4 +3365,7 @@ public class Config extends ConfigBase {
 
     @ConfField(mutable = true)
     public static boolean enable_rewrite_trunc_in_parser_step = true;
+
+    @ConfField
+    public static int dict_collect_thread_pool_size = 16;
 }
