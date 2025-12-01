@@ -17,11 +17,13 @@ package com.starrocks.connector.hudi;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.starrocks.connector.HdfsEnvironment;
 import com.starrocks.connector.RemoteFileDesc;
 import com.starrocks.connector.RemoteFileIO;
 import com.starrocks.connector.RemotePathKey;
 import com.starrocks.connector.exception.StarRocksConnectorException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hudi.common.config.HoodieMetadataConfig;
 import org.apache.hudi.common.engine.HoodieLocalEngineContext;
 import org.apache.hudi.common.fs.FSUtils;
@@ -76,6 +78,8 @@ public class HudiRemoteFileIO implements RemoteFileIO {
                     ctx.timeline = timeline;
                 }
             }
+        } catch (Throwable e) {
+            throw new StarRocksConnectorException("Failed to create HudiContext", e);
         } finally {
             ctx.lock.unlock();
         }
@@ -88,7 +92,9 @@ public class HudiRemoteFileIO implements RemoteFileIO {
             if (ctx.usedCount == 0) {
                 ctx.close();
             }
-        } finally {
+        } catch (Throwable e) {
+            throw new StarRocksConnectorException("Failed to destroy HudiContext", e);
+        }  finally {
             ctx.lock.unlock();
         }
     }
@@ -97,6 +103,9 @@ public class HudiRemoteFileIO implements RemoteFileIO {
     public Map<RemotePathKey, List<RemoteFileDesc>> getRemoteFiles(RemotePathKey pathKey) {
         String tableLocation = pathKey.getHudiTableLocation().orElseThrow(() ->
                 new StarRocksConnectorException("Missing hudi table base location on %s", pathKey));
+        // set ugi for authority
+        UserGroupInformation ugi = HdfsEnvironment.getUserGroupInformation(configuration.unwrap());
+        UserGroupInformation.setLoginUser(ugi);
 
         String partitionPath = pathKey.getPath();
         String partitionName = FSUtils.getRelativePartitionPath(new StoragePath(tableLocation), new StoragePath(partitionPath));
@@ -114,7 +123,7 @@ public class HudiRemoteFileIO implements RemoteFileIO {
                 return resultPartitions.put(pathKey, fileDescs).build();
             }
             Iterator<FileSlice> hoodieFileSliceIterator = hudiContext.fsView
-                    .getLatestMergedFileSlicesBeforeOrOn(partitionName, hudiContext.lastInstant.getTimestamp()).iterator();
+                    .getLatestMergedFileSlicesBeforeOrOn(partitionName, hudiContext.lastInstant.getCompletionTime()).iterator();
             while (hoodieFileSliceIterator.hasNext()) {
                 FileSlice fileSlice = hoodieFileSliceIterator.next();
                 Optional<HoodieBaseFile> baseFile = fileSlice.getBaseFile().toJavaOptional();
