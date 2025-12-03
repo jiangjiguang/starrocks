@@ -253,14 +253,13 @@ public class HiveMultiPartitionPruner implements PartitionPruner {
         return sortedPartitionValues;
     }
 
-    private ConstantOperator getResultByScalarFunction(CallOperator funcOperator,
+    private ConstantOperator getResultByScalarFunction(String functionName, ConstantOperator splitOperator,
                                                        List<ConstantOperator> sortedPartitionValues) {
         ConstantOperator result = null;
-        if (funcOperator.getFnName().equalsIgnoreCase(FunctionSet.CONCAT_WS)) {
-            ConstantOperator split = (ConstantOperator) funcOperator.getChild(0);
-            result = ScalarOperatorFunctions.concat_ws(split,
+        if (functionName.equalsIgnoreCase(FunctionSet.CONCAT_WS)) {
+            result = ScalarOperatorFunctions.concat_ws(splitOperator,
                     sortedPartitionValues.toArray(new ConstantOperator[0]));
-        } else if (funcOperator.getFnName().equalsIgnoreCase(FunctionSet.CONCAT)) {
+        } else if (functionName.equalsIgnoreCase(FunctionSet.CONCAT)) {
             result = ScalarOperatorFunctions.concat(sortedPartitionValues.toArray(new ConstantOperator[0]));
         }
         if (result == null) {
@@ -305,8 +304,10 @@ public class HiveMultiPartitionPruner implements PartitionPruner {
             idToPartitionPath.keySet().forEach(partId -> {
                 String location = idToPartitionPath.get(partId);
                 List<ConstantOperator> sortedPartitionValues = getPartitionValues(finalPredictArgs, location);
+                ConstantOperator splitOperator = getSplitOperator(funcOperator.getChild(0), location);
+                String functionName = funcOperator.getFnName();
                 // get the real partition value by concat_ws function
-                ConstantOperator result = getResultByScalarFunction(funcOperator, sortedPartitionValues);
+                ConstantOperator result = getResultByScalarFunction(functionName, splitOperator, sortedPartitionValues);
                 // set the operator with the real partition value
                 ScalarOperator newOperator = operator.clone();
                 newOperator.setChild(0, result);
@@ -328,6 +329,19 @@ public class HiveMultiPartitionPruner implements PartitionPruner {
         }
         noEvalConjuncts.addAll(noEvalConjunctMap.values());
         return new ArrayList<>(partitionIds);
+    }
+
+    private ConstantOperator getSplitOperator(ScalarOperator scalarOperator, String location) {
+        if (scalarOperator instanceof ConstantOperator) {
+            return (ConstantOperator) scalarOperator;
+        } else if (scalarOperator instanceof ColumnRefOperator) {
+            List<ScalarOperator> finalPredictArgs = new ArrayList<>();
+            finalPredictArgs.add(scalarOperator);
+            List<ConstantOperator> sortedPartitionValues = getPartitionValues(finalPredictArgs, location);
+            return sortedPartitionValues.get(0);
+        }
+        throw new StarRocksPlannerException("get split operator by constant function fail",
+                ErrorType.INTERNAL_ERROR);
     }
 
     private boolean evalPartitionPruneFilter(ScalarOperator operator) {

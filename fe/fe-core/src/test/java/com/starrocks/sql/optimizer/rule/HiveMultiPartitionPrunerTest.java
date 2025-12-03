@@ -486,4 +486,22 @@ public class HiveMultiPartitionPrunerTest {
         HiveMultiPartitionPruner pruner = initPruner(conjuncts);
         Assert.assertEquals(Lists.newArrayList(0L), pruner.prune());
     }
+
+    @Test
+    public void testConcatWsBinaryPredicate() throws AnalysisException {
+        // concat_ws(year, month, day, '-') = "2021-01-01"
+        List<ScalarOperator> conjuncts = new ArrayList<>();
+        CallOperator concatDateColumn = new CallOperator(FunctionSet.CONCAT_WS, Type.STRING,
+                Lists.newArrayList(
+                        yearColumn,
+                        monthColumn,
+                        dayColumn,
+                        ConstantOperator.createVarchar("-")
+                )
+        );
+        conjuncts.add(new BinaryPredicateOperator(BinaryType.EQ, concatDateColumn,
+                ConstantOperator.createDate(LocalDateTime.of(2021, 1, 1, 0, 0, 0))));
+        HiveMultiPartitionPruner pruner = initPruner(conjuncts);
+        Assert.assertEquals(Lists.newArrayList(0L), pruner.prune());
+    }
 }
