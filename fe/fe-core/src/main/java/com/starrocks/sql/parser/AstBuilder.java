@@ -6797,13 +6797,24 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
         return new VarBinaryLiteral(quotedText.substring(2, quotedText.length() - 1), createPos(context));
     }
 
-    private static String escapeBackSlash(String str) {
+    private String escapeBackSlash(String str) {
         StringWriter writer = new StringWriter();
         int strLen = str.length();
         for (int i = 0; i < strLen; ++i) {
             char c = str.charAt(i);
             if (c == '\\' && (i + 1) < strLen) {
-                switch (str.charAt(i + 1)) {
+                char next = str.charAt(i + 1);
+                if (isPrestoDialect) {
+                    if (next == 'u') {
+                        writer.append('\\').append('u');
+                        // Skip u
+                        i++;
+                        // No parsing. Move on to the next character
+                        continue;
+                    }
+                }
+
+                switch (next) {
                     case 'n':
                         writer.append('\n');
                         break;

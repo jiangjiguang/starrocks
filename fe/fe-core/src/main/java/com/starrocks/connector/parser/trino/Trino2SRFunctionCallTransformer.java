@@ -31,6 +31,7 @@ import com.starrocks.catalog.FunctionSet;
 import com.starrocks.catalog.ScalarType;
 import com.starrocks.catalog.Type;
 import com.starrocks.common.Config;
+import com.starrocks.common.util.RegexpUtils;
 import com.starrocks.sql.ast.IntervalLiteral;
 import com.starrocks.sql.ast.UnitIdentifier;
 import com.starrocks.sql.parser.ParsingException;
@@ -98,6 +99,9 @@ public class Trino2SRFunctionCallTransformer {
         if (result == null) {
             result = rewriteLengthFunction(fnName, children);
         }
+        if (result == null) {
+            result = rewriteRegexpExtractFunction(fnName, children);
+        }
         return result;
     }
 
@@ -111,6 +115,35 @@ public class Trino2SRFunctionCallTransformer {
         }
         functionName = FunctionSet.CHAR_LENGTH;
         return new FunctionCallExpr(functionName, arguments);
+    }
+
+    public static Expr rewriteRegexpExtractFunction(String functionName, List<Expr> arguments) {
+        int num = arguments.size();
+        if (!functionName.equalsIgnoreCase(FunctionSet.REGEXP_EXTRACT)) {
+            return null;
+        }
+        if (num != 2) {
+            return null;
+        }
+        // from regexp_extract(column, pattern) to regexp_extract(column, (pattern), 1)
+        Expr column = arguments.get(0);
+        Expr pattern = arguments.get(1);
+        if (!(pattern instanceof StringLiteral)) {
+            throw new ParsingException(String.format("%s function need string pattern, but the pattern is %s", functionName, pattern));
+        }
+        String patternTemp = ((StringLiteral) pattern).getStringValue();
+        // 1. Check if patternTemp contains (), and complete it if not
+        patternTemp = RegexpUtils.ensureCaptureGroup(patternTemp);
+        // 2. Check if there are any characters that need to be escaped. If so, escape them
+        patternTemp = RegexpUtils.convertUnicodeEscapes(patternTemp);
+        // 3. Create a new argument list. The first two parameters are the same, and add a third parameter that is 1
+        List<Expr> newArguments = new ArrayList<>();
+        newArguments.add(column);
+        newArguments.add(new StringLiteral(patternTemp));
+        // The default group=1
+        newArguments.add(new IntLiteral(1));
+        // 4. Create a new function call expression
+        return new FunctionCallExpr(functionName, newArguments);
     }
 
     public static Expr rewriteRegexpLikeFunction(String functionName, List<Expr> arguments) {
