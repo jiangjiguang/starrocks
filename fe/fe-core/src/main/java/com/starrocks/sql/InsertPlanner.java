@@ -70,8 +70,10 @@ import com.starrocks.sql.analyzer.SemanticException;
 import com.starrocks.sql.ast.DefaultValueExpr;
 import com.starrocks.sql.ast.InsertStmt;
 import com.starrocks.sql.ast.QueryRelation;
+import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.SelectListItem;
 import com.starrocks.sql.ast.SelectRelation;
+import com.starrocks.sql.ast.SubqueryRelation;
 import com.starrocks.sql.ast.ValuesRelation;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
@@ -870,6 +872,11 @@ public class InsertPlanner {
             if (session.isEnableConnectorSinkGlobalShuffle()) {
                 // use random shuffle for unpartitioned table
                 if (table.getPartitionColumnNames().isEmpty()) {
+                    if (session.isEnableLocalMergeInTableFunctionTable()) {
+                        if (checkQueryHaveOrderBy(queryRelation)) {
+                            return PhysicalPropertySet.EMPTY;
+                        }
+                    }
                     return new PhysicalPropertySet(DistributionProperty
                             .createProperty(new RoundRobinDistributionSpec()));
                 } else { // use hash shuffle for partitioned table
@@ -930,6 +937,42 @@ public class InsertPlanner {
         shuffleServiceEnable = true;
 
         return new PhysicalPropertySet(property);
+    }
+
+    /**
+     * Check if the query has ORDER BY (multi-level check)
+     * @param queryRelation QueryRelation
+     * @return boolean
+     */
+    private boolean checkQueryHaveOrderBy(QueryRelation queryRelation) {
+        boolean hasOrderBy = false;
+
+        if (!(queryRelation instanceof SelectRelation)) {
+            return hasOrderBy;
+        }
+        // Check the ORDER BY of the current layer
+        SelectRelation selectRel = (SelectRelation) queryRelation;
+        if (selectRel.hasOrderByClause()) {
+            return true;
+        }
+        // Check the next layer (if it exists)
+        if (!(selectRel.getRelation() instanceof SubqueryRelation)) {
+            return hasOrderBy;
+        }
+        SubqueryRelation subqueryRel = (SubqueryRelation) selectRel.getRelation();
+        QueryStatement subqueryStmt = subqueryRel.getQueryStatement();
+        if (subqueryStmt == null) {
+            return hasOrderBy;
+        }
+        QueryRelation subqueryQueryRel = subqueryStmt.getQueryRelation();
+        if (!(subqueryQueryRel instanceof SelectRelation)) {
+            return hasOrderBy;
+        }
+        SelectRelation subSelectRel = (SelectRelation) subqueryQueryRel;
+        if (subSelectRel.hasOrderByClause()) {
+            hasOrderBy = true;
+        }
+        return hasOrderBy;
     }
 
     private OptExprBuilder fillKeyPartitionsColumn(ColumnRefFactory columnRefFactory,
