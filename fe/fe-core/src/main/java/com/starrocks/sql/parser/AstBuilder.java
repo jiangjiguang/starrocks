@@ -6484,6 +6484,11 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
         } else if (context.aggregationFunction().ARRAY_AGG_DISTINCT() != null) { // alias to ARRAY_AGG
             functionName = FunctionSet.ARRAY_AGG;
             isDistinct = true;
+        } else if (context.aggregationFunction().COLLECT_SET() != null) { // alias to ARRAY_AGG
+            if (isPrestoDialect) {
+                functionName = FunctionSet.ARRAY_AGG;
+                isDistinct = true;
+            }
         } else if (context.aggregationFunction().GROUP_CONCAT() != null) {
             functionName = FunctionSet.GROUP_CONCAT;
             isGroupConcat = true;

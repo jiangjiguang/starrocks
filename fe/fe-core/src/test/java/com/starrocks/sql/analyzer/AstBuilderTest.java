@@ -193,7 +193,6 @@ public class AstBuilderTest {
         Assert.assertTrue(execPlan.toString().toLowerCase().contains("2025-09-26"));
     }
 
-
     @Test
     public void testLength() {
         connectContext.getSessionVariable().setEnablePrestoTranslation(true);
@@ -202,6 +201,16 @@ public class AstBuilderTest {
         ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
         assert execPlan != null;
         Assert.assertTrue(execPlan.toString().toLowerCase().contains("char_length"));
+    }
+
+    @Test
+    public void testCollectSet() {
+        connectContext.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "select collect_set(1)";
+        StatementBase parsedStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parsedStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertTrue(execPlan.toString().toLowerCase().contains("array_agg_distinct"));
     }
 
 }
