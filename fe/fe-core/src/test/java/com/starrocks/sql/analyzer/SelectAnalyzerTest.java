@@ -81,4 +81,20 @@ public class SelectAnalyzerTest extends PlanTestBase {
         Assert.assertTrue(execPlan.getExplainString(TExplainLevel.NORMAL).contains("CAST(to_json(map{12:100}) AS VARCHAR(1048576))"));
     }
 
+    @Test
+    public void testSelectDistinctColumnInGroupBy() throws Exception {
+        String sql = "select distinct v1 from test.t0 group by v1";
+        Assert.assertThrows(
+                "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY",
+                SemanticException.class,
+                () -> getExecPlan(sql)
+        );
+        // create scalar rewrite context
+        ConnectContext session = UtFrameUtils.createDefaultCtx();
+        // open presto translate
+        session.getSessionVariable().setEnablePrestoTranslation(true);
+        ExecPlan execPlan = getExecPlan(sql);
+        Assert.assertTrue(execPlan.getExplainString(TExplainLevel.NORMAL).contains("group by"));
+    }
+
 }

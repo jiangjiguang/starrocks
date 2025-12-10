@@ -317,7 +317,11 @@ public class SelectAnalyzer {
                 });
 
                 if (hasGroupByClause) {
-                    throw new SemanticException("cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+                    if (session.getSessionVariable().isEnablePrestoTranslation()) {
+                        selectList.setIsDistinct(false);
+                    } else {
+                        throw new SemanticException("cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+                    }
                 }
                 analyzeState.setIsDistinct(true);
             }
