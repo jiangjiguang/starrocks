@@ -572,7 +572,7 @@ public class HiveMetastoreApiConverter {
             // Currently, we only support parquet on hudi format.
             return RemoteFileInputFormat.PARQUET;
         }
-        return RemoteFileInputFormat.fromHdfsInputFormatClass(inputFormat);
+        return fromHdfsInputFormatClass(inputFormat);
     }
 
     public static TextFileFormatDesc toTextFileFormatDesc(Map<String, String> parameters) {
@@ -589,6 +589,8 @@ public class HiveMetastoreApiConverter {
         // There is a typo in Hive 2.x version, and fixed in Hive 3.x version.
         // https://issues.apache.org/jira/browse/HIVE-16922
         String collectionDelim;
+        String quoteChar = "";
+        String escapeChar = "";
         if (parameters.containsKey("colelction.delim")) {
             collectionDelim = parameters.getOrDefault("colelction.delim", "");
         } else {
@@ -600,6 +602,15 @@ public class HiveMetastoreApiConverter {
             // Support for hive org.apache.hadoop.hive.serde2.OpenCSVSerde
             // https://cwiki.apache.org/confluence/display/hive/csv+serde
             fieldDelim = parameters.getOrDefault(OpenCSVSerde.SEPARATORCHAR, "");
+            quoteChar = parameters.getOrDefault(OpenCSVSerde.QUOTECHAR, "");
+            // retry for lower case to get value
+            if (StringUtils.isBlank(quoteChar)) {
+                quoteChar = parameters.getOrDefault(OpenCSVSerde.QUOTECHAR.toLowerCase(), "");
+            }
+            escapeChar = parameters.getOrDefault(OpenCSVSerde.SEPARATORCHAR, "");
+            if (StringUtils.isBlank(escapeChar)) {
+                escapeChar = parameters.getOrDefault(OpenCSVSerde.SEPARATORCHAR.toLowerCase(), "");
+            }
         }
         String lineDelim = parameters.getOrDefault(serdeConstants.LINE_DELIM, "");
         String mapkeyDelim = parameters.getOrDefault(serdeConstants.MAPKEY_DELIM, "");
@@ -614,7 +625,7 @@ public class HiveMetastoreApiConverter {
         collectionDelim = collectionDelim.isEmpty() ? null : collectionDelim;
         mapkeyDelim = mapkeyDelim.isEmpty() ? null : mapkeyDelim;
 
-        return new TextFileFormatDesc(fieldDelim, lineDelim, collectionDelim, mapkeyDelim, skipHeaderLineCount);
+        return new TextFileFormatDesc(fieldDelim, lineDelim, collectionDelim, mapkeyDelim, skipHeaderLineCount, quoteChar, escapeChar);
     }
 
     public static HiveCommonStats toHiveCommonStats(Map<String, String> params) {
@@ -707,7 +718,7 @@ public class HiveMetastoreApiConverter {
         return -1;
     }
 
-    public static List<ColumnStatisticsObj> getColStatsFromSparkParams(org.apache.hadoop.hive.metastore.api.Table table) {
+    public static List<ColumnStatisticsObj> getColStatsFromSparkParams(Table table) {
         return table.getSd().getCols().stream()
                 .map(fieldSchema -> convertSparkColumnStatistics(fieldSchema, table.getParameters()))
                 .filter(Objects::nonNull)

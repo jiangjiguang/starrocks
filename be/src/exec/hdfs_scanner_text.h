@@ -32,6 +32,9 @@ const std::string LINE_DELIM_CR = "\r";
 // TODO(SmithCruise) CR + LF, but we don't support it yet, because our code only support single char as line delimiter
 const std::string LINE_DELIM_CR_LF = "\r\n";
 
+const char DEFAULT_QUOTE_CHAR = '\0';
+const char DEFAULT_ESCAPE_CHAR = '\0';
+
 // This class used by data lake(Hive, Iceberg,... etc), not for broker load.
 // Broker load plz refer to csv_scanner.cpp
 class HdfsTextScanner final : public HdfsScanner {
@@ -59,6 +62,10 @@ private:
     std::string _field_delimiter;
     char _collection_delimiter;
     char _mapkey_delimiter;
+    // quotation mark character, with a default value of 0 indicating that escape is not used
+    char _quote_char = '\0';
+    // Escape character, with a default value of 0 indicating that escape is not used
+    char _escape_char = '\0';
     int32_t _skip_header_line_count = 0;
     bool _need_probe_line_delimiter = false;
     // Always set true in data lake now.

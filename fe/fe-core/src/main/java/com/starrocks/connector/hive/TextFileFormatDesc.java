@@ -20,6 +20,7 @@ import com.starrocks.connector.exception.StarRocksConnectorException;
 import com.starrocks.qe.ConnectContext;
 import com.starrocks.qe.SessionVariable;
 import com.starrocks.thrift.TTextFileDesc;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -39,17 +40,28 @@ public class TextFileFormatDesc {
 
     private final int skipHeaderLineCount;
 
+    private final String quoteChar;
+
+    private final String escapeChar;
+
     public TextFileFormatDesc(String fieldDelim, String lineDelim, String collectionDelim, String mapkeyDelim) {
-        this(fieldDelim, lineDelim, collectionDelim, mapkeyDelim, 0);
+        this(fieldDelim, lineDelim, collectionDelim, mapkeyDelim, 0, null, null);
     }
 
     public TextFileFormatDesc(String fieldDelim, String lineDelim, String collectionDelim, String mapkeyDelim,
                               int skipHeaderLineCount) {
+        this(fieldDelim, lineDelim, collectionDelim, mapkeyDelim, skipHeaderLineCount, null, null);
+    }
+
+    public TextFileFormatDesc(String fieldDelim, String lineDelim, String collectionDelim, String mapkeyDelim,
+                              int skipHeaderLineCount, String quoteChar, String escapeChar) {
         this.fieldDelim = parseFieldDelim(fieldDelim);
         this.lineDelim = lineDelim;
         this.collectionDelim = collectionDelim;
         this.mapkeyDelim = mapkeyDelim;
         this.skipHeaderLineCount = skipHeaderLineCount;
+        this.quoteChar = quoteChar;
+        this.escapeChar = escapeChar;
     }
 
     public String getFieldDelim() {
@@ -86,6 +98,14 @@ public class TextFileFormatDesc {
         }
         if (mapkeyDelim != null) {
             desc.setMapkey_delim(mapkeyDelim);
+        }
+        if (!StringUtils.isBlank(quoteChar)) {
+            byte[] bs = quoteChar.getBytes();
+            desc.setEnclose(bs[0]);
+        }
+        if (!StringUtils.isBlank(escapeChar)) {
+            byte[] bs = escapeChar.getBytes();
+            desc.setEscape(bs[0]);
         }
         desc.setSkip_header_line_count(skipHeaderLineCount);
         return desc;
