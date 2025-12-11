@@ -6467,7 +6467,7 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
     @Override
     public ParseNode visitAggregationFunctionCall(com.starrocks.sql.parser.StarRocksParser.AggregationFunctionCallContext context) {
         NodePosition pos = createPos(context);
-        String functionName;
+        String functionName = null;
         boolean isGroupConcat = false;
         boolean isLegacyGroupConcat = false;
         boolean isDistinct = false;
