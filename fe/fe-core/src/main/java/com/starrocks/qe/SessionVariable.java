@@ -4574,7 +4574,7 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
         this.hiveUdfCustomFormatFieldDelimiter = hiveUdfCustomFormatFieldDelimiter;
     }
 
-    public static final String ENABLE_LOCAL_MERGE_IN_TABLE_FUNCTION_TABLE = "ENABLE_LOCAL_MERGE_IN_TABLE_FUNCTION_TABLE";
+    public static final String ENABLE_LOCAL_MERGE_IN_TABLE_FUNCTION_TABLE = "enable_local_merge_in_table_function_table";
 
     // insert into files() select from order by xx need keep the sort in sink
     @VariableMgr.VarAttr(name = ENABLE_LOCAL_MERGE_IN_TABLE_FUNCTION_TABLE)
