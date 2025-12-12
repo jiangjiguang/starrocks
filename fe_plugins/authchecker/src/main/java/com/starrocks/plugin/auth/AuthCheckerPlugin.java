@@ -33,7 +33,6 @@ import com.starrocks.sql.ast.InsertStmt;
 import com.starrocks.sql.ast.QueryRelation;
 import com.starrocks.sql.ast.QueryStatement;
 import com.starrocks.sql.ast.StatementBase;
-import com.starrocks.sql.ast.UpdateStmt;
 import com.starrocks.sql.optimizer.OptExpression;
 import com.starrocks.sql.optimizer.Optimizer;
 import com.starrocks.sql.optimizer.OptimizerConfig;
@@ -58,6 +57,8 @@ import java.util.stream.Collectors;
 
 import static com.starrocks.sql.optimizer.rule.RuleType.TF_PARTITION_PRUNE;
 import static com.starrocks.sql.optimizer.rule.RuleType.TF_PRUNE_EMPTY_SCAN;
+import static com.starrocks.sql.optimizer.rule.RuleType.TF_PUSHDOWN_AGG_GROUPING_SET;
+import static com.starrocks.sql.optimizer.rule.RuleType.TF_REWRITE_MULTI_DISTINCT;
 
 /*
  * This plugin will check query authorization before
@@ -171,6 +172,8 @@ public class AuthCheckerPlugin extends Plugin implements AuthPlugin {
         OptimizerConfig config = new OptimizerConfig(OptimizerConfig.OptimizerAlgorithm.RULE_BASED);
         config.disableRule(TF_PARTITION_PRUNE);
         config.disableRule(TF_PRUNE_EMPTY_SCAN);
+        config.disableRule(TF_REWRITE_MULTI_DISTINCT);
+        config.disableRule(TF_PUSHDOWN_AGG_GROUPING_SET);
         Optimizer optimizer = new Optimizer(config);
         optimizedPlan = optimizer.optimize(
                 connectContext,
