@@ -102,12 +102,6 @@ public class Trino2SRFunctionCallTransformer {
         if (result == null) {
             result = rewriteRegexpExtractFunction(fnName, children);
         }
-        if (result == null) {
-            result = convertRegisterFn(fnName, children);
-        }
-        if (result == null) {
-            result = ComplexFunctionCallTransformer.transform(fnName, children.toArray(new Expr[0]));
-        }
         return result;
     }
 
