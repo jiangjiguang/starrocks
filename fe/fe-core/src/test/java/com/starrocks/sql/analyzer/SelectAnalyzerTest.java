@@ -63,6 +63,8 @@ public class SelectAnalyzerTest extends PlanTestBase {
 
         selectAnalyzer.analyzerDoubleInValidRange(item);
         Assert.assertTrue(item.getExpr().toSql().toUpperCase().contains("CAST(CAST("));
+
+        Assert.assertEquals("test_col", item.getAlias());
     }
 
     @Test

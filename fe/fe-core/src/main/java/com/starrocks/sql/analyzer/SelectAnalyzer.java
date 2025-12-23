@@ -981,9 +981,14 @@ public class SelectAnalyzer {
         if (!expr.getType().isDecimalOfAnyVersion() && !expr.getType().isFloatingPointType()) {
             return;
         }
-        Expr stringExpr = new CastExpr(Type.VARCHAR, expr);
-        Expr doubleExpr = new CastExpr(expr.getType(), stringExpr);
+        if (!(expr instanceof SlotRef)) {
+            return;
+        }
+        SlotRef slotRef = (SlotRef) expr;
+        Expr stringExpr = new CastExpr(Type.VARCHAR, slotRef);
+        CastExpr doubleExpr = new CastExpr(slotRef.getType(), stringExpr);
         item.setExpr(doubleExpr);
+        item.setAlias(slotRef.getColumnName());
     }
 
     private void analyzeComplexTypeForInsertTableFunction(SelectListItem item) {
