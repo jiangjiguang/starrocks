@@ -46,6 +46,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static com.starrocks.common.profile.Tracers.Module.EXTERNAL;
 import static com.starrocks.connector.hive.HiveConnector.HIVE_METASTORE_TIMEOUT;
@@ -242,6 +243,19 @@ public class HiveMetaClient {
     }
 
     public List<String> getPartitionKeys(String dbName, String tableName) {
+        if (!Config.enable_check_hms_api_runtime_timeout) {
+            return actualGetPartitionKeys(dbName, tableName);
+        }
+
+        return HiveMetaClientTimeoutExecutor.executeWithTimeout(
+                () -> actualGetPartitionKeys(dbName, tableName),
+                Config.hms_api_runtime_second,
+                TimeUnit.SECONDS,
+                "getPartitionKeys"
+        );
+    }
+
+    public List<String> actualGetPartitionKeys(String dbName, String tableName) {
         long start = System.nanoTime();
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "HMS.listPartitionNames")) {
             List<String> result = callRPC("listPartitionNames",
@@ -263,6 +277,19 @@ public class HiveMetaClient {
     }
 
     public List<String> getPartitionKeysByValue(String dbName, String tableName, List<String> partitionValues) {
+        if (!Config.enable_check_hms_api_runtime_timeout) {
+            return actualGetPartitionKeysByValue(dbName, tableName, partitionValues);
+        }
+
+        return HiveMetaClientTimeoutExecutor.executeWithTimeout(
+                () -> actualGetPartitionKeysByValue(dbName, tableName, partitionValues),
+                Config.hms_api_runtime_second,
+                TimeUnit.SECONDS,
+                "getPartitionKeysByValue"
+        );
+    }
+
+    public List<String> actualGetPartitionKeysByValue(String dbName, String tableName, List<String> partitionValues) {
         long start = System.nanoTime();
         try (Timer ignored = Tracers.watchScope(EXTERNAL, "HMS.listPartitionNamesByValue")) {
             List<String> result = callRPC("listPartitionNames",
@@ -339,6 +366,19 @@ public class HiveMetaClient {
         }
     }
 
+    public List<Partition> getPartitionsByNames(String dbName, String tblName, List<String> partitionNames) {
+        if (!Config.enable_check_hms_api_runtime_timeout) {
+            return actualGetPartitionsByNames(dbName, tblName, partitionNames);
+        }
+
+        int timeout = Config.hms_api_runtime_second;
+        return HiveMetaClientTimeoutExecutor.executeWithTimeout(
+                () -> actualGetPartitionsByNames(dbName, tblName, partitionNames),
+                timeout, TimeUnit.SECONDS,
+                "getPartitionsByNames"
+        );
+    }
+
     /**
      * Both 'getPartitionsByNames' and 'getPartitionColumnStatistics' could throw exception or no response
      * when querying too many partitions at present. Due to statistics don't affect accuracy, user could adjust
@@ -346,7 +386,7 @@ public class HiveMetaClient {
      * But "getPartitionsByNames" interface must return the full contents due to the need to get partition file information.
      * So we resend request "getPartitionsByNames" when an exception occurs.
      */
-    public List<Partition> getPartitionsByNames(String dbName, String tblName, List<String> partitionNames) {
+    public List<Partition> actualGetPartitionsByNames(String dbName, String tblName, List<String> partitionNames) {
         long start = System.nanoTime();
         int size = partitionNames.size();
         List<Partition> partitions;
@@ -467,7 +507,22 @@ public class HiveMetaClient {
         }
     }
 
+
     public Map<String, List<ColumnStatisticsObj>> getPartitionColumnStats(String dbName, String tblName,
+                                                                          List<String> partitionNames, List<String> columnNames) {
+        if (!Config.enable_check_hms_api_runtime_timeout) {
+            return actualGetPartitionColumnStats(dbName, tblName, partitionNames, columnNames);
+        }
+
+        return HiveMetaClientTimeoutExecutor.executeWithTimeout(
+                () -> actualGetPartitionColumnStats(dbName, tblName, partitionNames, columnNames),
+                Config.hms_api_runtime_second,
+                TimeUnit.SECONDS,
+                "getPartitionColumnStats"
+        );
+    }
+
+    public Map<String, List<ColumnStatisticsObj>> actualGetPartitionColumnStats(String dbName, String tblName,
                                                                           List<String> partitionNames, List<String> columnNames) {
         long start = System.nanoTime();
         int size = partitionNames.size();

@@ -3358,7 +3358,7 @@ public class Config extends ConfigBase {
     public static Integer default_offline_load_pipeline_dop = 1;
 
     @ConfField(mutable = true)
-    public static Integer default_offline_load_query_timeout = 3600; // 1h
+    public static int default_offline_load_query_timeout = 3600; // 1h
 
     @ConfField(mutable = true)
     public static String default_offline_load_flag = Constants.LAKE_WAREHOUSE_TO_STAR_ROCKS;
@@ -3368,4 +3368,13 @@ public class Config extends ConfigBase {
 
     @ConfField
     public static int dict_collect_thread_pool_size = 16;
+
+    // The runtime timeout of hive metastore (second)
+    @ConfField(mutable = true)
+    public static int hms_api_runtime_second = 60; // 60s
+
+    // whether enable hive metastore runtime timeout check
+    @ConfField(mutable = true)
+    public static boolean enable_check_hms_api_runtime_timeout = false;
+
 }
