@@ -281,6 +281,22 @@ public class ImplicitCastRuleTest {
     }
 
     @Test
+    public void testBinaryPredicateInDateType() {
+        ScalarOperatorRewriteContext context = new ScalarOperatorRewriteContext();
+        ImplicitCastRule rule = new ImplicitCastRule();
+        // ==== test case for xx > '2025-12-01' === begin
+        ColumnRefOperator variableColumn = new ColumnRefOperator(0, Type.DATE, "xx", false);
+        ConstantOperator constantColumn =  new ConstantOperator("2025-12-01", Type.VARCHAR);
+        BinaryPredicateOperator op = new BinaryPredicateOperator(BinaryType.GT,
+                variableColumn, constantColumn);
+
+        ScalarOperator result = rule.apply(op, context);
+        assertEquals(PrimitiveType.DATETIME, result.getChild(1).getType().getPrimitiveType());
+        // ==== test case for xx > '2025-12-01' === end
+    }
+
+
+    @Test
     public void testPredicateForPrestoTranslate() {
         // create scalar rewrite context
         ScalarOperatorRewriteContext context = new ScalarOperatorRewriteContext();
