@@ -117,7 +117,8 @@ public class SelectAnalyzer {
                 Stream.concat(sourceExpressions.stream(), orderByExpressions.stream()).collect(Collectors.toList()));
         if (AnalyzerUtils.isAggregate(aggregates, groupByExpressions)) {
             if (!groupByExpressions.isEmpty() &&
-                    selectList.getItems().stream().anyMatch(SelectListItem::isStar) &&
+                    (selectList.getItems().stream().anyMatch(SelectListItem::isStar) &&
+                            !session.getSessionVariable().isEnablePrestoTranslation()) &&
                     !selectList.isDistinct()) {
                 throw new SemanticException("cannot combine '*' in select list with GROUP BY: *");
             }
@@ -237,16 +238,26 @@ public class SelectAnalyzer {
                 }
 
                 for (Field field : fields) {
-                    int fieldIndex = scope.getRelationFields().indexOf(field);
-                    /*
-                     * Generate a special "SlotRef" as FieldReference,
-                     * which represents a reference to the expression in the source scope.
-                     * Because the real expression cannot be obtained in star
-                     * eg: "select * from (select count(*) from table) t"
-                     */
-                    FieldReference fieldReference = new FieldReference(fieldIndex, item.getTblName());
-                    analyzeExpression(fieldReference, analyzeState, scope);
-                    outputExpressionBuilder.add(fieldReference);
+                    if (session.getSessionVariable().isEnablePrestoTranslation() &&
+                            field.getOriginExpression() instanceof SlotRef) {
+                        SlotRef expr = (SlotRef) field.getOriginExpression().clone();
+                        expr.setTblName(field.getRelationAlias());
+                        expr.setColumnName(field.getName());
+                        expr.setLabel(field.getName());
+                        analyzeExpression(expr, analyzeState, scope);
+                        outputExpressionBuilder.add(expr);
+                    } else {
+                        int fieldIndex = scope.getRelationFields().indexOf(field);
+                        /*
+                         * Generate a special "SlotRef" as FieldReference,
+                         * which represents a reference to the expression in the source scope.
+                         * Because the real expression cannot be obtained in star
+                         * eg: "select * from (select count(*) from table) t"
+                         */
+                        FieldReference fieldReference = new FieldReference(fieldIndex, item.getTblName());
+                        analyzeExpression(fieldReference, analyzeState, scope);
+                        outputExpressionBuilder.add(fieldReference);
+                    }
                 }
                 outputFields.addAll(fields);
 

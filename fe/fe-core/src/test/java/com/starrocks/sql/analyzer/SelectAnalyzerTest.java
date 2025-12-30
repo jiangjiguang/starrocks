@@ -99,4 +99,17 @@ public class SelectAnalyzerTest extends PlanTestBase {
         Assert.assertTrue(execPlan.getExplainString(TExplainLevel.NORMAL).contains("group by"));
     }
 
+    @Test
+    public void testSelectStarCombineWithGroupBy() throws Exception {
+        String sql = "select * from test.t0 group by v1, v2, v3";
+        Assert.assertThrows(
+                "cannot combine '*' in select list with GROUP BY: *",
+                SemanticException.class,
+                () -> getExecPlan(sql)
+        );
+        // open presto translate
+        connectContext.getSessionVariable().setEnablePrestoTranslation(true);
+        ExecPlan execPlan = getExecPlan(sql);
+        Assert.assertTrue(execPlan.getExplainString(TExplainLevel.NORMAL).contains("group by"));
+    }
 }
