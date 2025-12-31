@@ -1381,7 +1381,7 @@ public class Config extends ConfigBase {
     public static boolean enable_decimal_v3 = true;
 
     @ConfField(mutable = true)
-    public static boolean enable_sql_blacklist = false;
+    public static boolean enable_sql_blacklist = true;
 
     /**
      * If set to true, dynamic partition feature will open

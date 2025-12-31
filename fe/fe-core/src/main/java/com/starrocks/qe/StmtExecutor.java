@@ -528,6 +528,19 @@ public class StmtExecutor {
                 context.setExplainLevel(null);
             }
 
+            // For follower: verify sql in BlackList before forward to leader
+            // For leader: if this is a proxy sql, no need to verify sql in BlackList because every fe has its own blacklist
+            if ((parsedStmt instanceof QueryStatement || parsedStmt instanceof InsertStmt)
+                    && Config.enable_sql_blacklist && !parsedStmt.isExplain() && !isProxy) {
+                OriginStatement origStmt = parsedStmt.getOrigStmt();
+                if (origStmt != null) {
+                    String originSql = origStmt.originStmt.trim()
+                            .toLowerCase().replaceAll(" +", " ");
+                    // If this sql is in blacklist, show message.
+                    SqlBlackList.verifying(originSql);
+                }
+            }
+
             // execPlan is the output of new planner
             ExecPlan execPlan = null;
             boolean execPlanBuildByNewPlanner = false;
@@ -604,19 +617,6 @@ public class StmtExecutor {
             // no need to execute http query dump request in BE
             if (context.isHTTPQueryDump) {
                 return;
-            }
-
-            // For follower: verify sql in BlackList before forward to leader
-            // For leader: if this is a proxy sql, no need to verify sql in BlackList because every fe has its own blacklist
-            if ((parsedStmt instanceof QueryStatement || parsedStmt instanceof InsertStmt)
-                    && Config.enable_sql_blacklist && !parsedStmt.isExplain() && !isProxy) {
-                OriginStatement origStmt = parsedStmt.getOrigStmt();
-                if (origStmt != null) {
-                    String originSql = origStmt.originStmt.trim()
-                            .toLowerCase().replaceAll(" +", " ");
-                    // If this sql is in blacklist, show message.
-                    SqlBlackList.verifying(originSql);
-                }
             }
 
             if (isForwardToLeader()) {
