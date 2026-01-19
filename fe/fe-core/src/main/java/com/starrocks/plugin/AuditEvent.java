@@ -35,6 +35,8 @@
 package com.starrocks.plugin;
 
 import com.google.common.base.Joiner;
+import com.starrocks.common.QueryScanNodeDetail;
+import com.starrocks.persist.gson.GsonUtils;
 import com.starrocks.server.WarehouseManager;
 
 import java.lang.annotation.Retention;
@@ -144,6 +146,9 @@ public class AuditEvent {
 
     @AuditField(value = "IsForwardToLeader")
     public boolean isForwardToLeader = false;
+
+    @AuditField(value = "queryScanDetail")
+    public String queryScanDetail;
 
     public static class AuditEventBuilder {
 
@@ -331,6 +336,13 @@ public class AuditEvent {
 
         public String getHitMvs() {
             return this.auditEvent.hitMVs;
+        }
+
+        public AuditEventBuilder setQueryScanDetail(List<QueryScanNodeDetail> list) {
+            String scanContent = GsonUtils.GSON.newBuilder().disableHtmlEscaping()
+                    .create().toJson(list);
+            this.auditEvent.queryScanDetail = scanContent;
+            return this;
         }
 
         public AuditEventBuilder setIsForwardToLeader(boolean isForwardToLeader) {

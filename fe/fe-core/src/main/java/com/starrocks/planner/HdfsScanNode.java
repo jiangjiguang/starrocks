@@ -275,4 +275,8 @@ public class HdfsScanNode extends ScanNode {
     protected boolean supportTopNRuntimeFilter() {
         return true;
     }
+
+    public RemoteScanRangeLocations getScanRangeLocations() {
+        return scanRangeLocations;
+    }
 }

@@ -172,10 +172,8 @@ public class AuditLoaderPlugin extends Plugin implements AuditPlugin {
         auditBuffer.append(event.digest).append("\t");
         auditBuffer.append(event.planCpuCosts).append("\t");
         auditBuffer.append(event.planMemCosts).append("\t");
-        auditBuffer.append(event.catalog).append("\n");
-
-
-
+        auditBuffer.append(event.catalog).append("\t");
+        auditBuffer.append(event.queryScanDetail).append("\n");
     }
 
     private String truncateByBytes(String str) {

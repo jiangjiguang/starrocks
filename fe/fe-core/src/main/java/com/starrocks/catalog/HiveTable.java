@@ -146,6 +146,13 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
 
     private HiveStorageFormat storageFormat;
 
+    private List<String> partitionNameList;
+
+    @Override
+    public void setPartitionNameList(List<String> partitionNameList) {
+        this.partitionNameList = partitionNameList;
+    }
+
     public HiveTable() {
         super(TableType.HIVE);
     }
@@ -248,6 +255,11 @@ public class HiveTable extends Table implements HiveMetaStoreTable {
 
     public String getTableLocation() {
         return this.tableLocation;
+    }
+
+    @Override
+    public Integer getPartitionCount() {
+        return partitionNameList.size();
     }
 
     @Override

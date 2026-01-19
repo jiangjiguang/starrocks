@@ -67,7 +67,8 @@ public class StarrocksStreamLoader {
         conn.addRequestProperty("label", label);
         conn.addRequestProperty("max_filter_ratio", "1.0");
         conn.addRequestProperty("columns", "query_id, timestamp, client_ip, user, resource_group, db, state, error_code, query_time, scan_bytes," +
-                " scan_rows, return_rows, cpu_cost_ns, mem_cost_bytes, stmt_id, is_query, fe_ip, stmt, digest, plan_cpu_costs, plan_mem_costs, catalog");
+                " scan_rows, return_rows, cpu_cost_ns, mem_cost_bytes, stmt_id, is_query, fe_ip, stmt, digest, plan_cpu_costs, plan_mem_costs, " +
+                "catalog, query_scan_detail");
 
         conn.setDoOutput(true);
         conn.setDoInput(true);

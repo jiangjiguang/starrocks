@@ -102,6 +102,8 @@ public class HudiTable extends Table implements HiveMetaStoreTable {
 
     private HudiTableType tableType;
 
+    private List<String> partitionNameList;
+
     public HudiTable() {
         super(TableType.HUDI);
     }
@@ -142,6 +144,16 @@ public class HudiTable extends Table implements HiveMetaStoreTable {
 
     public String getTableLocation() {
         return hudiProperties.get(HUDI_BASE_PATH);
+    }
+
+    @Override
+    public Integer getPartitionCount() {
+        return partitionNameList.size();
+    }
+
+    @Override
+    public void setPartitionNameList(List<String> partitionNameList) {
+        this.partitionNameList = partitionNameList;
     }
 
     public String getHudiInputFormat() {

@@ -44,6 +44,7 @@ public class OdpsTable extends Table implements HiveMetaStoreTable {
     private String dbName;
     private List<Column> dataColumns;
     private List<Column> partitionColumns;
+    private List<String> partitionNameList;
 
     public OdpsTable() {
         super(TableType.ODPS);
@@ -91,6 +92,16 @@ public class OdpsTable extends Table implements HiveMetaStoreTable {
     @Override
     public List<Column> getPartitionColumns() {
         return partitionColumns;
+    }
+
+    @Override
+    public Integer getPartitionCount() {
+        return partitionNameList.size();
+    }
+
+    @Override
+    public void setPartitionNameList(List<String> partitionNameList) {
+        this.partitionNameList = partitionNameList;
     }
 
     @Override

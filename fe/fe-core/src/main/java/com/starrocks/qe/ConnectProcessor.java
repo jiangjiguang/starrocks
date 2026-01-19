@@ -199,6 +199,7 @@ public class ConnectProcessor {
                 .setReturnRows(ctx.getReturnRows())
                 .setStmtId(ctx.getStmtId())
                 .setIsForwardToLeader(isForwardToLeader)
+                .setQueryScanDetail(ctx.getQueryScanNodeDetailList())
                 .setQueryId(ctx.getQueryId() == null ? "NaN" : ctx.getQueryId().toString());
         if (statistics != null) {
             ctx.getAuditEventBuilder().setScanBytes(statistics.scanBytes);

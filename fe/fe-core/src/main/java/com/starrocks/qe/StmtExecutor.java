@@ -72,6 +72,7 @@ import com.starrocks.common.MetaNotFoundException;
 import com.starrocks.common.NoAliveBackendException;
 import com.starrocks.common.Pair;
 import com.starrocks.common.QueryDumpLog;
+import com.starrocks.common.QueryScanNodeDetail;
 import com.starrocks.common.Status;
 import com.starrocks.common.TimeoutException;
 import com.starrocks.common.UserException;
@@ -1216,7 +1217,7 @@ public class StmtExecutor {
             String explainString = buildExplainString(execPlan, ResourceGroupClassifier.QueryType.SELECT,
                     parsedStmt.getExplainLevel());
             if (executeInFe) {
-                if (parsedStmt.getExplainLevel() != StatementBase.ExplainLevel.TYPE) {
+                if (!StatementBase.ExplainLevel.explainReturnJson().contains(parsedStmt.getExplainLevel())) {
                     explainString = "EXECUTE IN FE\n" + explainString;
                 }
             }
@@ -1247,6 +1248,9 @@ public class StmtExecutor {
         } else {
             coord = getCoordinatorFactory().createQueryScheduler(context, fragments, scanNodes, descTable);
         }
+
+        // check sql scan partitions and files whether valid
+        QueryScanNodeDetail.checkQueryScanSizeValid(context, scanNodes);
 
         QeProcessorImpl.INSTANCE.registerQuery(context.getExecutionId(),
                 new QeProcessorImpl.QueryInfo(context, originStmt.originStmt, coord));
@@ -1839,6 +1843,14 @@ public class StmtExecutor {
             explainString += columnTypeStr;
             return explainString;
         }
+
+        if (parsedStmt.getExplainLevel() == StatementBase.ExplainLevel.SCAN_DETAIL && execPlan != null) {
+            String scanDetailStr = QueryScanNodeDetail.getScanNodeExplain(context, execPlan.getScanNodes());
+            LOG.info("sql queryId: " + context.getQueryId() + " explain scan_detail result:" + scanDetailStr);
+            explainString += scanDetailStr;
+            return explainString;
+        }
+
         // marked delete will get execPlan null
         if (execPlan == null) {
             explainString += "NOT AVAILABLE";

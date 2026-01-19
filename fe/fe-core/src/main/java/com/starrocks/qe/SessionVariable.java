@@ -4583,4 +4583,52 @@ public class SessionVariable implements Serializable, Writable, Cloneable {
     public boolean isEnableLocalMergeInTableFunctionTable() {
         return enableLocalMergeInTableFunctionTable;
     }
+
+    public static final String SCAN_FILES_LIMIT = "scan_files_limit";
+    @VariableMgr.VarAttr(name = SCAN_FILES_LIMIT)
+    private int scanFilesLimit = 0;
+
+    public static final String SCAN_PARTITIONS_LIMIT = "scan_partitions_limit";
+    @VariableMgr.VarAttr(name = SCAN_PARTITIONS_LIMIT)
+    private int scanPartitionsLimit = 0;
+
+    public static final String ENABLE_PARTITION_PRUNE_FAIL_LIMIT = "enable_partition_prune_fail_limit";
+    @VariableMgr.VarAttr(name = ENABLE_PARTITION_PRUNE_FAIL_LIMIT)
+    private boolean enablePartitionPruneFailLimit = false;
+
+    public static final String SCAN_TABLES_LIMIT = "scan_tables_limit";
+    @VariableMgr.VarAttr(name = SCAN_TABLES_LIMIT)
+    private int scanTablesLimit = 0;
+
+    public int getScanFilesLimit() {
+        return scanFilesLimit;
+    }
+
+    public void setScanFilesLimit(int scanFilesLimit) {
+        this.scanFilesLimit = scanFilesLimit;
+    }
+
+    public int getScanPartitionsLimit() {
+        return scanPartitionsLimit;
+    }
+
+    public void setScanPartitionsLimit(int scanPartitionsLimit) {
+        this.scanPartitionsLimit = scanPartitionsLimit;
+    }
+
+    public boolean isEnablePartitionPruneFailLimit() {
+        return enablePartitionPruneFailLimit;
+    }
+
+    public void setEnablePartitionPruneFailLimit(boolean enablePartitionPruneFailLimit) {
+        this.enablePartitionPruneFailLimit = enablePartitionPruneFailLimit;
+    }
+
+    public int getScanTablesLimit() {
+        return scanTablesLimit;
+    }
+
+    public void setScanTablesLimit(int scanTablesLimit) {
+        this.scanTablesLimit = scanTablesLimit;
+    }
 }

@@ -45,6 +45,7 @@ import com.starrocks.cluster.ClusterNamespace;
 import com.starrocks.common.DdlException;
 import com.starrocks.common.ErrorCode;
 import com.starrocks.common.ErrorReport;
+import com.starrocks.common.QueryScanNodeDetail;
 import com.starrocks.common.util.TimeUtils;
 import com.starrocks.common.util.UUIDUtil;
 import com.starrocks.http.HttpConnectContext;
@@ -243,6 +244,8 @@ public class ConnectContext {
     // QueryMaterializationContext is different from MaterializationContext that it keeps the context during the query
     // lifecycle instead of per materialized view.
     private QueryMaterializationContext queryMVContext;
+
+    private List<QueryScanNodeDetail> queryScanNodeDetailList = new ArrayList<>();
 
     public StmtExecutor getExecutor() {
         return executor;
@@ -553,6 +556,7 @@ public class ConnectContext {
     public void setStartTime() {
         startTime = Instant.now();
         returnRows = 0;
+        queryScanNodeDetailList = new ArrayList<>();
     }
 
     public void updateReturnRows(int returnRows) {
@@ -674,6 +678,7 @@ public class ConnectContext {
         mysqlChannel.close();
         threadLocalInfo.remove();
         returnRows = 0;
+        queryScanNodeDetailList = new ArrayList<>();
     }
 
     public boolean isKilled() {
@@ -1049,6 +1054,14 @@ public class ConnectContext {
 
     public ScopeGuard bindScope() {
         return ScopeGuard.setIfNotExists(this);
+    }
+
+    public List<QueryScanNodeDetail> getQueryScanNodeDetailList() {
+        return queryScanNodeDetailList;
+    }
+
+    public void setQueryScanNodeDetail(List<QueryScanNodeDetail> list) {
+        this.queryScanNodeDetailList = list;
     }
 
     // Change current catalog of this session, and reset current database.

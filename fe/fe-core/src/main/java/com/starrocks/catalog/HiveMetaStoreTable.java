@@ -36,4 +36,8 @@ public interface HiveMetaStoreTable {
     List<Column> getPartitionColumns();
 
     String getTableLocation();
+
+    Integer getPartitionCount();
+
+    void setPartitionNameList(List<String> partitionNameList);
 }

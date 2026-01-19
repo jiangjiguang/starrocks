@@ -331,6 +331,8 @@ public class OptExternalPartitionPruner {
                                     hmsTable.getTableName());
                 }
 
+                hmsTable.setPartitionNameList(partitionNames);
+
                 List<PartitionKey> keys = new ArrayList<>();
                 List<Long> ids = new ArrayList<>();
                 for (String partName : partitionNames) {

@@ -68,7 +68,12 @@ public abstract class StatementBase implements ParseNode {
         SCHEDULER,
         TYPE,
         DIGEST,
+        SCAN_DETAIL,
         ;
+
+        public static List<ExplainLevel> explainReturnJson() {
+            return List.of(ExplainLevel.TYPE, ExplainLevel.SCAN_DETAIL);
+        }
 
         public static ExplainLevel defaultValue() {
             return NORMAL;

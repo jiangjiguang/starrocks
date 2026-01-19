@@ -421,6 +421,10 @@ public class IcebergTable extends Table {
                 Objects.equal(tableIdentifier, otherTable.getTableIdentifier());
     }
 
+    public Map<String, String> getIcebergProperties() {
+        return icebergProperties;
+    }
+
     public static Builder builder() {
         return new Builder();
     }

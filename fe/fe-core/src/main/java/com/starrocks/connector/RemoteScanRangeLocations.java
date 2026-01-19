@@ -422,4 +422,8 @@ public class RemoteScanRangeLocations {
     public int getScanRangeLocationsSize() {
         return result.size();
     }
+
+    public List<DescriptorTable.ReferencedPartitionInfo> getPartitionInfos() {
+        return partitionInfos;
+    }
 }
