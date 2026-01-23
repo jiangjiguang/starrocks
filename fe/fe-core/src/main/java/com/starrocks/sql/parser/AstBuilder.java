@@ -6919,6 +6919,14 @@ public class AstBuilder extends com.starrocks.sql.parser.StarRocksBaseVisitor<Pa
                 idx = idx + 1;
                 index = new IntLiteral(idx);
             }
+            if ((index instanceof FunctionCallExpr) || (index instanceof ArithmeticExpr)) {
+                ArithmeticExpr arithmeticExpr = new ArithmeticExpr(
+                        ArithmeticExpr.Operator.ADD,
+                        index,
+                        new IntLiteral(1, Type.INT)
+                );
+                index = arithmeticExpr;
+            }
         }
         return new CollectionElementExpr(value, index, false);
     }

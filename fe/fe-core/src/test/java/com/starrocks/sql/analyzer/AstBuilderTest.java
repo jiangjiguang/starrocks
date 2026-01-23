@@ -213,4 +213,13 @@ public class AstBuilderTest {
         Assert.assertTrue(execPlan.toString().toLowerCase().contains("array_agg_distinct"));
     }
 
+    @Test
+    public void testSubscriptForPresto() {
+        connectContext.getSessionVariable().setEnablePrestoTranslation(true);
+        String sql = "explain select split('000,1111', ',')[size(split('000,1111', ','))]";
+        StatementBase parseStmt = SqlParser.parseOneWithStarRocksDialect(sql, connectContext.getSessionVariable());
+        ExecPlan execPlan = StatementPlanner.plan(parseStmt, connectContext, TResultSinkType.STATISTIC);
+        assert execPlan != null;
+        Assert.assertTrue(execPlan.toString().toLowerCase().contains(" + 1"));
+    }
 }
