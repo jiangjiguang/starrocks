@@ -45,7 +45,8 @@ bool DateConverter::read_string(Column* column, const Slice& s, const Options& o
 
 bool DateConverter::read_quoted_string(Column* column, const Slice& tmp_s, const Options& options) const {
     Slice s = tmp_s;
-    if (!remove_enclosing_quotes<'"'>(&s)) {
+    // For Hive format, don't require quotes
+    if (!options.is_hive && !remove_enclosing_quotes<'"'>(&s)) {
         return false;
     }
     return read_string(column, s, options);

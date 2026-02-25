@@ -47,7 +47,13 @@ Status MapConverter::write_quoted_string(OutputStream* os, const Column& column,
     return write_string(os, column, row_num, options);
 }
 
-bool MapConverter::validate(const Slice& s) const {
+bool MapConverter::validate(const Slice& s, const Options& options) const {
+    // For Hive format, we don't require braces
+    if (options.is_hive) {
+        return true; // Hive format can be any string
+    }
+
+    // For standard format, check braces
     if (s.size < 2) {
         return false;
     }
@@ -57,46 +63,81 @@ bool MapConverter::validate(const Slice& s) const {
     return true;
 }
 
-bool MapConverter::split_map_key_value(Slice s, std::vector<Slice>& keys, std::vector<Slice>& values) const {
-    s.remove_prefix(1);
-    s.remove_suffix(1);
+bool MapConverter::split_map_key_value(Slice s, std::vector<Slice>& keys, std::vector<Slice>& values, const Options& options) const {
+    // For Hive format, don't remove braces
+    if (!options.is_hive) {
+        s.remove_prefix(1);
+        s.remove_suffix(1);
+    }
+
     if (s.empty()) {
-        // Consider empty map {}.
+        // Consider empty map {} or empty Hive map.
         return true;
     }
+
+    // For Hive format, use Hive delimiters
+    char map_delimiter = options.is_hive ? options.array_hive_collection_delimiter : _map_delimiter;
+    char kv_delimiter = options.is_hive ? options.array_hive_mapkey_delimiter : _kv_delimiter;
 
     bool in_quote = false;
     int map_nest_level = 0;
     int last_index = 0;
     size_t i = 0;
-    for (; i < s.size; i++) {
-        char c = s[i];
-        if (c == '"') {
-            in_quote = !in_quote;
-        } else if (!in_quote && c == '{') {
-            map_nest_level++;
-        } else if (!in_quote && c == '}') {
-            map_nest_level--;
-        } else if (!in_quote && map_nest_level == 0 && c == _kv_delimiter) {
-            if (i == last_index) { // size should not be 0
-                return false;
+
+    // For Hive format, we don't need to handle braces or quotes
+    if (options.is_hive) {
+        // Simple split for Hive format
+        for (; i < s.size; i++) {
+            char c = s[i];
+            if (c == kv_delimiter) {
+                if (i == last_index) { // size should not be 0
+                    return false;
+                }
+                keys.emplace_back(s.data + last_index, i - last_index);
+                last_index = i + 1;
+            } else if (c == map_delimiter) {
+                if (i == last_index) {
+                    return false;
+                }
+                values.emplace_back(s.data + last_index, i - last_index);
+                last_index = i + 1;
             }
-            keys.emplace_back(s.data + last_index, i - last_index);
-            last_index = i + 1;
-        } else if (!in_quote && map_nest_level == 0 && c == _map_delimiter) {
-            if (i == last_index) {
-                return false;
-            }
+        }
+        // Add the last value
+        if (i > last_index) {
             values.emplace_back(s.data + last_index, i - last_index);
-            last_index = i + 1;
+        }
+    } else {
+        // Standard format with braces and quotes
+        for (; i < s.size; i++) {
+            char c = s[i];
+            if (c == '"') {
+                in_quote = !in_quote;
+            } else if (!in_quote && c == '{') {
+                map_nest_level++;
+            } else if (!in_quote && c == '}') {
+                map_nest_level--;
+            } else if (!in_quote && map_nest_level == 0 && c == kv_delimiter) {
+                if (i == last_index) { // size should not be 0
+                    return false;
+                }
+                keys.emplace_back(s.data + last_index, i - last_index);
+                last_index = i + 1;
+            } else if (!in_quote && map_nest_level == 0 && c == map_delimiter) {
+                if (i == last_index) {
+                    return false;
+                }
+                values.emplace_back(s.data + last_index, i - last_index);
+                last_index = i + 1;
+            }
+        }
+        if (!in_quote && map_nest_level == 0 && i == s.size) {
+            if (i > last_index) {
+                values.emplace_back(s.data + last_index, i - last_index);
+            }
         }
     }
-    if (!in_quote && map_nest_level == 0 && i == s.size) {
-        if (i == last_index) {
-            return false;
-        }
-        values.emplace_back(s.data + last_index, i - last_index);
-    }
+
     if (map_nest_level != 0 || in_quote || values.size() != keys.size()) {
         return false;
     }
@@ -104,7 +145,7 @@ bool MapConverter::split_map_key_value(Slice s, std::vector<Slice>& keys, std::v
 }
 
 bool MapConverter::read_string(Column* column, const Slice& s, const Options& options) const {
-    if (!validate(s)) {
+    if (!validate(s, options)) {
         return false;
     }
     auto* map = down_cast<MapColumn*>(column);
@@ -112,7 +153,7 @@ bool MapConverter::read_string(Column* column, const Slice& s, const Options& op
     auto* keys = map->keys_column().get();
     auto* values = map->values_column().get();
     std::vector<Slice> key_fields, value_fields;
-    if (!s.empty() && !split_map_key_value(s, key_fields, value_fields)) {
+    if (!s.empty() && !split_map_key_value(s, key_fields, value_fields, options)) {
         return false;
     }
     size_t old_size = keys->size();

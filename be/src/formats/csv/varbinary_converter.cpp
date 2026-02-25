@@ -101,7 +101,8 @@ bool VarBinaryConverter::read_string(Column* column, const Slice& s, const Optio
 bool VarBinaryConverter::read_quoted_string(Column* column, const Slice& tmp_s, const Options& options) const {
     Slice s = tmp_s;
     // TODO: need write quote for binary?
-    if (!remove_enclosing_quotes<'"'>(&s)) {
+    // For Hive format, don't require quotes
+    if (!options.is_hive && !remove_enclosing_quotes<'"'>(&s)) {
         return false;
     }
     return read_string(column, s, options);

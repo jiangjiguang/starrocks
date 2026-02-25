@@ -33,8 +33,8 @@ public:
     bool read_quoted_string(Column* column, const Slice& s, const Options& options) const override;
 
 private:
-    bool validate(const Slice& s) const;
-    bool split_map_key_value(Slice s, std::vector<Slice>& keys, std::vector<Slice>& values) const;
+    bool validate(const Slice& s, const Options& options) const;
+    bool split_map_key_value(Slice s, std::vector<Slice>& keys, std::vector<Slice>& values, const Options& options) const;
     std::unique_ptr<Converter> _key_converter;
     std::unique_ptr<Converter> _value_converter;
     char _map_delimiter;
