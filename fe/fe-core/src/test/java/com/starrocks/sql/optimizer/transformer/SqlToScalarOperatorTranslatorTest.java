@@ -26,6 +26,8 @@ import com.starrocks.sql.optimizer.operator.OperatorType;
 import com.starrocks.sql.optimizer.operator.scalar.CallOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ConstantOperator;
 import com.starrocks.sql.optimizer.operator.scalar.ScalarOperator;
+import com.starrocks.sql.plan.PlanTestBase;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.time.LocalDateTime;
@@ -33,7 +35,22 @@ import java.util.Collections;
 
 import static org.junit.Assert.assertEquals;
 
-public class SqlToScalarOperatorTranslatorTest {
+public class SqlToScalarOperatorTranslatorTest extends PlanTestBase {
+
+    @BeforeClass
+    public static void beforeClass() throws Exception {
+        PlanTestBase.beforeClass();
+        starRocksAssert.withTable("CREATE TABLE test_struct (" +
+                "  `id` int(11) NOT NULL,\n" +
+                "  `pt` date NOT NULL ,\n" +
+                "  `c1` struct<a int(11), b int(11)> NULL" +
+                ") ENGINE=OLAP \n" +
+                "DUPLICATE KEY(`id`) " +
+                "DISTRIBUTED BY HASH(`id`) BUCKETS 10  " +
+                "properties(" +
+                "  \"replication_num\"=\"1\"" +
+                ") ;");
+    }
 
     @Test
     public void testTranslateConstant() {
@@ -59,5 +76,12 @@ public class SqlToScalarOperatorTranslatorTest {
         CallOperator so = (CallOperator) SqlToScalarOperatorTranslator.translate(complexFunc,
                 new ExpressionMapping(null, Collections.emptyList()), new ColumnRefFactory());
         assertEquals("if", so.getFnName());
+    }
+
+    @Test
+    public void testStructType() throws Exception {
+        String sql = "select * from (select id, c1, pt from test.test_struct) as _temp";
+        String plan = getFragmentPlan(sql);
+        assertCContains(plan, "TABLE: test");
     }
 }

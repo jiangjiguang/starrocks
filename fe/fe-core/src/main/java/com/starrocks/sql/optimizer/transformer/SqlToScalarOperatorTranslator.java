@@ -331,10 +331,15 @@ public final class SqlToScalarOperatorTranslator {
 
             // If origin type is struct type, means that node contains subfield access
             if (node.getTrueOriginType().isStructType()) {
-                Preconditions.checkArgument(node.getUsedStructFieldPos() != null, "StructType SlotRef must have" +
-                        "an non-empty usedStructFiledPos!");
-                Preconditions.checkArgument(node.getUsedStructFieldPos().size() > 0);
-                return SubfieldOperator.build(columnRefOperator, node.getOriginType(), node.getUsedStructFieldPos());
+                // Check if this is a struct field access
+                if (node.getUsedStructFieldPos() != null && !node.getUsedStructFieldPos().isEmpty()) {
+                    // Has specific subfield access, build SubfieldOperator
+                    return SubfieldOperator.build(columnRefOperator, node.getOriginType(), node.getUsedStructFieldPos());
+                } else {
+                    // This is a struct field but not accessing specific subfield (e.g., select * from table_with_struct_column)
+                    // Return the ColumnRefOperator directly without accessing subfields
+                    return columnRefOperator;
+                }
             }
 
             ScalarOperator constOperator = expressionMapping.getConstOperator(columnRefOperator);
