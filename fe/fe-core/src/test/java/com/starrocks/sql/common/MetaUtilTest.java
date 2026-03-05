@@ -18,6 +18,7 @@ import com.starrocks.analysis.TableName;
 import com.starrocks.catalog.Column;
 import com.starrocks.catalog.ColumnId;
 import com.starrocks.catalog.Database;
+import com.starrocks.catalog.InternalCatalog;
 import com.starrocks.catalog.KeysType;
 import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Partition;
@@ -162,5 +163,54 @@ public class MetaUtilTest {
 
         MetaUtils.normalizationTableNameOnlyQuery(connectContext, starrocksAuditTableName);
         Assert.assertEquals(starrocksAuditTableName.getCatalog(), connectContext.getSessionVariable().getCatalog());
+    }
+
+    @Test
+    public void testNormalizationTableNameOnlyQueryWithSpecifiedCatalog() {
+        // Test case for DSR-BugFix-216-01: specify the catalog in sql need set to TableName
+
+        // Set a non-default catalog
+        String customCatalog = "custom_catalog";
+        connectContext.setCurrentCatalog(customCatalog);
+
+        // Test with enable presto translation false (OLAP scenario)
+        SessionVariable sessionVariable = connectContext.getSessionVariable();
+        sessionVariable.setEnablePrestoTranslation(false);
+        connectContext.setSessionVariable(sessionVariable);
+
+        // Simulate the internal database
+        TableName internalDbTable = new TableName(null, "information_schema", "table");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, internalDbTable);
+        Assert.assertEquals(InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME, internalDbTable.getCatalog());
+
+        // TableName with null catalog should be set to current catalog
+        TableName tableName = new TableName(null, "test", "t0");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, tableName);
+        Assert.assertEquals(customCatalog, tableName.getCatalog());
+
+        // TableName with non-null catalog should remain unchanged
+        tableName = new TableName("other_catalog", "test", "t0");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, tableName);
+        Assert.assertEquals("other_catalog", tableName.getCatalog());
+
+        // Test with enable presto translation true
+        sessionVariable.setEnablePrestoTranslation(true);
+        connectContext.setSessionVariable(sessionVariable);
+
+        // Simulate the internal database
+        internalDbTable = new TableName(null, "information_schema", "table");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, internalDbTable);
+        Assert.assertEquals(InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME, internalDbTable.getCatalog());
+
+        // TableName with null catalog should be set to current catalog (not default presto catalog)
+        tableName = new TableName(null, "test", "t0");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, tableName);
+        Assert.assertEquals(customCatalog, tableName.getCatalog());
+
+        // Reset to default catalog
+        connectContext.setCurrentCatalog(com.starrocks.catalog.InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME);
+        tableName = new TableName(null, "test", "t0");
+        MetaUtils.normalizationTableNameOnlyQuery(connectContext, tableName);
+        Assert.assertEquals(Config.default_presto_catalog, tableName.getCatalog());
     }
 }

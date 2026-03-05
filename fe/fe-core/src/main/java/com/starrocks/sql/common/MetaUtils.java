@@ -258,6 +258,12 @@ public class MetaUtils {
             return;
         }
 
+        // Specify the catalog in sql
+        if (!connectContext.getCurrentCatalog().equalsIgnoreCase(InternalCatalog.DEFAULT_INTERNAL_CATALOG_NAME)) {
+            tableName.setCatalog(connectContext.getCurrentCatalog());
+            return;
+        }
+
         // reset the catalog as unified_catalog_hms when enable presto translation
         tableName.setCatalog(Config.default_presto_catalog);
     }
