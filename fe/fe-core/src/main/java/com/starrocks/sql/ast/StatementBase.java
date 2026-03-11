@@ -69,6 +69,8 @@ public abstract class StatementBase implements ParseNode {
         TYPE,
         DIGEST,
         SCAN_DETAIL,
+        RESOURCE_DETAIL,
+        SQL_PROFILE,
         ;
 
         public static List<ExplainLevel> explainReturnJson() {

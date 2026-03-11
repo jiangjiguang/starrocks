@@ -73,6 +73,7 @@ import com.starrocks.common.NoAliveBackendException;
 import com.starrocks.common.Pair;
 import com.starrocks.common.QueryDumpLog;
 import com.starrocks.common.QueryScanNodeDetail;
+import com.starrocks.common.SqlResourceDetail;
 import com.starrocks.common.Status;
 import com.starrocks.common.TimeoutException;
 import com.starrocks.common.UserException;
@@ -689,6 +690,9 @@ public class StmtExecutor {
                                 }
                                 handleExplainStmt(ExplainAnalyzer.analyze(
                                         ProfilingExecPlan.buildFrom(execPlan), profile, null));
+                            } else if (parsedStmt.isExplain() &&
+                                    StatementBase.ExplainLevel.SQL_PROFILE.equals(parsedStmt.getExplainLevel())) {
+                                handleSqlProfileExplain();
                             }
                         }
 
@@ -1196,6 +1200,10 @@ public class StmtExecutor {
                 && StatementBase.ExplainLevel.ANALYZE.equals(parsedStmt.getExplainLevel());
         boolean isSchedulerExplain = parsedStmt.isExplain()
                 && StatementBase.ExplainLevel.SCHEDULER.equals(parsedStmt.getExplainLevel());
+        boolean isBeResourceExplain = parsedStmt.isExplain()
+                && StatementBase.ExplainLevel.RESOURCE_DETAIL.equals(parsedStmt.getExplainLevel());
+        boolean isSqlProfileExplain = parsedStmt.isExplain()
+                && StatementBase.ExplainLevel.SQL_PROFILE.equals(parsedStmt.getExplainLevel());
         boolean isOutfileQuery = (parsedStmt instanceof QueryStatement) && ((QueryStatement) parsedStmt).hasOutFileClause();
         if (isOutfileQuery) {
             Map<TableName, Table> tables = AnalyzerUtils.collectAllTable(parsedStmt);
@@ -1204,10 +1212,10 @@ public class StmtExecutor {
                 throw new SemanticException("temporary table doesn't support select outfile statement");
             }
         }
-        boolean executeInFe = !isExplainAnalyze && !isSchedulerExplain && !isOutfileQuery
+        boolean executeInFe = !isExplainAnalyze && !isSchedulerExplain && !isBeResourceExplain && !isSqlProfileExplain && !isOutfileQuery
                 && canExecuteInFe(context, execPlan.getPhysicalPlan());
 
-        if (isExplainAnalyze) {
+        if (isExplainAnalyze || isBeResourceExplain || isSqlProfileExplain) {
             context.getSessionVariable().setEnableProfile(true);
             context.getSessionVariable().setEnableAsyncProfile(false);
             context.getSessionVariable().setPipelineProfileLevel(1);
@@ -1283,7 +1291,7 @@ public class StmtExecutor {
             do {
                 batch = coord.getNext();
                 // for outfile query, there will be only one empty batch send back with eos flag
-                if (batch.getBatch() != null && !isOutfileQuery && !isExplainAnalyze) {
+                if (batch.getBatch() != null && !isOutfileQuery && !isExplainAnalyze && !isBeResourceExplain && !isSqlProfileExplain) {
                     // For some language driver, getting error packet after fields packet will be recognized as a success result
                     // so We need to send fields after first batch arrived
                     if (!isSendFields) {
@@ -1309,7 +1317,7 @@ public class StmtExecutor {
                     context.updateReturnRows(batch.getBatch().getRows().size());
                 }
             } while (!batch.isEos());
-            if (!isSendFields && !isOutfileQuery && !isExplainAnalyze) {
+            if (!isSendFields && !isOutfileQuery && !isExplainAnalyze && !isBeResourceExplain && !isSqlProfileExplain) {
                 sendFields(colNames, outputExprs);
             }
         }
@@ -1320,6 +1328,15 @@ public class StmtExecutor {
         } else {
             context.getState().setOk(statisticsForAuditLog.returnedRows, 0, "");
         }
+
+        // Handle EXPLAIN RESOURCE_DETAIL: return BE resource usage
+        if (isBeResourceExplain) {
+            handleBeResourceExplain();
+            return;
+        }
+
+        // Note: SQL_PROFILE is handled in executeByBe's finally block after profile is written
+
         if (null == statisticsForAuditLog || null == statisticsForAuditLog.statsItems ||
                 statisticsForAuditLog.statsItems.isEmpty()) {
             return;
@@ -1827,6 +1844,32 @@ public class StmtExecutor {
         context.getState().setEof();
     }
 
+    private void handleBeResourceExplain() throws IOException {
+        // Get query statistics
+        PQueryStatistics statistics = null;
+        if (statisticsForAuditLog != null) {
+            statistics = statisticsForAuditLog;
+        }
+        if (coord != null) {
+            PQueryStatistics stats = coord.getAuditStatistics();
+            if (stats != null) {
+                statistics =  stats;
+            }
+        }
+        String sqlResourceDetailContent = SqlResourceDetail.initContent(statistics, context.getStartTime());
+        handleExplainStmt(sqlResourceDetailContent);
+    }
+
+    private void handleSqlProfileExplain() throws IOException {
+        String queryId = DebugUtil.printId(context.getExecutionId());
+        String profileContent = ProfileManager.getInstance().getProfile(queryId);
+        if (profileContent == null) {
+            handleExplainStmt("Profile not found for query: " + queryId);
+        } else {
+            handleExplainStmt(profileContent);
+        }
+    }
+
     private String buildExplainString(ExecPlan execPlan, ResourceGroupClassifier.QueryType queryType,
                                       StatementBase.ExplainLevel explainLevel) {
         String explainString = "";
@@ -2100,6 +2143,10 @@ public class StmtExecutor {
      * NOTE: `writeProfile` can only be called once, otherwise the profile detail will be lost.
      */
     public void handleDMLStmtWithProfile(ExecPlan execPlan, DmlStmt stmt) throws Exception {
+        boolean isBeResourceExplain = parsedStmt.isExplain()
+                && StatementBase.ExplainLevel.RESOURCE_DETAIL.equals(parsedStmt.getExplainLevel());
+        boolean isSqlProfileExplain = parsedStmt.isExplain()
+                && StatementBase.ExplainLevel.SQL_PROFILE.equals(parsedStmt.getExplainLevel());
         try {
             handleDMLStmt(execPlan, stmt);
         } catch (Throwable t) {
@@ -2112,6 +2159,10 @@ public class StmtExecutor {
                 if (parsedStmt.isExplain() &&
                         StatementBase.ExplainLevel.ANALYZE.equals(parsedStmt.getExplainLevel())) {
                     handleExplainStmt(ExplainAnalyzer.analyze(ProfilingExecPlan.buildFrom(execPlan), profile, null));
+                } else if (isBeResourceExplain) {
+                    handleBeResourceExplain();
+                } else if (isSqlProfileExplain) {
+                    handleSqlProfileExplain();
                 }
             }
             if (isAsync) {
@@ -2131,8 +2182,12 @@ public class StmtExecutor {
                 && StatementBase.ExplainLevel.ANALYZE.equals(parsedStmt.getExplainLevel());
         boolean isSchedulerExplain = parsedStmt.isExplain()
                 && StatementBase.ExplainLevel.SCHEDULER.equals(parsedStmt.getExplainLevel());
+        boolean isBeResourceExplain = parsedStmt.isExplain()
+                && StatementBase.ExplainLevel.RESOURCE_DETAIL.equals(parsedStmt.getExplainLevel());
+        boolean isSqlProfileExplain = parsedStmt.isExplain()
+                && StatementBase.ExplainLevel.SQL_PROFILE.equals(parsedStmt.getExplainLevel());
 
-        if (isExplainAnalyze) {
+        if (isExplainAnalyze || isBeResourceExplain || isSqlProfileExplain) {
             context.getSessionVariable().setEnableProfile(true);
             context.getSessionVariable().setEnableAsyncProfile(false);
             context.getSessionVariable().setPipelineProfileLevel(1);

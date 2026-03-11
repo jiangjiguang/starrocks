@@ -602,6 +602,54 @@ class ParserTest {
                 "select [0, 1, 2][3]",
                 AstToStringBuilder.toString(stmt));
     }
+
+    @Test
+    void testExplainResourceDetail() {
+        String sql = "EXPLAIN SQL_RESOURCE_DETAIL SELECT * FROM t1";
+        ConnectContext ctx = UtFrameUtils.createDefaultCtx();
+        ctx.setThreadLocalInfo();
+        SessionVariable sessionVariable = ctx.getSessionVariable();
+        QueryStatement stmt = (QueryStatement) SqlParser.parse(sql, sessionVariable).get(0);
+
+        Assert.assertTrue(stmt.isExplain());
+        Assert.assertEquals(StatementBase.ExplainLevel.RESOURCE_DETAIL, stmt.getExplainLevel());
+    }
+
+    @Test
+    void testExplainResourceDetailInsert() {
+        String sql = "EXPLAIN SQL_RESOURCE_DETAIL INSERT INTO t1 SELECT * FROM t2";
+        ConnectContext ctx = UtFrameUtils.createDefaultCtx();
+        ctx.setThreadLocalInfo();
+        SessionVariable sessionVariable = ctx.getSessionVariable();
+        QueryStatement stmt = (QueryStatement) SqlParser.parse(sql, sessionVariable).get(0);
+
+        Assert.assertTrue(stmt.isExplain());
+        Assert.assertEquals(StatementBase.ExplainLevel.RESOURCE_DETAIL, stmt.getExplainLevel());
+    }
+
+    @Test
+    void testExplainSqlProfile() {
+        String sql = "EXPLAIN SQL_PROFILE SELECT * FROM t1";
+        ConnectContext ctx = UtFrameUtils.createDefaultCtx();
+        ctx.setThreadLocalInfo();
+        SessionVariable sessionVariable = ctx.getSessionVariable();
+        QueryStatement stmt = (QueryStatement) SqlParser.parse(sql, sessionVariable).get(0);
+
+        Assert.assertTrue(stmt.isExplain());
+        Assert.assertEquals(StatementBase.ExplainLevel.SQL_PROFILE, stmt.getExplainLevel());
+    }
+
+    @Test
+    void testExplainSqlProfileInsert() {
+        String sql = "EXPLAIN SQL_PROFILE INSERT INTO t1 SELECT * FROM t2";
+        ConnectContext ctx = UtFrameUtils.createDefaultCtx();
+        ctx.setThreadLocalInfo();
+        SessionVariable sessionVariable = ctx.getSessionVariable();
+        QueryStatement stmt = (QueryStatement) SqlParser.parse(sql, sessionVariable).get(0);
+
+        Assert.assertTrue(stmt.isExplain());
+        Assert.assertEquals(StatementBase.ExplainLevel.SQL_PROFILE, stmt.getExplainLevel());
+    }
 }
 
 
