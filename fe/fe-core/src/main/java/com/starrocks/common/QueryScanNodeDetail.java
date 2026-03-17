@@ -265,19 +265,20 @@ public class QueryScanNodeDetail {
 
     public static void checkQueryScanSizeValid(ConnectContext connectContext, List<ScanNode> scanNodes)
             throws UserException {
+        if (scanNodes.isEmpty()) {
+            return;
+        }
+        SessionVariable sessionVariable = connectContext.getSessionVariable();
+        if (sessionVariable == null) {
+            return;
+        }
+
+        long start = System.currentTimeMillis();
+        int totalScanPartitionSize = 0;
+        int totalScanFileSize = 0;
+        boolean partitionPrunedFail = false;
+        List<String> fullTableNames = new ArrayList<>();
         try {
-            long start = System.currentTimeMillis();
-            SessionVariable sessionVariable = connectContext.getSessionVariable();
-            if (sessionVariable == null) {
-                return;
-            }
-            if (scanNodes.isEmpty()) {
-                return;
-            }
-            int totalScanPartitionSize = 0;
-            int totalScanFileSize = 0;
-            boolean partitionPrunedFail = false;
-            List<String> fullTableNames = new ArrayList<>();
             List<QueryScanNodeDetail> scanNodeDetailList = new ArrayList<>();
             for (ScanNode scanNode : scanNodes) {
                 QueryScanNodeDetail detail = new QueryScanNodeDetail();
@@ -341,19 +342,20 @@ public class QueryScanNodeDetail {
             }
 
             connectContext.setQueryScanNodeDetail(scanNodeDetailList);
-
-            checkScanTableLimit(start, sessionVariable, fullTableNames.size());
-            checkScanPartitionLimit(start, sessionVariable, totalScanPartitionSize);
-            checkScanFileLimit(start, sessionVariable, totalScanFileSize);
-            checkPartitionPruneFail(start, sessionVariable, partitionPrunedFail);
-
-            long end = System.currentTimeMillis();
-            long elapseMs = end - start;
-            if (elapseMs > 1000) {
-                LOG.warn("check sql scan size valid elapse: {}ms", elapseMs);
-            }
         } catch (Exception e) {
             LOG.warn("check query scan detail fail, reason is ", e);
+            return;
+        }
+
+        checkScanTableLimit(start, sessionVariable, fullTableNames.size());
+        checkScanPartitionLimit(start, sessionVariable, totalScanPartitionSize);
+        checkScanFileLimit(start, sessionVariable, totalScanFileSize);
+        checkPartitionPruneFail(start, sessionVariable, partitionPrunedFail);
+
+        long end = System.currentTimeMillis();
+        long elapseMs = end - start;
+        if (elapseMs > 1000) {
+            LOG.warn("check sql scan size valid elapse: {}ms", elapseMs);
         }
     }
 
