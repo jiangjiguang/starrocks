@@ -42,6 +42,7 @@ import com.starrocks.catalog.Table;
 import com.starrocks.common.IdGenerator;
 import com.starrocks.thrift.TDescriptorTable;
 
+import com.starrocks.thrift.TTableDescriptor;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -174,8 +175,11 @@ public class DescriptorTable {
         }
 
         for (Table tbl : referencedTbls.values()) {
-            result.addToTableDescriptors(
-                    tbl.toThrift(referencedPartitionsPerTable.getOrDefault(tbl, Lists.newArrayList())));
+            TTableDescriptor tableDescriptor = tbl.toThrift(
+                    referencedPartitionsPerTable.getOrDefault(tbl, Lists.newArrayList()));
+            if (tableDescriptor != null) {
+                result.addToTableDescriptors(tableDescriptor);
+            }
         }
         return result;
     }

@@ -34,14 +34,11 @@
 
 package com.starrocks.common;
 
-import com.google.common.collect.Lists;
 import com.google.gson.annotations.SerializedName;
 import com.starrocks.catalog.HiveTable;
 import com.starrocks.catalog.HudiTable;
 import com.starrocks.catalog.IcebergTable;
 import com.starrocks.catalog.OlapTable;
-import com.starrocks.catalog.PartitionKey;
-import com.starrocks.connector.RemoteFileInfo;
 import com.starrocks.persist.gson.GsonUtils;
 import com.starrocks.planner.HdfsScanNode;
 import com.starrocks.planner.HudiScanNode;
@@ -58,7 +55,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class QueryScanNodeDetail {
     private static final Logger LOG = LoggerFactory.getLogger(QueryScanNodeDetail.class);
@@ -162,27 +161,22 @@ public class QueryScanNodeDetail {
                 detail.setPartitionPruneFail(true);
             }
             HiveTable table = hdfsScanNode.getHiveTable();
-            String catalogName = table.getCatalogName();
             String dbName = table.getDbName();
             String tableName = table.getTableName();
             detail.setTableName(dbName + "." + tableName);
             detail.setScanPartitions(scanNodePredicates.getSelectedPartitionIds().size());
-            detail.setTotalPartitions(getExternalTablePartitionSize(catalogName, dbName, tableName));
-            List<PartitionKey> partitionKeys = Lists.newArrayList();
-            for (long partitionId : scanNodePredicates.getSelectedPartitionIds()) {
-                PartitionKey partitionKey = scanNodePredicates.getIdToPartitionKey().get(partitionId);
-                partitionKeys.add(partitionKey);
-            }
+            detail.setTotalPartitions(table.getPartitionCount());
 
-            List<RemoteFileInfo> partitions = GlobalStateMgr.getCurrentState()
-                    .getMetadataMgr().getRemoteFileInfos(catalogName, table, partitionKeys);
-            int totalScanFiles = 0;
-            if (!CollectionUtils.isEmpty(partitions)) {
-                for (RemoteFileInfo remoteFileInfo : partitions) {
-                    totalScanFiles += remoteFileInfo.getFiles().size();
+            // Use already computed scanRangeLocations to count unique files
+            // instead of re-fetching from metadata (which may be stale or unavailable)
+            List<TScanRangeLocations> scanRanges = hdfsScanNode.getScanRangeLocations(0);
+            Set<String> uniqueFiles = new HashSet<>();
+            for (TScanRangeLocations scanRange : scanRanges) {
+                if (scanRange.getScan_range() != null && scanRange.getScan_range().isSetHdfs_scan_range()) {
+                    uniqueFiles.add(scanRange.getScan_range().getHdfs_scan_range().getRelative_path());
                 }
             }
-            detail.setScanFiles(totalScanFiles);
+            detail.setScanFiles(uniqueFiles.size());
         } catch (Exception e) {
             LOG.error("Failed to get explain sql_scan_detail in HdfsScanNode", e);
             throw e;
@@ -204,7 +198,10 @@ public class QueryScanNodeDetail {
             detail.setScanPartitions(scanNodePredicates.getSelectedPartitionIds().size());
             List<TScanRangeLocations> locationsList = icebergScanNode.getScanRangeLocations(0);
             detail.setScanFiles(locationsList.size());
-            detail.setTotalPartitions(getExternalTablePartitionSize(catalogName, dbName, tableName));
+            // Iceberg table needs to get partition count via MetadataMgr
+            List<String> partitionNames = GlobalStateMgr.getCurrentState().getMetadataMgr()
+                    .listPartitionNames(catalogName, dbName, tableName);
+            detail.setTotalPartitions(partitionNames.size() == 0 ? 1 : partitionNames.size());
         } catch (Exception e) {
             LOG.error("Failed to get explain sql_scan_detail in IcebergScanNode", e);
             throw e;
@@ -215,7 +212,6 @@ public class QueryScanNodeDetail {
         try {
             HudiScanNode hudiScanNode = (HudiScanNode) scanNode;
             HudiTable table = hudiScanNode.getHudiTable();
-            String catalogName = table.getCatalogName();
             String dbName = table.getDbName();
             String tableName = table.getTableName();
             detail.setTableName(dbName + "." + tableName);
@@ -226,7 +222,7 @@ public class QueryScanNodeDetail {
             detail.setScanPartitions(scanNodePredicates.getSelectedPartitionIds().size());
             List<TScanRangeLocations> locationsList = hudiScanNode.getScanRangeLocations(0);
             detail.setScanFiles(locationsList.size());
-            detail.setTotalPartitions(getExternalTablePartitionSize(catalogName, dbName, tableName));
+            detail.setTotalPartitions(table.getPartitionCount());
         } catch (Exception e) {
             LOG.error("Failed to get explain sql_scan_detail in HudiScanNode", e);
             throw e;
@@ -248,18 +244,6 @@ public class QueryScanNodeDetail {
             LOG.error("Failed to get explain sql_scan_detail in OlapScanNode", e);
             throw e;
         }
-    }
-
-    private static Integer getExternalTablePartitionSize(String catalog, String dbName, String tableName) {
-        long start = System.currentTimeMillis();
-        List<String> partitionNames = GlobalStateMgr.getCurrentState().getMetadataMgr().
-                listPartitionNames(catalog, dbName, tableName);
-        long end = System.currentTimeMillis();
-        long elapseMs = end - start;
-        if (elapseMs > 1000) {
-            LOG.warn("get external table {}.{} partition name list elapse: {}ms", dbName, tableName, elapseMs);
-        }
-        return partitionNames.size();
     }
 
 
@@ -291,30 +275,43 @@ public class QueryScanNodeDetail {
                     HdfsScanNode hdfsScanNode = (HdfsScanNode) scanNode;
                     HiveTable hiveTable = hdfsScanNode.getHiveTable();
                     fullTableName = hiveTable.getDbName() + "." + hiveTable.getTableName();
-                    currentScanPartitionSize = hdfsScanNode.getScanRangeLocations().getPartitionInfos().size();
-                    currentScanFileSize = hdfsScanNode.getScanRangeLocations().getScanRangeLocationsSize();
+                    currentScanPartitionSize = hdfsScanNode.getScanNodePredicates().getSelectedPartitionIds().size();
+                    // Use getScanRangeLocations(0) to get already computed scan ranges
+                    // and count unique files from relative_path
+                    List<TScanRangeLocations> scanRanges = hdfsScanNode.getScanRangeLocations(0);
+                    Set<String> uniqueFiles = new HashSet<>();
+                    for (TScanRangeLocations scanRange : scanRanges) {
+                        if (scanRange.getScan_range() != null && scanRange.getScan_range().isSetHdfs_scan_range()) {
+                            uniqueFiles.add(scanRange.getScan_range().getHdfs_scan_range().getRelative_path());
+                        }
+                    }
+                    currentScanFileSize = uniqueFiles.size();
                     currentPartitionPrunedFail = !CollectionUtils.isEmpty(hdfsScanNode.getScanNodePredicates().getNoEvalPartitionConjuncts());
                     totalPartitionSize = hiveTable.getPartitionCount();
                 }
                 if (scanNode instanceof IcebergScanNode) {
                     IcebergScanNode icebergScanNode = (IcebergScanNode) scanNode;
                     IcebergTable icebergTable = icebergScanNode.getIcebergTable();
-                    fullTableName = icebergTable.getRemoteDbName() + "." + icebergTable.getRemoteTableName();
+                    String catalogName = icebergTable.getCatalogName();
+                    String dbName = icebergTable.getRemoteDbName();
+                    String tableName = icebergTable.getRemoteTableName();
+                    fullTableName = dbName + "." + tableName;
                     currentScanPartitionSize = icebergScanNode.getScanNodePredicates().getSelectedPartitionIds().size();
-                    for (TScanRangeLocations tScanRangeLocations : icebergScanNode.getScanRangeLocations(0)) {
-                        currentScanFileSize += tScanRangeLocations.getLocations().size();
-                    }
+                    // Scan ranges have been computed in prepareExec(), use the computed result directly
+                    currentScanFileSize = icebergScanNode.getScanRangeLocations(0).size();
                     currentPartitionPrunedFail = !CollectionUtils.isEmpty(icebergScanNode.getScanNodePredicates().getNoEvalPartitionConjuncts());
-                    totalPartitionSize = icebergTable.getPartitions().size();
+                    // Iceberg table needs to get partition count via MetadataMgr
+                    List<String> partitionNames = GlobalStateMgr.getCurrentState().getMetadataMgr()
+                            .listPartitionNames(catalogName, dbName, tableName);
+                    totalPartitionSize = partitionNames.size() == 0 ? 1 : partitionNames.size();
                 }
                 if (scanNode instanceof HudiScanNode) {
                     HudiScanNode hudiScanNode = (HudiScanNode) scanNode;
                     HudiTable hudiTable = hudiScanNode.getHudiTable();
                     fullTableName = hudiTable.getDbName() + "." + hudiTable.getTableName();
                     currentScanPartitionSize = hudiScanNode.getScanNodePredicates().getSelectedPartitionIds().size();
-                    for (TScanRangeLocations tScanRangeLocations : hudiScanNode.getScanRangeLocations(0)) {
-                        currentScanFileSize += tScanRangeLocations.getLocations().size();
-                    }
+                    // Scan ranges have been computed in prepareExec(), use the computed result directly
+                    currentScanFileSize = hudiScanNode.getScanRangeLocations(0).size();
                     currentPartitionPrunedFail = !CollectionUtils.isEmpty(hudiScanNode.getScanNodePredicates().getNoEvalPartitionConjuncts());
                     totalPartitionSize = hudiTable.getPartitionCount();
                 }

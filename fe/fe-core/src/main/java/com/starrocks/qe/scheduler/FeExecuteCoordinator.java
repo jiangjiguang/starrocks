@@ -18,6 +18,7 @@ import com.google.common.collect.Lists;
 import com.starrocks.analysis.Expr;
 import com.starrocks.analysis.SlotRef;
 import com.starrocks.catalog.ScalarType;
+import com.starrocks.common.QueryScanNodeDetail;
 import com.starrocks.common.Status;
 import com.starrocks.common.util.DateUtils;
 import com.starrocks.common.util.RuntimeProfile;
@@ -70,7 +71,9 @@ public class FeExecuteCoordinator extends Coordinator {
     }
     @Override
     public void startScheduling(boolean needDeploy) throws Exception {
-
+        // Check sql scan partitions and files whether valid
+        // For FE execution, scanNodes is usually empty (constant queries like SELECT 1+1)
+        QueryScanNodeDetail.checkQueryScanSizeValid(connectContext, execPlan.getScanNodes());
     }
 
     @Override

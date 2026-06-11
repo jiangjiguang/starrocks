@@ -1257,9 +1257,6 @@ public class StmtExecutor {
             coord = getCoordinatorFactory().createQueryScheduler(context, fragments, scanNodes, descTable);
         }
 
-        // check sql scan partitions and files whether valid
-        QueryScanNodeDetail.checkQueryScanSizeValid(context, scanNodes);
-
         QeProcessorImpl.INSTANCE.registerQuery(context.getExecutionId(),
                 new QeProcessorImpl.QueryInfo(context, originStmt.originStmt, coord));
 
