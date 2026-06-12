@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <utility>
 
 #include "common/logging.h"
@@ -32,7 +33,8 @@ public:
                           std::unique_ptr<connector::ConnectorChunkSink> connector_chunk_sink,
                           std::unique_ptr<connector::AsyncFlushStreamPoller> _io_poller,
                           std::shared_ptr<connector::SinkMemoryManager> sink_mem_mgr,
-                          connector::SinkOperatorMemoryManager* op_mem_mgr, FragmentContext* fragment_context);
+                          connector::SinkOperatorMemoryManager* op_mem_mgr, FragmentContext* fragment_context,
+                          std::atomic<int32_t>& num_sinkers);
 
     ~ConnectorSinkOperator() override = default;
 
@@ -61,6 +63,7 @@ private:
     std::unique_ptr<connector::AsyncFlushStreamPoller> _io_poller;
     std::shared_ptr<connector::SinkMemoryManager> _sink_mem_mgr;
     connector::SinkOperatorMemoryManager* _op_mem_mgr; // child of _sink_mem_mgr
+    std::atomic<int32_t>& _num_sinkers;
 
     bool _no_more_input = false;
     bool _is_cancelled = false;
@@ -78,10 +81,12 @@ public:
     OperatorPtr create(int32_t degree_of_parallelism, int32_t driver_sequence) override;
 
 private:
+    void _increment_num_sinkers_no_barrier() { _num_sinkers.fetch_add(1, std::memory_order_relaxed); }
     std::unique_ptr<connector::ConnectorChunkSinkProvider> _data_sink_provider;
     std::shared_ptr<connector::ConnectorChunkSinkContext> _sink_context;
     std::shared_ptr<connector::SinkMemoryManager> _sink_mem_mgr;
     FragmentContext* _fragment_context;
+    std::atomic<int32_t> _num_sinkers = 0;
 };
 
 } // namespace starrocks::pipeline
