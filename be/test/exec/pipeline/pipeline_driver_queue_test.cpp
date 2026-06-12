@@ -193,13 +193,13 @@ PARALLEL_TEST(PrioritySharedDriverQueueTest, test_prority_task) {
     driver4->driver_acct().update_last_time_spent(400);
     queue.put_back(driver4.get());
 
-    auto task_driver_1 = queue.take();
+    auto task_driver_1 = queue.take(true);
     ASSERT_EQ(task_driver_1.value()->driver_id(), driver4->driver_id());
-    auto task_driver_2 = queue.take();
+    auto task_driver_2 = queue.take(true);
     ASSERT_EQ(task_driver_2.value()->driver_id(), driver3->driver_id());
-    auto task_driver_3 = queue.take();
+    auto task_driver_3 = queue.take(true);
     ASSERT_EQ(task_driver_3.value()->driver_id(), driver1->driver_id());
-    auto task_driver_4 = queue.take();
+    auto task_driver_4 = queue.take(true);
     ASSERT_EQ(task_driver_4.value()->driver_id(), driver2->driver_id());
 }
 

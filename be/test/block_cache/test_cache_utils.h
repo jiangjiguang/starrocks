@@ -23,7 +23,7 @@ constexpr size_t KB = 1024;
 constexpr size_t MB = KB * 1024;
 constexpr size_t GB = MB * 1024;
 
-CacheOptions create_simple_options(size_t block_size, size_t mem_quota, ssize_t disk_quota = -1,
+inline CacheOptions create_simple_options(size_t block_size, size_t mem_quota, ssize_t disk_quota = -1,
                                    const std::string& engine = "starcache") {
     CacheOptions options;
     options.mem_space_size = mem_quota;
@@ -41,7 +41,7 @@ CacheOptions create_simple_options(size_t block_size, size_t mem_quota, ssize_t 
     return options;
 }
 
-std::shared_ptr<BlockCache> create_cache(const CacheOptions& options) {
+inline std::shared_ptr<BlockCache> create_cache(const CacheOptions& options) {
     std::shared_ptr<BlockCache> cache(new BlockCache);
     Status status = cache->init(options);
     EXPECT_TRUE(status.ok());

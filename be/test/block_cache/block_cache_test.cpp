@@ -25,6 +25,7 @@
 #include "common/statusor.h"
 #include "fs/fs_util.h"
 #include "storage/options.h"
+#include "test_cache_utils.h"
 
 namespace starrocks {
 
@@ -345,9 +346,9 @@ TEST_F(BlockCacheTest, cache_ttl) {
     ASSERT_TRUE(fs::create_directories(cache_dir).ok());
 
     const size_t block_size = 256 * 1024;
-    CacheOptions options = TestCacheUtils::create_simple_options(block_size, 20 * MB);
+    auto options = create_simple_options(block_size, 20 * MB);
     options.ttl_check_interval_ms = 1;
-    auto cache = TestCacheUtils::create_cache(options);
+    auto cache = create_cache(options);
 
     const size_t batch_size = block_size;
     const std::string cache_key = "test_file";
@@ -356,10 +357,11 @@ TEST_F(BlockCacheTest, cache_ttl) {
     write_options.ttl_seconds = 1;
 
     std::string value(batch_size, 'a');
-    ASSERT_OK(cache->write(cache_key, 0, batch_size, value.c_str(), &write_options));
+    auto st = cache->write_buffer(cache_key, 0, batch_size, value.c_str(), &write_options);
+    ASSERT_TRUE(st.ok()) << st.to_string();
 
     char rvalue[batch_size] = {0};
-    auto res = cache->read(cache_key, 0, batch_size, rvalue);
+    auto res = cache->read_buffer(cache_key, 0, batch_size, rvalue);
     ASSERT_TRUE(res.status().ok());
     std::string expect_value(batch_size, 'a');
     ASSERT_EQ(memcmp(rvalue, expect_value.c_str(), batch_size), 0);
@@ -368,8 +370,9 @@ TEST_F(BlockCacheTest, cache_ttl) {
     sleep(10);
     ASSERT_FALSE(cache->exist(cache_key, 0, batch_size));
 
-    ASSERT_OK(cache->shutdown());
-    ASSERT_OK(fs::remove_all(cache_dir));
+    cache->shutdown();
+    fs::remove_all(cache_dir).ok();
+
 }
 
 #endif

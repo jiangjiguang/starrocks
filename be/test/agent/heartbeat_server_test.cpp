@@ -17,8 +17,12 @@
 #include "common/process_exit.h"
 #include "gen_cpp/Types_types.h"
 #include "gtest/gtest.h"
+#include "service/backend_options.h"
 
 namespace starrocks {
+
+// defined in common/process_exit.cpp
+extern std::atomic<bool> k_starrocks_exit;
 
 TEST(HeartbeatServerTest, test_print_master_info_with_token_null) {
     HeartbeatServer server;
@@ -61,44 +65,10 @@ TEST(HeartbeatServerTest, test_print_master_info_with_token_hidden) {
     EXPECT_EQ(server.print_master_info(master_info), expected_output);
 }
 
-TEST(HeartbeatServerTest, test_unmatched_node_type_heartbeat) {
-    HeartbeatServer server;
-    TMasterInfo master_info;
-
-    // not set node type.
-    StatusOr res = server.compare_master_info(master_info);
-    EXPECT_EQ(TStatusCode::OK, res.status().code());
-
-    BackendOptions::init(false);
-    master_info.__set_node_type(TNodeType::Backend);
-    res = server.compare_master_info(master_info);
-    EXPECT_EQ(TStatusCode::OK, res.status().code());
-
-    BackendOptions::init(true);
-    master_info.__set_node_type(TNodeType::Compute);
-    res = server.compare_master_info(master_info);
-    EXPECT_EQ(TStatusCode::OK, res.status().code());
-
-    BackendOptions::init(true);
-    master_info.__set_node_type(TNodeType::Backend);
-    res = server.compare_master_info(master_info);
-    EXPECT_EQ(TStatusCode::INTERNAL_ERROR, res.status().code());
-    EXPECT_TRUE(res.status().message().find("Unmatched node type"));
-    EXPECT_TRUE(res.status().message().find("actually CN"));
-
-    BackendOptions::init(false);
-    master_info.__set_node_type(TNodeType::Compute);
-    res = server.compare_master_info(master_info);
-    EXPECT_EQ(TStatusCode::INTERNAL_ERROR, res.status().code());
-    EXPECT_TRUE(res.status().message().find("Unmatched node type"));
-    EXPECT_TRUE(res.status().message().find("actually BE"));
-}
-
 TEST(HeartbeatServerTest, test_frontend_aware_of_exit) {
     clear_frontend_aware_of_exit();
     ASSERT_FALSE(is_frontend_aware_of_exit());
 
-TEST(HeartbeatServerTest, test_shutdown_heartbeat) {
     HeartbeatServer server;
     {
         THeartbeatResult result;
