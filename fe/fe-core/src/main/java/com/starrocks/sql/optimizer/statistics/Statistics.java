@@ -16,6 +16,7 @@ package com.starrocks.sql.optimizer.statistics;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.starrocks.qe.ConnectContext;
 import com.starrocks.sql.common.ErrorType;
 import com.starrocks.sql.common.StarRocksPlannerException;
 import com.starrocks.sql.optimizer.base.ColumnRefSet;
@@ -88,12 +89,24 @@ public class Statistics {
 
     public ColumnStatistic getColumnStatistic(ColumnRefOperator column) {
         if (columnStatistics.get(column) == null) {
+            ConnectContext context = ConnectContext.get();
+            if (context != null && context.getSessionVariable() != null) {
+                if (context.getSessionVariable().isEnablePrestoTranslation()) {
+                    // Statistics derivation may legitimately reach a column ref that was not propagated into this
+                    // node's column statistics map (e.g. a cast slot used as a join key after join reorder / limit
+                    // pushdown). Degrade to an unknown statistic instead of failing the whole query planning.
+                    return columnStatistics.getOrDefault(column, ColumnStatistic.unknown());
+                }
+            }
             throw new StarRocksPlannerException(ErrorType.INTERNAL_ERROR,
                     "only found column statistics: %s, but missing statistic of col: %s.",
                     ColumnRefOperator.toString(columnStatistics.keySet()), column);
         } else {
             return columnStatistics.get(column);
         }
+
+
+
     }
 
     public Map<ColumnRefOperator, ColumnStatistic> getColumnStatistics() {
