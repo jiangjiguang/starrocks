@@ -150,6 +150,16 @@ public:
     // longer needed.
     virtual Handle* lookup(const CacheKey& key) = 0;
 
+    // Refresh recency without acquiring/releasing a handle or invoking a deleter.
+    virtual void touch(const CacheKey& key) = 0;
+
+    // Update charge only if the cached value passes pred (or pred is null).
+    // pred runs under the shard lock and must not re-enter the cache.
+    // Deleters run after unlocking. Neither value nor value_size is changed;
+    // charge follows this branch's insert() accounting (no handle overhead).
+    virtual bool update_charge_if(const CacheKey& key, size_t charge,
+                                  bool (*pred)(void* value, const void* ctx), const void* ctx) = 0;
+
     // Release a mapping returned by a previous Lookup().
     // REQUIRES: handle must not have been released yet.
     // REQUIRES: handle must have been returned by a method on *this.
@@ -281,6 +291,9 @@ public:
                           void (*deleter)(const CacheKey& key, void* value),
                           CachePriority priority = CachePriority::NORMAL, size_t value_size = 0);
     Cache::Handle* lookup(const CacheKey& key, uint32_t hash);
+    void touch(const CacheKey& key, uint32_t hash);
+    bool update_charge_if(const CacheKey& key, uint32_t hash, size_t charge,
+                          bool (*pred)(void* value, const void* ctx), const void* ctx);
     void release(Cache::Handle* handle);
     void erase(const CacheKey& key, uint32_t hash);
     int prune();
@@ -327,6 +340,9 @@ public:
     Handle* insert(const CacheKey& key, void* value, size_t charge, void (*deleter)(const CacheKey& key, void* value),
                    CachePriority priority = CachePriority::NORMAL, size_t value_size = 0) override;
     Handle* lookup(const CacheKey& key) override;
+    void touch(const CacheKey& key) override;
+    bool update_charge_if(const CacheKey& key, size_t charge, bool (*pred)(void* value, const void* ctx),
+                          const void* ctx) override;
     void release(Handle* handle) override;
     void erase(const CacheKey& key) override;
     void* value(Handle* handle) override;

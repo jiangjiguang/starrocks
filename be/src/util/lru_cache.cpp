@@ -234,6 +234,41 @@ Cache::Handle* LRUCache::lookup(const CacheKey& key, uint32_t hash) {
     return reinterpret_cast<Cache::Handle*>(e);
 }
 
+void LRUCache::touch(const CacheKey& key, uint32_t hash) {
+    std::lock_guard l(_mutex);
+    LRUHandle* e = _table.lookup(key, hash);
+    if (e != nullptr && e->refs == 1) {
+        DCHECK(e->in_cache);
+        _lru_remove(e);
+        _lru_append(&_lru, e);
+    }
+}
+
+bool LRUCache::update_charge_if(const CacheKey& key, uint32_t hash, size_t charge,
+                                bool (*pred)(void* value, const void* ctx), const void* ctx) {
+    std::vector<LRUHandle*> deleted;
+    bool updated = false;
+    {
+        std::lock_guard l(_mutex);
+        LRUHandle* e = _table.lookup(key, hash);
+        if (e != nullptr && (pred == nullptr || pred(e->value, ctx))) {
+            _usage = _usage - e->charge + charge;
+            e->charge = charge;
+            if (e->refs == 1) {
+                _lru_remove(e);
+                _lru_append(&_lru, e);
+            }
+            _evict_from_lru(0, &deleted);
+            // The updated entry may have been evicted; do not access it again.
+            updated = true;
+        }
+    }
+    for (auto* entry : deleted) {
+        entry->free();
+    }
+    return updated;
+}
+
 void LRUCache::release(Cache::Handle* handle) {
     if (handle == nullptr) {
         return;
@@ -444,6 +479,17 @@ Cache::Handle* ShardedLRUCache::insert(const CacheKey& key, void* value, size_t 
 Cache::Handle* ShardedLRUCache::lookup(const CacheKey& key) {
     const uint32_t hash = _hash_slice(key);
     return _shards[_shard(hash)].lookup(key, hash);
+}
+
+void ShardedLRUCache::touch(const CacheKey& key) {
+    const uint32_t hash = _hash_slice(key);
+    _shards[_shard(hash)].touch(key, hash);
+}
+
+bool ShardedLRUCache::update_charge_if(const CacheKey& key, size_t charge,
+                                       bool (*pred)(void* value, const void* ctx), const void* ctx) {
+    const uint32_t hash = _hash_slice(key);
+    return _shards[_shard(hash)].update_charge_if(key, hash, charge, pred, ctx);
 }
 
 void ShardedLRUCache::release(Handle* handle) {

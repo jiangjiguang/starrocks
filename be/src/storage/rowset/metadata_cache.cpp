@@ -32,7 +32,21 @@ MetadataCache::MetadataCache(size_t capacity) {
 }
 
 void MetadataCache::cache_rowset(Rowset* ptr) {
-    _insert(ptr->rowset_id_str(), ptr, ptr->segment_memory_usage());
+    auto* weak_ptr = new std::weak_ptr<Rowset>(ptr->shared_from_this());
+    _insert(ptr->rowset_id_str(), weak_ptr, ptr->segment_memory_usage());
+}
+
+void MetadataCache::update_rowset_charge(Rowset* ptr, size_t charge) {
+    auto rowset_owner_matches = [](void* value, const void* ctx) {
+        const auto& cached = *static_cast<const std::weak_ptr<Rowset>*>(value);
+        const auto& expected = *static_cast<const std::weak_ptr<Rowset>*>(ctx);
+        // Compare ownership without locking the weak_ptr: destroying a temporary strong
+        // reference under the shard lock could destroy another Rowset and re-enter the cache.
+        return !cached.owner_before(expected) && !expected.owner_before(cached);
+    };
+    const std::string key = ptr->rowset_id_str();
+    const auto expected = ptr->weak_from_this();
+    _cache->update_charge_if(CacheKey(key), charge, rowset_owner_matches, &expected);
 }
 
 void MetadataCache::evict_rowset(Rowset* ptr) {
@@ -51,7 +65,7 @@ void MetadataCache::set_capacity(size_t capacity) {
     _cache->set_capacity(capacity);
 }
 
-void MetadataCache::_insert(const std::string& key, Rowset* ptr, size_t size) {
+void MetadataCache::_insert(const std::string& key, std::weak_ptr<Rowset>* ptr, size_t size) {
     Cache::Handle* handle = _cache->insert(CacheKey(key), ptr, size, _cache_value_deleter);
     _cache->release(handle);
 }
@@ -61,15 +75,16 @@ void MetadataCache::_erase(const std::string& key) {
 }
 
 void MetadataCache::_cache_value_deleter(const CacheKey& /*key*/, void* value) {
-    // close this rowset, release metadata memory
-    reinterpret_cast<Rowset*>(value)->close();
+    auto* weak_ptr = static_cast<std::weak_ptr<Rowset>*>(value);
+    if (auto rowset = weak_ptr->lock()) {
+        rowset->close();
+    }
+    delete weak_ptr;
 }
 
 void MetadataCache::_warmup(const std::string& key) {
-    Cache::Handle* handle = _cache->lookup(CacheKey(key));
-    if (handle != nullptr) {
-        _cache->release(handle);
-    }
+    // load() holds the Rowset lock. Touch must not evict and re-enter close().
+    _cache->touch(CacheKey(key));
 }
 
 } // namespace starrocks

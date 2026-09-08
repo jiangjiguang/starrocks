@@ -36,6 +36,7 @@
 
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <vector>
 
 using namespace starrocks;
@@ -346,6 +347,93 @@ TEST_F(CacheTest, SetCapacity) {
         _cache->release(handles[i]);
     }
     ASSERT_EQ(32, _cache->get_memory_usage());
+}
+
+TEST_F(CacheTest, UpdateChargeChecksValueOwnership) {
+    Insert(1, 10, 100);
+    std::string key;
+    EncodeKey(&key, 1);
+    auto matches = [](void* value, const void* expected) { return value == expected; };
+    ASSERT_FALSE(_cache->update_charge_if(key, 200, matches, EncodeValue(20)));
+    ASSERT_EQ(100, _cache->get_memory_usage());
+    ASSERT_TRUE(_cache->update_charge_if(key, 200, matches, EncodeValue(10)));
+    ASSERT_EQ(200, _cache->get_memory_usage());
+    ASSERT_TRUE(_cache->update_charge_if(key, 50, matches, EncodeValue(10)));
+    ASSERT_EQ(50, _cache->get_memory_usage());
+    ASSERT_EQ(0, _cache->get_lookup_count());
+    ASSERT_TRUE(_deleted_keys.empty());
+
+    Insert(1, 20, 100);
+    ASSERT_FALSE(_cache->update_charge_if(key, 300, matches, EncodeValue(10)));
+    ASSERT_EQ(100, _cache->get_memory_usage());
+    ASSERT_EQ(20, Lookup(1));
+    Erase(1);
+    ASSERT_FALSE(_cache->update_charge_if(key, 300, nullptr, nullptr));
+    ASSERT_EQ(0, _cache->get_memory_usage());
+}
+
+TEST_F(CacheTest, ChargeGrowthEvictsAndPinnedEntryWaitsForRelease) {
+    Insert(1, 10, 100);
+    std::string key;
+    EncodeKey(&key, 1);
+    ASSERT_TRUE(_cache->update_charge_if(key, kCacheSize + 1, nullptr, nullptr));
+    ASSERT_EQ(0, _cache->get_memory_usage());
+    ASSERT_EQ(1, _deleted_keys.size());
+
+    auto* handle = _cache->insert(key, EncodeValue(20), 100, &CacheTest::Deleter);
+    ASSERT_TRUE(_cache->update_charge_if(key, kCacheSize + 1, nullptr, nullptr));
+    ASSERT_EQ(kCacheSize + 1, _cache->get_memory_usage());
+    ASSERT_EQ(1, _deleted_keys.size());
+    _cache->release(handle);
+    ASSERT_EQ(0, _cache->get_memory_usage());
+    ASSERT_EQ(2, _deleted_keys.size());
+}
+
+TEST(CacheChargeTest, DeleterCanReenterCacheAfterUpdate) {
+    std::unique_ptr<Cache> cache(new_lru_cache(32));
+    struct State {
+        Cache* cache;
+        bool deleted = false;
+    } state{cache.get()};
+    auto deleter = [](const CacheKey&, void* value) {
+        auto* state = static_cast<State*>(value);
+        // A deleter called under the shard lock would deadlock here.
+        EXPECT_EQ(0, state->cache->get_memory_usage());
+        state->deleted = true;
+    };
+    cache->release(cache->insert("key", &state, 1, deleter));
+    ASSERT_TRUE(cache->update_charge_if("key", 100, nullptr, nullptr));
+    ASSERT_TRUE(state.deleted);
+}
+
+TEST(CacheChargeTest, TouchUpdatesRecencyWithoutEviction) {
+    LRUCache cache;
+    cache.set_capacity(2);
+    std::vector<std::string> deleted;
+    auto deleter = [](const CacheKey& key, void* value) {
+        static_cast<std::vector<std::string>*>(value)->push_back(key.to_string());
+    };
+    cache.release(cache.insert("first", 1, &deleted, 1, deleter));
+    cache.release(cache.insert("second", 2, &deleted, 1, deleter));
+    cache.touch("first", 1);
+    cache.release(cache.insert("third", 3, &deleted, 1, deleter));
+    ASSERT_EQ(std::vector<std::string>{"second"}, deleted);
+    ASSERT_EQ(0, cache.get_lookup_count());
+    cache.prune();
+}
+
+TEST(CacheChargeTest, TouchDoesNotReleasePinnedOverCapacityEntry) {
+    LRUCache cache;
+    cache.set_capacity(1);
+    bool deleted = false;
+    auto deleter = [](const CacheKey&, void* value) { *static_cast<bool*>(value) = true; };
+    auto* handle = cache.insert("key", 1, &deleted, 2, deleter);
+    cache.touch("key", 1);
+    ASSERT_FALSE(deleted);
+    ASSERT_EQ(2, cache.get_usage());
+    cache.release(handle);
+    ASSERT_TRUE(deleted);
+    ASSERT_EQ(0, cache.get_usage());
 }
 
 } // namespace starrocks
