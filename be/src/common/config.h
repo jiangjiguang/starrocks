@@ -1445,7 +1445,8 @@ CONF_mBool(enable_core_file_size_optimization, "true");
 // 9. wg_driver_executor
 // use commas to separate:
 // * means release all above
-CONF_mString(try_release_resource_before_core_dump, "data_cache");
+// Releasing data_cache in the signal handler may deadlock; see StarRocks #59226/#59227.
+CONF_mString(try_release_resource_before_core_dump, "");
 
 // When upgrade thrift to 0.20.0, the MaxMessageSize member defines the maximum size of a (received) message, in bytes.
 // The default value is represented by a constant named DEFAULT_MAX_MESSAGE_SIZE, whose value is 100 * 1024 * 1024 bytes.

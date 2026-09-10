@@ -35,6 +35,14 @@ curl http://<BE_IP>:<BE_HTTP_PORT>/varz
 
 ### Server
 
+##### try_release_resource_before_core_dump
+
+- Default: Empty string
+- Type: String
+- Unit: -
+- Is mutable: Yes
+- Description: A comma-separated list of resources to release before collecting a core dump, or `*` for all supported resources. An empty value skips this resource-release step; it does not disable normal DataCache operation or all other core-size optimizations. The default is changed from `data_cache` to empty by the backport of community PR #59227 because releasing caches from a crash handler can deadlock. Avoid explicitly configuring `data_cache` or `*`. Changing the setting cannot unblock a handler already waiting on a cache lock.
+
 <!--
 ##### cluster_id
 

@@ -31,6 +31,14 @@ curl http://<BE_IP>:<BE_HTTP_PORT>/varz
 
 ### Server
 
+##### try_release_resource_before_core_dump
+
+- 默认值：空字符串
+- 类型：String
+- 单位：无
+- 是否动态配置：是
+- 描述：生成 core 前需要释放的资源列表，使用逗号分隔，`*` 表示所有支持的资源。空值表示跳过这一资源释放步骤，不关闭日常 DataCache，也不关闭其他 core 大小优化。社区 #59227 将默认值从 `data_cache` 改为空，避免异常处理期间清缓存导致死锁。不要显式配置为 `data_cache` 或 `*`。修改此参数不能解除已经发生的缓存锁等待。
+
 <!--
 ##### cluster_id
 
