@@ -23,6 +23,7 @@ namespace starrocks {
 
 // defined in common/process_exit.cpp
 extern std::atomic<bool> k_starrocks_exit;
+extern std::atomic<bool> k_starrocks_be_crashing;
 
 TEST(HeartbeatServerTest, test_print_master_info_with_token_null) {
     HeartbeatServer server;
@@ -91,6 +92,16 @@ TEST(HeartbeatServerTest, test_frontend_aware_of_exit) {
         ASSERT_TRUE(is_frontend_aware_of_exit());
     }
     k_starrocks_exit = false;
+}
+
+TEST(HeartbeatServerTest, test_crashing_reports_shutdown) {
+    HeartbeatServer server;
+    THeartbeatResult result;
+    TMasterInfo info;
+    set_process_is_crashing();
+    server.heartbeat(result, info);
+    k_starrocks_be_crashing.store(false);
+    EXPECT_EQ(TStatusCode::SHUTDOWN, result.status.status_code);
 }
 
 } // namespace starrocks

@@ -36,6 +36,10 @@ std::atomic<bool> k_starrocks_quick_exit;
 // This flag records whether there is a such response with status SHUTDOWN sent back to FE.
 std::atomic<bool> k_starrocks_fe_heartbeat_aware_shutdown = false;
 
+// Accessed from fatal-signal handlers; it must never fall back to a mutex.
+static_assert(std::atomic<bool>::is_always_lock_free);
+std::atomic<bool> k_starrocks_be_crashing = false;
+
 bool set_process_exit() {
     bool expected = false;
     return k_starrocks_exit.compare_exchange_strong(expected, true);
@@ -64,6 +68,14 @@ void clear_frontend_aware_of_exit() {
 
 bool is_frontend_aware_of_exit() {
     return k_starrocks_fe_heartbeat_aware_shutdown.load(std::memory_order_relaxed);
+}
+
+void set_process_is_crashing() {
+    k_starrocks_be_crashing.store(true, std::memory_order_relaxed);
+}
+
+bool is_process_crashing() {
+    return k_starrocks_be_crashing.load(std::memory_order_relaxed);
 }
 
 } // namespace starrocks
