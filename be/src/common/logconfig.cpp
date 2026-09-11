@@ -27,6 +27,7 @@
 #include <mutex>
 
 #include "common/config.h"
+#include "common/crash_watchdog.h"
 #include "common/process_exit.h"
 #include "gutil/endian.h"
 #include "gutil/stringprintf.h"
@@ -280,6 +281,11 @@ bool init_glog(const char* basename, bool install_signal_handler) {
         google::InstallFailureWriter(failure_writer);
         google::InstallFailureFunction((google::logging_fail_func_t)failure_function);
         google::InstallFailureHandlerAfterOutputLog(failure_handler_after_output_log);
+        const int64_t timeout_seconds = config::process_force_exit_after_crash_handler_hang_second;
+        may_start_crash_watchdog(timeout_seconds);
+        if (timeout_seconds > 0) {
+            LOG(WARNING) << "crash watchdog enabled; may force-exit before a slow core dump completes";
+        }
     }
 
     logging_initialized = true;

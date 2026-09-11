@@ -31,6 +31,15 @@ curl http://<BE_IP>:<BE_HTTP_PORT>/varz
 
 ### Server
 
+##### process_force_exit_after_crash_handler_hang_second
+
+- 默认值：0
+- 类型：Int64
+- 单位：秒
+- 是否动态配置：否
+- 描述：限制 BE/CN 被异常处理回调标记为 crashing 后仍然存活的时间。正数表示启动后台 watchdog，小于等于 0 表示关闭；需要 `dump_trace_info=true` 以安装异常处理回调。达到期限后通过 `_exit(1)` 直接退出，不执行析构，也不额外生成 core。此参数不监控普通查询超时或正常停机，修改后需要重启节点。启用时应预留诊断时间，因为强制退出可能中断较慢的异常清理或 core 收集。本分支回合自社区 #76491，并补齐 #66212 的 crashing 状态依赖。
+- 触发条件：与社区实现一致，仅在 `failure_handler_after_output_log` 中，清理尚未开始、`enable_core_file_size_optimization=true` 且 core 文件大小限制不为 0 时设置 crashing 标记。不在 `failure_writer` 或 `failure_function` 中提前设置标记。设置标记之前的阻塞不在保护范围内，包括本分支 `failure_writer` 中的 jemalloc 清理。
+
 ##### try_release_resource_before_core_dump
 
 - 默认值：空字符串

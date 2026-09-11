@@ -35,6 +35,15 @@ curl http://<BE_IP>:<BE_HTTP_PORT>/varz
 
 ### Server
 
+##### process_force_exit_after_crash_handler_hang_second
+
+- Default: 0
+- Type: Int64
+- Unit: Seconds
+- Is mutable: No
+- Description: Bounds how long a BE/CN can remain alive after its crash handler marks the process as crashing. A positive value enables a background watchdog at startup; values less than or equal to zero disable it. Requires `dump_trace_info=true`, which installs the crash callbacks. When the deadline is reached, the watchdog calls `_exit(1)` without running destructors or generating another core dump. It does not monitor normal query timeouts or graceful shutdown. Restart the node after changing this setting. Allow enough time for diagnostics: enabling the watchdog can interrupt slow crash cleanup or core collection. Backported from community PR #76491 with the crash-state dependency from #66212.
+- Trigger condition: As in the upstream implementation, the crash flag is set only in `failure_handler_after_output_log`, when cleanup has not started, `enable_core_file_size_optimization=true`, and the core file limit is nonzero. No early marking is added to `failure_writer` or `failure_function`. A stall before this flag is set is not covered; in this branch that includes jemalloc cleanup in `failure_writer`.
+
 ##### try_release_resource_before_core_dump
 
 - Default: Empty string

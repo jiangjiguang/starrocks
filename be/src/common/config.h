@@ -1433,6 +1433,9 @@ CONF_mBool(skip_lake_pk_preload, "false");
 CONF_mBool(lake_enable_alter_struct, "false");
 // Reduce core file size by not dumping jemalloc retain pages
 CONF_mBool(enable_core_file_size_optimization, "true");
+// Force exit if crash handling stays stuck for this many seconds. Disabled at <= 0.
+// Read once at startup; enabling may interrupt slow crash cleanup or core collection.
+CONF_Int64(process_force_exit_after_crash_handler_hang_second, "0");
 // Current supported modules:
 // 1. data_cache (data cache for shared-nothing table, data cache for external table, data cache for shared-data table)
 // 2. connector_scan_executor

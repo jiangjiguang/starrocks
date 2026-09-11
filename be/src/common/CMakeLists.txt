@@ -24,6 +24,7 @@ add_library(Common STATIC
   s3_uri.cpp
   tracer.cpp
   process_exit.cpp
+  crash_watchdog.cpp
   prof/heap_prof.cpp
 )
 
