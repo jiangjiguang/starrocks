@@ -35,6 +35,7 @@
 package com.starrocks.catalog;
 
 import com.starrocks.catalog.MaterializedIndex.IndexState;
+import com.starrocks.common.DdlException;
 import com.starrocks.common.util.concurrent.lock.LockManager;
 import com.starrocks.persist.CreateTableInfo;
 import com.starrocks.persist.EditLog;
@@ -153,5 +154,30 @@ public class DatabaseTest {
         Database db3 = new Database(101, "db3");
         db3.setCatalogName("hive");
         Assert.assertEquals("hive.db3", db3.getUUID());
+    }
+
+    @Test
+    public void testQuotaChecksUseRefreshedUsage() throws Exception {
+        db.setDataQuota(100);
+        db.usedDataQuotaBytes.set(99);
+        db.checkDataSizeQuota();
+        db.usedDataQuotaBytes.set(100);
+        try {
+            db.checkDataSizeQuota();
+            Assert.fail("data quota check should reject a full quota");
+        } catch (DdlException e) {
+            // Expected.
+        }
+
+        db.setReplicaQuota(10);
+        db.usedReplicaQuotaBytes.set(9);
+        db.checkReplicaQuota();
+        db.usedReplicaQuotaBytes.set(10);
+        try {
+            db.checkReplicaQuota();
+            Assert.fail("replica quota check should reject a full quota");
+        } catch (DdlException e) {
+            // Expected.
+        }
     }
 }

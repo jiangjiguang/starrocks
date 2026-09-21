@@ -75,6 +75,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.zip.Adler32;
 
@@ -125,6 +126,10 @@ public class Database extends MetaObject implements Writable {
 
     // For external database location like hdfs://name_node:9000/user/hive/warehouse/test.db/
     private String location;
+
+    // Quota usage is refreshed periodically so DDL checks do not scan the whole database.
+    public volatile AtomicLong usedDataQuotaBytes = new AtomicLong(0);
+    public volatile AtomicLong usedReplicaQuotaBytes = new AtomicLong(0);
 
     public Database() {
         this(0, null);
@@ -214,30 +219,11 @@ public class Database extends MetaObject implements Writable {
         return replicaQuotaSize;
     }
 
-    public long getUsedDataQuotaWithLock() {
-        long usedDataQuota = 0;
-        Locker locker = new Locker();
-        locker.lockDatabase(this, LockType.READ);
-        try {
-            for (Table table : this.idToTable.values()) {
-                if (!table.isOlapTableOrMaterializedView()) {
-                    continue;
-                }
-
-                OlapTable olapTable = (OlapTable) table;
-                usedDataQuota = usedDataQuota + olapTable.getDataSize();
-            }
-            return usedDataQuota;
-        } finally {
-            locker.unLockDatabase(this, LockType.READ);
-        }
-    }
-
     public void checkDataSizeQuota() throws DdlException {
         Pair<Double, String> quotaUnitPair = DebugUtil.getByteUint(dataQuotaBytes);
         String readableQuota = DebugUtil.DECIMAL_FORMAT_SCALE_3.format(quotaUnitPair.first) + " "
                 + quotaUnitPair.second;
-        long usedDataQuota = getUsedDataQuotaWithLock();
+        long usedDataQuota = usedDataQuotaBytes.get();
         long leftDataQuota = Math.max(dataQuotaBytes - usedDataQuota, 0);
 
         Pair<Double, String> leftQuotaUnitPair = DebugUtil.getByteUint(leftDataQuota);
@@ -254,21 +240,7 @@ public class Database extends MetaObject implements Writable {
     }
 
     public void checkReplicaQuota() throws DdlException {
-        long usedReplicaQuota = 0;
-        Locker locker = new Locker();
-        locker.lockDatabase(this, LockType.READ);
-        try {
-            for (Table table : this.idToTable.values()) {
-                if (!table.isOlapTableOrMaterializedView()) {
-                    continue;
-                }
-
-                OlapTable olapTable = (OlapTable) table;
-                usedReplicaQuota = usedReplicaQuota + olapTable.getReplicaCount();
-            }
-        } finally {
-            locker.unLockDatabase(this, LockType.READ);
-        }
+        long usedReplicaQuota = usedReplicaQuotaBytes.get();
 
         long leftReplicaQuota = Math.max(replicaQuotaSize - usedReplicaQuota, 0L);
         LOG.info("database[{}] replica quota: left number: {} / total: {}",
