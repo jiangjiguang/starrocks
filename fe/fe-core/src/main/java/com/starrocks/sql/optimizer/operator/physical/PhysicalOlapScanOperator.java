@@ -51,6 +51,7 @@ public class PhysicalOlapScanOperator extends PhysicalScanOperator {
     private boolean withoutColocateRequirement = false;
 
     private boolean usePkIndex = false;
+    private boolean hasPartitionConstraint;
 
     private List<Pair<Integer, ColumnDict>> globalDicts = Lists.newArrayList();
     private Map<Integer, ScalarOperator> globalDictsExpr = Maps.newHashMap();
@@ -93,6 +94,15 @@ public class PhysicalOlapScanOperator extends PhysicalScanOperator {
         this.hintsReplicaId = scanOperator.getHintsReplicaIds();
         this.prunedPartitionPredicates = scanOperator.getPrunedPartitionPredicates();
         this.usePkIndex = scanOperator.isUsePkIndex();
+        this.hasPartitionConstraint = scanOperator.hasPartitionConstraint();
+    }
+
+    public boolean hasPartitionConstraint() {
+        return hasPartitionConstraint;
+    }
+
+    public void setHasPartitionConstraint(boolean hasPartitionConstraint) {
+        this.hasPartitionConstraint = hasPartitionConstraint;
     }
 
     public long getSelectedIndexId() {
@@ -204,7 +214,7 @@ public class PhysicalOlapScanOperator extends PhysicalScanOperator {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), selectedIndexId, selectedPartitionId,
-                selectedTabletId);
+                selectedTabletId, hasPartitionConstraint);
     }
 
     @Override
@@ -220,6 +230,7 @@ public class PhysicalOlapScanOperator extends PhysicalScanOperator {
         }
         PhysicalOlapScanOperator that = (PhysicalOlapScanOperator) o;
         return selectedIndexId == that.selectedIndexId &&
+                hasPartitionConstraint == that.hasPartitionConstraint &&
                 Objects.equals(distributionSpec, that.distributionSpec) &&
                 Objects.equals(selectedPartitionId, that.selectedPartitionId) &&
                 Objects.equals(selectedTabletId, that.selectedTabletId);
@@ -267,6 +278,7 @@ public class PhysicalOlapScanOperator extends PhysicalScanOperator {
             builder.needSortedByKeyPerTablet = operator.needSortedByKeyPerTablet;
             builder.needOutputChunkByBucket = operator.needOutputChunkByBucket;
             builder.usePkIndex = operator.usePkIndex;
+            builder.hasPartitionConstraint = operator.hasPartitionConstraint;
             builder.globalDicts = operator.globalDicts;
             builder.prunedPartitionPredicates = operator.prunedPartitionPredicates;
             return this;

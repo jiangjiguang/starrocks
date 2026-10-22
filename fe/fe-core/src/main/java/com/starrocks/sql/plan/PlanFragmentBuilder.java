@@ -792,6 +792,7 @@ public class PlanFragmentBuilder {
 
             OlapScanNode scanNode = new OlapScanNode(context.getNextNodeId(), tupleDescriptor, "OlapScanNode",
                     context.getConnectContext().getCurrentWarehouseId());
+            scanNode.setHasPartitionConstraint(node.hasPartitionConstraint());
             scanNode.setLimit(node.getLimit());
             scanNode.computeStatistics(optExpr.getStatistics());
             scanNode.setScanOptimzeOption(node.getScanOptimzeOption());

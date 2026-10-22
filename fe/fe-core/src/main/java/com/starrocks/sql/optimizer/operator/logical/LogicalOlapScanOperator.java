@@ -45,6 +45,8 @@ public final class LogicalOlapScanOperator extends LogicalScanOperator {
 
     private List<ScalarOperator> prunedPartitionPredicates;
     private boolean usePkIndex;
+    // Preserve valid partition constraints even when they select every partition that contains data.
+    private boolean hasPartitionConstraint;
 
     // record if this scan is derived from SplitScanORToUnionRule
     private boolean fromSplitOR;
@@ -154,6 +156,10 @@ public final class LogicalOlapScanOperator extends LogicalScanOperator {
         return prunedPartitionPredicates;
     }
 
+    public boolean hasPartitionConstraint() {
+        return hasPartitionConstraint;
+    }
+
     public boolean isFromSplitOR() {
         return fromSplitOR;
     }
@@ -175,6 +181,7 @@ public final class LogicalOlapScanOperator extends LogicalScanOperator {
 
         LogicalOlapScanOperator that = (LogicalOlapScanOperator) o;
         return selectedIndexId == that.selectedIndexId &&
+                hasPartitionConstraint == that.hasPartitionConstraint &&
                 Objects.equals(distributionSpec, that.distributionSpec) &&
                 Objects.equals(selectedPartitionId, that.selectedPartitionId) &&
                 Objects.equals(partitionNames, that.partitionNames) &&
@@ -186,7 +193,7 @@ public final class LogicalOlapScanOperator extends LogicalScanOperator {
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), selectedIndexId, selectedPartitionId,
-                selectedTabletId, hintsTabletIds, hintsReplicaIds);
+                selectedTabletId, hintsTabletIds, hintsReplicaIds, hasPartitionConstraint);
     }
 
     public static Builder builder() {
@@ -214,12 +221,24 @@ public final class LogicalOlapScanOperator extends LogicalScanOperator {
             builder.hintsReplicaIds = scanOperator.hintsReplicaIds;
             builder.prunedPartitionPredicates = scanOperator.prunedPartitionPredicates;
             builder.usePkIndex = scanOperator.usePkIndex;
+            builder.hasPartitionConstraint = scanOperator.hasPartitionConstraint;
             builder.fromSplitOR = scanOperator.fromSplitOR;
             return this;
         }
 
         public Builder setSelectedIndexId(long selectedIndexId) {
             builder.selectedIndexId = selectedIndexId;
+            return this;
+        }
+
+        @Override
+        public Builder setPredicate(ScalarOperator predicate) {
+            // A rewritten predicate cannot inherit a constraint derived from the previous one.
+            // Explicitly setting null also invalidates a constraint whose predicate was already pruned away.
+            if (predicate == null || !Objects.equals(builder.predicate, predicate)) {
+                builder.hasPartitionConstraint = false;
+            }
+            super.setPredicate(predicate);
             return this;
         }
 
@@ -231,9 +250,15 @@ public final class LogicalOlapScanOperator extends LogicalScanOperator {
         public Builder setSelectedPartitionId(List<Long> selectedPartitionId) {
             if (selectedPartitionId == null) {
                 builder.selectedPartitionId = null;
+                builder.hasPartitionConstraint = false;
             } else {
                 builder.selectedPartitionId = ImmutableList.copyOf(selectedPartitionId);
             }
+            return this;
+        }
+
+        public Builder setHasPartitionConstraint(boolean hasPartitionConstraint) {
+            builder.hasPartitionConstraint = hasPartitionConstraint;
             return this;
         }
 

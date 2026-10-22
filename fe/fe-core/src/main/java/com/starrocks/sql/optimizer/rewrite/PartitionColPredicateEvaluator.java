@@ -49,9 +49,11 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class PartitionColPredicateEvaluator {
@@ -69,6 +71,11 @@ public class PartitionColPredicateEvaluator {
     private final int candidateNum;
 
     private final Column partitionColumn;
+    private boolean hasPartitionConstraint;
+
+    public boolean hasPartitionConstraint() {
+        return hasPartitionConstraint;
+    }
 
     public PartitionColPredicateEvaluator(List<Column> partitionColumns,
                                           RangePartitionInfo rangePartitionInfo, List<Long> candidatePartitions) {
@@ -83,6 +90,7 @@ public class PartitionColPredicateEvaluator {
     }
 
     public List<Long> prunePartitions(PartitionColPredicateExtractor extractor, ScalarOperator predicates) {
+        hasPartitionConstraint = false;
         Evaluator evaluator = new Evaluator();
         List<Long> res = Lists.newArrayList();
         try {
@@ -91,6 +99,7 @@ public class PartitionColPredicateEvaluator {
                 return candidatePartitions;
             }
             BitSet predicatesRes = newPredicates.accept(evaluator, null);
+            hasPartitionConstraint = evaluator.constrainedPredicates.contains(newPredicates);
             for (int i = 0; i < candidatePartitions.size(); i++) {
                 if (predicatesRes.get(i)) {
                     res.add(candidatePartitions.get(i));
@@ -98,12 +107,15 @@ public class PartitionColPredicateEvaluator {
             }
             return res;
         } catch (Exception e) {
+            hasPartitionConstraint = false;
             LOG.warn("evaluate range partitions failed.", e);
             return candidatePartitions;
         }
     }
 
     private class Evaluator extends ScalarOperatorVisitor<BitSet, Void> {
+        private final Set<ScalarOperator> constrainedPredicates =
+                Collections.newSetFromMap(new IdentityHashMap<>());
 
         @Override
         public BitSet visit(ScalarOperator scalarOperator, Void context) {
@@ -112,6 +124,9 @@ public class PartitionColPredicateEvaluator {
 
         @Override
         public BitSet visitConstant(ConstantOperator literal, Void context) {
+            if (!literal.getBoolean()) {
+                constrainedPredicates.add(literal);
+            }
             return literal.getBoolean() ? createAllTrueBitSet() : new BitSet(candidateNum);
         }
 
@@ -200,12 +215,16 @@ public class PartitionColPredicateEvaluator {
                     break;
                 case NE:
                 default:
-                    predicateRange = Range.all();
+                    return createAllTrueBitSet();
             }
             
             BitSet res = evaluateRangeHitSet(predicate.getChild(0), predicateRange);
             if (type == BinaryType.EQ_FOR_NULL) {
                 res.or(evaluateNullRangeHitSet(predicate.getChild(0), childType));
+            }
+
+            if (exprToCandidateRanges.containsKey(predicate.getChild(0))) {
+                constrainedPredicates.add(predicate);
             }
 
             return res;
@@ -217,9 +236,17 @@ public class PartitionColPredicateEvaluator {
             if (predicate.isAnd()) {
                 BitSet second = predicate.getChild(1).accept(this, null);
                 first.and(second);
+                if (constrainedPredicates.contains(predicate.getChild(0))
+                        || constrainedPredicates.contains(predicate.getChild(1))) {
+                    constrainedPredicates.add(predicate);
+                }
             } else if (predicate.isOr()) {
                 BitSet second = predicate.getChild(1).accept(this, null);
                 first.or(second);
+                if (constrainedPredicates.contains(predicate.getChild(0))
+                        && constrainedPredicates.contains(predicate.getChild(1))) {
+                    constrainedPredicates.add(predicate);
+                }
             } else {
                 first = predicate.getChild(0).accept(this, null);
                 first.flip(0, candidateNum);
@@ -267,6 +294,8 @@ public class PartitionColPredicateEvaluator {
 
             if (encounterEx) {
                 res = createAllTrueBitSet();
+            } else if (exprToCandidateRanges.containsKey(predicate.getChild(0))) {
+                constrainedPredicates.add(predicate);
             }
             return res;
         }
@@ -284,6 +313,9 @@ public class PartitionColPredicateEvaluator {
             Range<PartitionKey> predicateRange = Range.closed(conditionKey, conditionKey);
             BitSet res = evaluateRangeHitSet(predicate.getChild(0), predicateRange);
             res.or(evaluateNullRangeHitSet(predicate.getChild(0), columnType));
+            if (exprToCandidateRanges.containsKey(predicate.getChild(0))) {
+                constrainedPredicates.add(predicate);
+            }
             return res;
         }
 

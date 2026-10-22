@@ -234,9 +234,7 @@ public class QueryScanNodeDetail {
             OlapScanNode olapScanNode = (OlapScanNode) scanNode;
             OlapTable table = olapScanNode.getOlapTable();
             detail.setTableName(table.getTableIdentifier());
-            if (CollectionUtils.isEmpty(olapScanNode.getPrunedPartitionPredicates())) {
-                detail.setPartitionPruneFail(true);
-            }
+            detail.setPartitionPruneFail(olapScanNode.isPartitionPruneFail());
             detail.setScanPartitions(olapScanNode.getSelectedPartitionIds().size());
             detail.setTotalPartitions(olapScanNode.getOlapTable().getPartitionsCount());
             detail.setScanFiles(olapScanNode.getScanTabletIds().size());
@@ -321,7 +319,7 @@ public class QueryScanNodeDetail {
                     fullTableName = table.getTableIdentifier();
                     currentScanPartitionSize = olapScanNode.getSelectedPartitionIds().size();
                     currentScanFileSize = olapScanNode.getScanTabletIds().size();
-                    currentPartitionPrunedFail = CollectionUtils.isEmpty(olapScanNode.getPrunedPartitionPredicates());
+                    currentPartitionPrunedFail = olapScanNode.isPartitionPruneFail();
                     totalPartitionSize = table.getPartitions().size();
                 }
                 fullTableNames.add(fullTableName);

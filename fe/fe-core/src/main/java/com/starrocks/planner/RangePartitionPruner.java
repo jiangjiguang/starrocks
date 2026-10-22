@@ -64,6 +64,11 @@ public class RangePartitionPruner implements PartitionPruner {
     private Map<Long, Range<PartitionKey>> partitionRangeMap;
     private List<Column> partitionColumns;
     private Map<String, PartitionColumnFilter> partitionColumnFilters;
+    private boolean hasPartitionConstraint;
+
+    public boolean hasPartitionConstraint() {
+        return hasPartitionConstraint;
+    }
 
     public RangePartitionPruner(Map<Long, Range<PartitionKey>> rangeMap,
                                 List<Column> columns,
@@ -118,6 +123,7 @@ public class RangePartitionPruner implements PartitionPruner {
         LiteralExpr upperBound = filter.getUpperBound();
         if (null == inPredicateLiterals || ((lowerBound != null || upperBound != null) &&
                 inPredicateLiterals.size() * complex > inPredicateMaxLen)) {
+            hasPartitionConstraint |= lowerBound != null || upperBound != null;
             if (filter.lowerBoundInclusive && filter.upperBoundInclusive
                     && lowerBound != null && upperBound != null
                     && 0 == lowerBound.compareLiteral(upperBound)) {
@@ -194,6 +200,7 @@ public class RangePartitionPruner implements PartitionPruner {
             }
             return result;
         }
+        hasPartitionConstraint = true;
         Set<Long> resultSet = Sets.newHashSet();
         int newComplex = inPredicateLiterals.size() * complex;
         for (LiteralExpr expr : inPredicateLiterals) {
@@ -217,6 +224,7 @@ public class RangePartitionPruner implements PartitionPruner {
     }
 
     public List<Long> prune() throws AnalysisException {
+        hasPartitionConstraint = false;
         PartitionKey minKey = new PartitionKey();
         PartitionKey maxKey = new PartitionKey();
         // Map to RangeMapTree

@@ -38,7 +38,6 @@ import com.starrocks.catalog.RangePartitionInfo;
 import com.starrocks.common.AnalysisException;
 import com.starrocks.common.Pair;
 import com.starrocks.planner.PartitionColumnFilter;
-import com.starrocks.planner.PartitionPruner;
 import com.starrocks.planner.RangePartitionPruner;
 import com.starrocks.sql.optimizer.Utils;
 import com.starrocks.sql.optimizer.operator.ColumnFilterConverter;
@@ -64,16 +63,18 @@ public class OptOlapPartitionPruner {
     private static final Logger LOG = LogManager.getLogger(OptOlapPartitionPruner.class);
 
     public static LogicalOlapScanOperator prunePartitions(LogicalOlapScanOperator logicalOlapScanOperator) {
-        List<Long> selectedPartitionIds = null;
         OlapTable table = (OlapTable) logicalOlapScanOperator.getTable();
 
         PartitionInfo partitionInfo = table.getPartitionInfo();
 
+        Pair<List<Long>, Boolean> pruningResult = Pair.create(null, false);
         if (partitionInfo.isRangePartition()) {
-            selectedPartitionIds = rangePartitionPrune(table, (RangePartitionInfo) partitionInfo, logicalOlapScanOperator);
+            pruningResult = rangePartitionPrune(table, (RangePartitionInfo) partitionInfo, logicalOlapScanOperator);
         } else if (partitionInfo.getType() == PartitionType.LIST) {
-            selectedPartitionIds = listPartitionPrune(table, (ListPartitionInfo) partitionInfo, logicalOlapScanOperator);
+            pruningResult = listPartitionPrune(table, (ListPartitionInfo) partitionInfo, logicalOlapScanOperator);
         }
+        List<Long> selectedPartitionIds = pruningResult.first;
+        boolean hasPartitionConstraint = logicalOlapScanOperator.hasPartitionConstraint() || pruningResult.second;
 
         if (selectedPartitionIds == null) {
             selectedPartitionIds =
@@ -96,6 +97,7 @@ public class OptOlapPartitionPruner {
                     (RangePartitionInfo) partitionInfo,
                     selectedPartitionIds);
             selectedPartitionIds = evaluator.prunePartitions(extractor, logicalOlapScanOperator.getPredicate());
+            hasPartitionConstraint |= evaluator.hasPartitionConstraint();
         }
 
         final Pair<ScalarOperator, List<ScalarOperator>> prunePartitionPredicate =
@@ -109,6 +111,7 @@ public class OptOlapPartitionPruner {
             builder.setPredicate(Utils.compoundAnd(prunePartitionPredicate.first))
                     .setPrunedPartitionPredicates(prunePartitionPredicate.second);
         }
+        builder.setHasPartitionConstraint(hasPartitionConstraint);
         return builder.build();
     }
 
@@ -138,7 +141,8 @@ public class OptOlapPartitionPruner {
                 // new predicate should cover the old one
                 .setPredicate(newOlapScanOperator.getPredicate())
                 // use the new pruned partition predicates
-                .setPrunedPartitionPredicates(newOlapScanOperator.getPrunedPartitionPredicates());
+                .setPrunedPartitionPredicates(newOlapScanOperator.getPrunedPartitionPredicates())
+                .setHasPartitionConstraint(newOlapScanOperator.hasPartitionConstraint());
         return builder.build();
     }
 
@@ -264,8 +268,8 @@ public class OptOlapPartitionPruner {
         partitionValueToIds.put(value, partitionIdSet);
     }
 
-    private static List<Long> listPartitionPrune(OlapTable olapTable, ListPartitionInfo listPartitionInfo,
-                                                 LogicalOlapScanOperator operator) {
+    private static Pair<List<Long>, Boolean> listPartitionPrune(OlapTable olapTable, ListPartitionInfo listPartitionInfo,
+                                                                LogicalOlapScanOperator operator) {
 
         Map<ColumnRefOperator, ConcurrentNavigableMap<LiteralExpr, Set<Long>>> columnToPartitionValuesMap =
                 Maps.newConcurrentMap();
@@ -355,18 +359,18 @@ public class OptOlapPartitionPruner {
         try {
             List<Long> prune = partitionPruner.prune();
             if (prune == null && isTemporaryPartitionPrune) {
-                return Lists.newArrayList(partitionIds);
+                return Pair.create(Lists.newArrayList(partitionIds), true);
             } else {
-                return prune;
+                return Pair.create(prune, prune != null || specifyPartitionIds != null);
             }
         } catch (AnalysisException e) {
             LOG.warn("PartitionPrune Failed. ", e);
         }
-        return specifyPartitionIds;
+        return Pair.create(specifyPartitionIds, specifyPartitionIds != null);
     }
 
-    private static List<Long> rangePartitionPrune(OlapTable olapTable, RangePartitionInfo partitionInfo,
-                                                  LogicalOlapScanOperator operator) {
+    private static Pair<List<Long>, Boolean> rangePartitionPrune(OlapTable olapTable, RangePartitionInfo partitionInfo,
+                                                                 LogicalOlapScanOperator operator) {
         Map<Long, Range<PartitionKey>> keyRangeById;
         if (operator.getPartitionNames() != null && operator.getPartitionNames().getPartitionNames() != null) {
             keyRangeById = Maps.newHashMap();
@@ -380,15 +384,17 @@ public class OptOlapPartitionPruner {
         } else {
             keyRangeById = partitionInfo.getIdToRange(false);
         }
-        PartitionPruner partitionPruner = new RangePartitionPruner(keyRangeById,
+        RangePartitionPruner partitionPruner = new RangePartitionPruner(keyRangeById,
                 partitionInfo.getPartitionColumns(olapTable.getIdToColumn()),
                 operator.getColumnFilters());
         try {
-            return partitionPruner.prune();
+            List<Long> selected = partitionPruner.prune();
+            return Pair.create(selected, operator.getPartitionNames() != null
+                    || partitionPruner.hasPartitionConstraint());
         } catch (Exception e) {
             LOG.warn("PartitionPrune Failed. ", e);
         }
-        return Lists.newArrayList(keyRangeById.keySet());
+        return Pair.create(Lists.newArrayList(keyRangeById.keySet()), operator.getPartitionNames() != null);
     }
 
     private static boolean isNeedFurtherPrune(List<Long> candidatePartitions, LogicalOlapScanOperator olapScanOperator,

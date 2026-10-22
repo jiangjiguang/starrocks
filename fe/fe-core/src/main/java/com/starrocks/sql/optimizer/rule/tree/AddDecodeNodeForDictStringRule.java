@@ -488,6 +488,7 @@ public class AddDecodeNodeForDictStringRule implements TreeRewriteRule {
                                     scanOperator.getProjection(), scanOperator.isUsePkIndex());
                     newOlapScan.setScanOptimzeOption(scanOperator.getScanOptimzeOption());
                     newOlapScan.setPreAggregation(scanOperator.isPreAggregation());
+                    newOlapScan.setHasPartitionConstraint(scanOperator.hasPartitionConstraint());
                     newOlapScan.setGlobalDicts(globalDicts);
                     // set output columns because of the projection is not encoded but the colRefToColumnMetaMap has encoded.
                     // There need to set right output columns

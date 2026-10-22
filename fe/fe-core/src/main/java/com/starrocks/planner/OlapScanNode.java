@@ -62,6 +62,7 @@ import com.starrocks.catalog.OlapTable;
 import com.starrocks.catalog.Partition;
 import com.starrocks.catalog.PartitionInfo;
 import com.starrocks.catalog.PartitionKey;
+import com.starrocks.catalog.PartitionType;
 import com.starrocks.catalog.PhysicalPartition;
 import com.starrocks.catalog.RangePartitionInfo;
 import com.starrocks.catalog.Replica;
@@ -155,6 +156,7 @@ public class OlapScanNode extends ScanNode {
     private long totalTabletsNum = 0;
     private long selectedIndexId = -1;
     private int selectedPartitionNum = 0;
+    private boolean hasPartitionConstraint;
     private List<Long> selectedPartitionIds = Lists.newArrayList();
     private long actualRows = 0;
     // List of tablets will be scanned by current olap_scan_node
@@ -207,6 +209,15 @@ public class OlapScanNode extends ScanNode {
 
     public Map<Long, Long> getScanPartitionVersions() {
         return scanPartitionVersions;
+    }
+
+    public void setHasPartitionConstraint(boolean hasPartitionConstraint) {
+        this.hasPartitionConstraint = hasPartitionConstraint;
+    }
+
+    public boolean isPartitionPruneFail() {
+        return olapTable.getPartitionInfo().getType() != PartitionType.UNPARTITIONED
+                && !selectedPartitionIds.isEmpty() && !hasPartitionConstraint;
     }
 
     public void setIsPreAggregation(boolean isPreAggregation, String reason) {
@@ -383,11 +394,13 @@ public class OlapScanNode extends ScanNode {
         } else {
             keyRangeById = partitionInfo.getIdToRange(false);
         }
-        PartitionPruner partitionPruner = new RangePartitionPruner(
+        RangePartitionPruner partitionPruner = new RangePartitionPruner(
                 keyRangeById,
                 partitionInfo.getPartitionColumns(olapTable.getIdToColumn()),
                 columnFilters);
-        return partitionPruner.prune();
+        List<Long> selected = partitionPruner.prune();
+        hasPartitionConstraint = partitionNames != null || partitionPruner.hasPartitionConstraint();
+        return selected;
     }
 
     private Collection<Long> distributionPrune(
