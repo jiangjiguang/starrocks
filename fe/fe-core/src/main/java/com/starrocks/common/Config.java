@@ -1541,6 +1541,12 @@ public class Config extends ConfigBase {
     public static int db_used_data_quota_update_interval_secs = 300;
 
     /**
+     * Maximum time in milliseconds to refresh one database's quota usage. 0 disables the timeout.
+     */
+    @ConfField(mutable = true)
+    public static long db_used_data_quota_lock_timeout_ms = 0;
+
+    /**
      * Load using hadoop cluster will be deprecated in the future.
      * Set to true to disable this kind of load.
      */

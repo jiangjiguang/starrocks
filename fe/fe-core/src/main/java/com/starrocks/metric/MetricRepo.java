@@ -172,6 +172,22 @@ public final class MetricRepo {
     public static Histogram HISTO_JOURNAL_WRITE_BYTES;
     public static Histogram HISTO_SHORTCIRCUIT_RPC_LATENCY;
     public static Histogram HISTO_THRIFT_RPC_LATENCY;
+    public static Histogram HISTO_DATABASE_QUOTA_REFRESH_LATENCY;
+
+    public static LongCounterMetric COUNTER_DATABASE_QUOTA_REFRESH;
+    public static LongCounterMetric COUNTER_DATABASE_QUOTA_REFRESH_TIMEOUT;
+    public static final MetricWithLabelGroup<GaugeMetricImpl<Long>> GAUGE_DATABASE_QUOTA_REFRESH_LATENCY_BY_DB =
+            new MetricWithLabelGroup<>("db_name", () -> new GaugeMetricImpl<>(
+                    "database_quota_refresh_latency_by_db_ms", MetricUnit.MILLISECONDS,
+                    "latest database quota refresh latency"));
+    public static final MetricWithLabelGroup<LongCounterMetric> COUNTER_DATABASE_QUOTA_REFRESH_BY_DB =
+            new MetricWithLabelGroup<>("db_name", () -> new LongCounterMetric(
+                    "database_quota_refresh_by_db", MetricUnit.OPERATIONS,
+                    "database quota refresh attempts"));
+    public static final MetricWithLabelGroup<LongCounterMetric> COUNTER_DATABASE_QUOTA_REFRESH_TIMEOUT_BY_DB =
+            new MetricWithLabelGroup<>("db_name", () -> new LongCounterMetric(
+                    "database_quota_refresh_timeout_by_db", MetricUnit.OPERATIONS,
+                    "database quota refreshes that timed out"));
 
     // following metrics will be updated by metric calculator
     public static GaugeMetricImpl<Double> GAUGE_QUERY_PER_SECOND;
@@ -565,6 +581,16 @@ public final class MetricRepo {
         HISTO_SHORTCIRCUIT_RPC_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name("shortcircuit", "latency", "ms"));
         HISTO_THRIFT_RPC_LATENCY =
                METRIC_REGISTER.histogram(MetricRegistry.name("thrift", "rpc", "latency", "ns"));
+        HISTO_DATABASE_QUOTA_REFRESH_LATENCY = METRIC_REGISTER.histogram(
+                MetricRegistry.name("database_quota_refresh_latency", "latency", "ms"));
+
+        COUNTER_DATABASE_QUOTA_REFRESH = new LongCounterMetric(
+                "database_quota_refresh", MetricUnit.OPERATIONS, "database quota refresh attempts");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_DATABASE_QUOTA_REFRESH);
+        COUNTER_DATABASE_QUOTA_REFRESH_TIMEOUT = new LongCounterMetric(
+                "database_quota_refresh_timeout", MetricUnit.OPERATIONS,
+                "database quota refreshes that timed out");
+        STARROCKS_METRIC_REGISTER.addMetric(COUNTER_DATABASE_QUOTA_REFRESH_TIMEOUT);
 
 
         HISTO_LIST_LOCATED_STATUS_QUERY_LATENCY = METRIC_REGISTER.histogram(MetricRegistry.name(
@@ -1038,4 +1064,3 @@ public final class MetricRepo {
         STARROCKS_METRIC_REGISTER.addMetric(metric);
     }
 }
-

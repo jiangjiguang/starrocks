@@ -21,8 +21,9 @@ import com.starrocks.catalog.Table;
 import com.starrocks.common.Config;
 import com.starrocks.common.FeConstants;
 import com.starrocks.common.util.FrontendDaemon;
-import com.starrocks.common.util.concurrent.lock.AutoCloseableLock;
 import com.starrocks.common.util.concurrent.lock.LockType;
+import com.starrocks.common.util.concurrent.lock.Locker;
+import com.starrocks.metric.MetricRepo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -57,46 +58,105 @@ public class DatabaseQuotaRefresher extends FrontendDaemon {
                 continue;
             }
 
-            try {
-                if (db.getDataQuota() < FeConstants.DEFAULT_DB_DATA_QUOTA_BYTES) {
-                    db.usedDataQuotaBytes.set(getUsedDataQuota(db));
-                }
-                if (db.getReplicaQuota() < FeConstants.DEFAULT_DB_REPLICA_QUOTA_SIZE) {
-                    db.usedReplicaQuotaBytes.set(getUsedReplicaQuota(db));
-                }
-            } catch (Throwable e) {
-                LOG.warn("Failed to update database [{}] quota usage", dbId, e);
-            }
+            refreshDatabaseQuota(db, dbId);
         }
     }
 
-    private long getUsedDataQuota(Database database) {
+    private void refreshDatabaseQuota(Database db, long dbId) {
+        boolean refreshDataQuota = db.getDataQuota() < FeConstants.DEFAULT_DB_DATA_QUOTA_BYTES;
+        boolean refreshReplicaQuota = db.getReplicaQuota() < FeConstants.DEFAULT_DB_REPLICA_QUOTA_SIZE;
+        if (!refreshDataQuota && !refreshReplicaQuota) {
+            return;
+        }
+
+        long startNanos = System.nanoTime();
+        boolean timedOut = false;
+        try {
+            QuotaUsage usage = getQuotaUsage(db, refreshDataQuota, refreshReplicaQuota);
+            if (usage == null) {
+                timedOut = true;
+                return;
+            }
+            if (refreshDataQuota) {
+                db.usedDataQuotaBytes.set(usage.dataBytes);
+            }
+            if (refreshReplicaQuota) {
+                db.usedReplicaQuotaBytes.set(usage.replicaCount);
+            }
+        } catch (Throwable e) {
+            LOG.warn("Failed to update database [{}] quota usage", dbId, e);
+        } finally {
+            recordRefreshMetrics(db.getFullName(), System.nanoTime() - startNanos, timedOut);
+        }
+    }
+
+    private void recordRefreshMetrics(String db, long elapsedNanos, boolean timedOut) {
+        if (!MetricRepo.hasInit) {
+            return;
+        }
+        long elapsedMs = elapsedNanos / 1_000_000L;
+        MetricRepo.HISTO_DATABASE_QUOTA_REFRESH_LATENCY.update(elapsedMs);
+        MetricRepo.COUNTER_DATABASE_QUOTA_REFRESH.increase(1L);
+        MetricRepo.GAUGE_DATABASE_QUOTA_REFRESH_LATENCY_BY_DB.getMetric(db).setValue(elapsedMs);
+        MetricRepo.COUNTER_DATABASE_QUOTA_REFRESH_BY_DB.getMetric(db).increase(1L);
+        if (timedOut) {
+            MetricRepo.COUNTER_DATABASE_QUOTA_REFRESH_TIMEOUT.increase(1L);
+            MetricRepo.COUNTER_DATABASE_QUOTA_REFRESH_TIMEOUT_BY_DB.getMetric(db).increase(1L);
+        }
+    }
+
+    private QuotaUsage getQuotaUsage(Database database, boolean refreshDataQuota, boolean refreshReplicaQuota) {
         long usedDataQuota = 0;
+        long usedReplicaQuota = 0;
+        long configuredTimeoutMs = Config.db_used_data_quota_lock_timeout_ms;
+        long timeoutMs = configuredTimeoutMs == 0 ? 0 : Math.max(1L, configuredTimeoutMs);
+        long deadlineNanos = timeoutMs > 0 ? System.nanoTime() + timeoutMs * 1_000_000L : 0;
+
         for (Table table : database.getTables()) {
             if (!table.isOlapTableOrMaterializedView()) {
                 continue;
             }
-            OlapTable olapTable = (OlapTable) table;
-            try (AutoCloseableLock ignored = new AutoCloseableLock(
-                    database, Lists.newArrayList(olapTable.getId()), LockType.READ)) {
-                usedDataQuota += olapTable.getDataSize();
+
+            List<Long> tableIds = Lists.newArrayList(table.getId());
+            Locker locker = new Locker();
+            if (timeoutMs == 0) {
+                locker.lockTablesWithIntensiveDbLock(database, tableIds, LockType.READ);
+            } else {
+                long remainingNanos = deadlineNanos - System.nanoTime();
+                long remainingMs = Math.max(1L, (remainingNanos + 999_999L) / 1_000_000L);
+                if (!locker.tryLockTablesWithIntensiveDbLock(database, tableIds, LockType.READ, remainingMs)) {
+                    LOG.warn("Skip database [{}] quota refresh because table [{}] lock timed out after {} ms",
+                            database.getId(), table.getId(), timeoutMs);
+                    return null;
+                }
+            }
+            try {
+                OlapTable olapTable = (OlapTable) table;
+                if (refreshDataQuota) {
+                    usedDataQuota += olapTable.getDataSize();
+                }
+                if (refreshReplicaQuota) {
+                    usedReplicaQuota += olapTable.getReplicaCount();
+                }
+            } finally {
+                locker.unLockTablesWithIntensiveDbLock(database, tableIds, LockType.READ);
+            }
+            if (timeoutMs > 0 && System.nanoTime() >= deadlineNanos) {
+                LOG.warn("Skip database [{}] quota refresh because the refresh deadline of {} ms was exceeded",
+                        database.getId(), timeoutMs);
+                return null;
             }
         }
-        return usedDataQuota;
+        return new QuotaUsage(usedDataQuota, usedReplicaQuota);
     }
 
-    private long getUsedReplicaQuota(Database database) {
-        long usedReplicaQuota = 0;
-        for (Table table : database.getTables()) {
-            if (!table.isOlapTableOrMaterializedView()) {
-                continue;
-            }
-            OlapTable olapTable = (OlapTable) table;
-            try (AutoCloseableLock ignored = new AutoCloseableLock(
-                    database, Lists.newArrayList(olapTable.getId()), LockType.READ)) {
-                usedReplicaQuota += olapTable.getReplicaCount();
-            }
+    private static class QuotaUsage {
+        private final long dataBytes;
+        private final long replicaCount;
+
+        private QuotaUsage(long dataBytes, long replicaCount) {
+            this.dataBytes = dataBytes;
+            this.replicaCount = replicaCount;
         }
-        return usedReplicaQuota;
     }
 }
