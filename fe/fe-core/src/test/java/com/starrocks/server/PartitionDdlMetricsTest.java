@@ -6,6 +6,7 @@ import com.starrocks.common.FeConstants;
 import com.starrocks.metric.GaugeMetricImpl;
 import com.starrocks.metric.LongCounterMetric;
 import com.starrocks.metric.Metric;
+import com.starrocks.metric.MetricLabel;
 import com.starrocks.metric.MetricRepo;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -41,9 +42,9 @@ public class PartitionDdlMetricsTest {
         permit.close(true);
         permit.close(false);
 
-        assertEquals(submittedBefore + 1L, submitted.getValue());
-        assertEquals(startedBefore + 1L, started.getValue());
-        assertEquals(finishedBefore + 1L, finished.getValue());
+        assertEquals(submittedBefore + 1L, submitted.getValue().longValue());
+        assertEquals(startedBefore + 1L, started.getValue().longValue());
+        assertEquals(finishedBefore + 1L, finished.getValue().longValue());
         assertEquals(Long.valueOf(0L), gauge("partition_ddl_running", "ADD_PARTITION").getValue());
         assertTrue(gauge("partition_ddl_last_latency_ms", "ADD_PARTITION").getValue() >= 0L);
     }
@@ -60,7 +61,7 @@ public class PartitionDdlMetricsTest {
                 PartitionDdlMetrics.Operation.DROP_PARTITION);
         permit.close(false);
 
-        assertEquals(failedBefore + 1L, failed.getValue());
+        assertEquals(failedBefore + 1L, failed.getValue().longValue());
         assertNotNull(dbGauge("partition_ddl_running", "test_db", "DROP_PARTITION"));
         assertEquals(Long.valueOf(0L), dbGauge("partition_ddl_running", "test_db", "DROP_PARTITION").getValue());
     }
@@ -68,7 +69,7 @@ public class PartitionDdlMetricsTest {
     private static LongCounterMetric counter(String name, String operation) {
         List<Metric> metrics = MetricRepo.getMetricsByName(name);
         return (LongCounterMetric) metrics.stream()
-                .filter(metric -> operation.equals(metric.getLabels().get(0).getValue()))
+                .filter(metric -> hasLabel(metric, "operation", operation))
                 .findFirst().orElseThrow(AssertionError::new);
     }
 
@@ -78,7 +79,7 @@ public class PartitionDdlMetricsTest {
 
     private static GaugeMetricImpl<Long> gauge(String name, String operation) {
         return (GaugeMetricImpl<Long>) MetricRepo.getMetricsByName(name).stream()
-                .filter(metric -> operation.equals(metric.getLabels().get(0).getValue()))
+                .filter(metric -> hasLabel(metric, "operation", operation))
                 .findFirst().orElseThrow(AssertionError::new);
     }
 
@@ -88,10 +89,17 @@ public class PartitionDdlMetricsTest {
 
     private static Metric dbMetric(String name, String dbName, String operation) {
         return MetricRepo.getMetricsByName(name).stream()
-                .filter(metric -> metric.getLabels().stream().anyMatch(label ->
-                        "db_name".equals(label.getKey()) && dbName.equals(label.getValue())))
-                .filter(metric -> metric.getLabels().stream().anyMatch(label ->
-                        "operation".equals(label.getKey()) && operation.equals(label.getValue())))
+                .filter(metric -> hasLabel(metric, "db_name", dbName))
+                .filter(metric -> hasLabel(metric, "operation", operation))
                 .findFirst().orElseThrow(AssertionError::new);
+    }
+
+    private static boolean hasLabel(Metric<?> metric, String key, String value) {
+        for (MetricLabel label : metric.getLabels()) {
+            if (key.equals(label.getKey()) && value.equals(label.getValue())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
