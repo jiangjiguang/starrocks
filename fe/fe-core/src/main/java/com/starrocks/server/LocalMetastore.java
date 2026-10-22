@@ -864,6 +864,20 @@ public class LocalMetastore implements ConnectorMetadata, MVRepairHandler, Memor
     @Override
     public void addPartitions(ConnectContext ctx, Database db, String tableName, AddPartitionClause addPartitionClause)
             throws DdlException, AnalysisException {
+        PartitionDdlMetrics.Permit metricsPermit =
+                PartitionDdlMetrics.begin(db.getId(), db.getFullName(), PartitionDdlMetrics.Operation.ADD_PARTITION);
+        try {
+            addPartitionsInternal(ctx, db, tableName, addPartitionClause);
+            metricsPermit.close(true);
+        } catch (DdlException | AnalysisException | RuntimeException e) {
+            metricsPermit.close(false);
+            throw e;
+        }
+    }
+
+    private void addPartitionsInternal(ConnectContext ctx, Database db, String tableName,
+                                       AddPartitionClause addPartitionClause)
+            throws DdlException, AnalysisException {
         Locker locker = new Locker();
         locker.lockDatabase(db, LockType.READ);
         try {
@@ -1410,6 +1424,18 @@ public class LocalMetastore implements ConnectorMetadata, MVRepairHandler, Memor
     }
 
     public void dropPartition(Database db, Table table, DropPartitionClause clause) throws DdlException {
+        PartitionDdlMetrics.Permit metricsPermit =
+                PartitionDdlMetrics.begin(db.getId(), db.getFullName(), PartitionDdlMetrics.Operation.DROP_PARTITION);
+        try {
+            dropPartitionInternal(db, table, clause);
+            metricsPermit.close(true);
+        } catch (DdlException | RuntimeException e) {
+            metricsPermit.close(false);
+            throw e;
+        }
+    }
+
+    private void dropPartitionInternal(Database db, Table table, DropPartitionClause clause) throws DdlException {
         CatalogUtils.checkTableExist(db, table.getName());
         OlapTable olapTable = (OlapTable) table;
         Locker locker = new Locker();
@@ -4821,6 +4847,19 @@ public class LocalMetastore implements ConnectorMetadata, MVRepairHandler, Memor
      * The entry of replacing partitions with temp partitions.
      */
     public void replaceTempPartition(Database db, String tableName, ReplacePartitionClause clause) throws DdlException {
+        PartitionDdlMetrics.Permit metricsPermit =
+                PartitionDdlMetrics.begin(db.getId(), db.getFullName(), PartitionDdlMetrics.Operation.REPLACE_PARTITION);
+        try {
+            replaceTempPartitionInternal(db, tableName, clause);
+            metricsPermit.close(true);
+        } catch (DdlException | RuntimeException e) {
+            metricsPermit.close(false);
+            throw e;
+        }
+    }
+
+    private void replaceTempPartitionInternal(Database db, String tableName, ReplacePartitionClause clause)
+            throws DdlException {
         List<String> partitionNames = clause.getPartitionNames();
         // duplicate temp partition will cause Incomplete transaction
         List<String> tempPartitionNames =
