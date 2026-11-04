@@ -66,6 +66,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -655,6 +656,28 @@ public class TabletInvertedIndex implements MemoryTrackable {
         markTabletForceDelete(tablet.getId(), tablet.getBackendIds());
     }
 
+    public void markTabletsForceDelete(Collection<Tablet> tablets) {
+        // Resolve backend IDs before acquiring the index lock: LocalTablet has its own lock.
+        Map<Long, Set<Long>> backendIds = Maps.newHashMap();
+        for (Tablet tablet : tablets) {
+            if (!(tablet instanceof LakeTablet)) {
+                Set<Long> ids = tablet.getBackendIds();
+                if (!ids.isEmpty()) {
+                    backendIds.put(tablet.getId(), Sets.newHashSet(ids));
+                }
+            }
+        }
+        if (backendIds.isEmpty()) {
+            return;
+        }
+        writeLock();
+        try {
+            forceDeleteTablets.putAll(backendIds);
+        } finally {
+            writeUnlock();
+        }
+    }
+
     public void eraseTabletForceDelete(long tabletId, long backendId) {
         writeLock();
         try {
@@ -675,22 +698,41 @@ public class TabletInvertedIndex implements MemoryTrackable {
         }
         writeLock();
         try {
-            Map<Long, Replica> replicas = replicaMetaTable.rowMap().remove(tabletId);
-            if (replicas != null) {
-                for (Replica replica : replicas.values()) {
-                    replicaToTabletMap.remove(replica.getId());
-                }
-
-                for (long backendId : replicas.keySet()) {
-                    backingReplicaMetaTable.remove(backendId, tabletId);
-                }
-            }
-            tabletMetaMap.remove(tabletId);
-
-            LOG.debug("delete tablet: {}", tabletId);
+            deleteTabletUnlocked(tabletId);
         } finally {
             writeUnlock();
         }
+    }
+
+    public void deleteTablets(Collection<Long> tabletIds) {
+        if (tabletIds.isEmpty() || GlobalStateMgr.isCheckpointThread()) {
+            return;
+        }
+        writeLock();
+        try {
+            for (long tabletId : tabletIds) {
+                deleteTabletUnlocked(tabletId);
+            }
+        } finally {
+            writeUnlock();
+        }
+    }
+
+    // Caller holds the inverted-index write lock; update every replica lookup consistently.
+    private void deleteTabletUnlocked(long tabletId) {
+        Map<Long, Replica> replicas = replicaMetaTable.rowMap().remove(tabletId);
+        if (replicas != null) {
+            for (Replica replica : replicas.values()) {
+                replicaToTabletMap.remove(replica.getId());
+            }
+
+            for (long backendId : replicas.keySet()) {
+                backingReplicaMetaTable.remove(backendId, tabletId);
+            }
+        }
+        tabletMetaMap.remove(tabletId);
+
+        LOG.debug("delete tablet: {}", tabletId);
     }
 
     public Table<Long, Long, Replica> getReplicaMetaTable() {
