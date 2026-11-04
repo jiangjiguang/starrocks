@@ -784,8 +784,9 @@ public class LeaderImpl {
                 return;
             }
 
+            long tableId = tabletMeta.getTableId();
             Locker locker = new Locker();
-            locker.lockDatabase(db, LockType.WRITE);
+            locker.lockTableWithIntensiveDbLock(db, tableId, LockType.WRITE);
             try {
                 // local migration just set path hash
                 Replica replica =
@@ -793,7 +794,7 @@ public class LeaderImpl {
                 Preconditions.checkArgument(reportedTablet.isSetPath_hash());
                 replica.setPathHash(reportedTablet.getPath_hash());
             } finally {
-                locker.unLockDatabase(db, LockType.WRITE);
+                locker.unLockTablesWithIntensiveDbLock(db, java.util.Collections.singletonList(tableId), LockType.WRITE);
             }
         } finally {
             AgentTaskQueue.removeTask(task.getBackendId(), TTaskType.STORAGE_MEDIUM_MIGRATE, task.getSignature());

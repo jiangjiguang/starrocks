@@ -2974,16 +2974,14 @@ public class LocalMetastore implements ConnectorMetadata, MVRepairHandler, Memor
             }
             Multimap<Long, Long> tableIdToPartitionIds = changedPartitionsMap.get(dbId);
 
-            // use try lock to avoid blocking a long time.
-            // if block too long, backend report rpc will timeout.
-            Locker locker = new Locker();
-            if (!locker.tryLockDatabase(db, LockType.WRITE, Database.TRY_LOCK_TIMEOUT_MS)) {
-                LOG.warn("try get db {} writelock but failed when hecking backend storage medium", dbId);
-                continue;
-            }
-            Preconditions.checkState(locker.isWriteLockHeldByCurrentThread(db));
-            try {
-                for (Long tableId : tableIdToPartitionIds.keySet()) {
+            for (Long tableId : tableIdToPartitionIds.keySet()) {
+                Locker locker = new Locker();
+                if (!locker.tryLockTableWithIntensiveDbLock(db, tableId, LockType.WRITE,
+                        Database.TRY_LOCK_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                    LOG.warn("try get db {} table {} write lock failed when checking storage medium", dbId, tableId);
+                    continue;
+                }
+                try {
                     Table table = db.getTable(tableId);
                     if (table == null) {
                         continue;
@@ -3017,10 +3015,10 @@ public class LocalMetastore implements ConnectorMetadata, MVRepairHandler, Memor
                             GlobalStateMgr.getCurrentState().getEditLog().logModifyPartition(info);
                         }
                     } // end for partitions
-                } // end for tables
-            } finally {
-                locker.unLockDatabase(db, LockType.WRITE);
-            }
+                } finally {
+                    locker.unLockTablesWithIntensiveDbLock(db, Lists.newArrayList(tableId), LockType.WRITE);
+                }
+            } // end for tables
         } // end for dbs
         return storageMediumMap;
     }

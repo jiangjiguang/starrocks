@@ -791,7 +791,9 @@ public class ReportHandler extends Daemon implements MemoryTrackable {
         } // end for dbs
     }
 
-    private static void deleteFromMeta(ListMultimap<Long, Long> tabletDeleteFromMeta, long backendId,
+    static long maxTableWriteLockHoldingTimeMs = 1000L;
+
+    static void deleteFromMeta(ListMultimap<Long, Long> tabletDeleteFromMeta, long backendId,
                                        long backendReportVersion) {
         AgentBatchTask createReplicaBatchTask = new AgentBatchTask();
         TabletInvertedIndex invertedIndex = GlobalStateMgr.getCurrentState().getTabletInvertedIndex();
@@ -801,35 +803,48 @@ public class ReportHandler extends Daemon implements MemoryTrackable {
                 .getClusterInfo().getBackend(backendId).getDisks().values()) {
             hashToDiskInfo.put(diskInfo.getPathHash(), diskInfo);
         }
-        final long MAX_DB_WLOCK_HOLDING_TIME_MS = 1000L;
+        // Keep the 3.3 tablet-report API; group its database batches by table before locking.
+        ListMultimap<Pair<Long, Long>, Long> tableDeletes = ArrayListMultimap.create();
+        for (Long tabletId : tabletDeleteFromMeta.values()) {
+            TabletMeta meta = invertedIndex.getTabletMeta(tabletId);
+            if (meta != null) {
+                tableDeletes.put(Pair.create(meta.getDbId(), meta.getTableId()), tabletId);
+            }
+        }
         List<Long> deleteTablets = new ArrayList<>();
         List<ReplicaPersistInfo> replicaPersistInfoList = new ArrayList<>();
-        DB_TRAVERSE:
-        for (Long dbId : tabletDeleteFromMeta.keySet()) {
+        TABLE_TRAVERSE:
+        for (Pair<Long, Long> key : tableDeletes.keySet()) {
+            long dbId = key.first;
+            long tableId = key.second;
             Database db = globalStateMgr.getLocalMetastore().getDbIncludeRecycleBin(dbId);
             if (db == null) {
                 continue;
             }
             Locker locker = new Locker();
-            locker.lockDatabase(db, LockType.WRITE);
+            locker.lockTableWithIntensiveDbLock(db, tableId, LockType.WRITE);
+            boolean locked = true;
             long lockStartTime = System.currentTimeMillis();
             try {
                 int deleteCounter = 0;
-                List<Long> tabletIds = tabletDeleteFromMeta.get(dbId);
+                List<Long> tabletIds = tableDeletes.get(key);
                 List<TabletMeta> tabletMetaList = invertedIndex.getTabletMetaList(tabletIds);
                 for (int i = 0; i < tabletMetaList.size(); i++) {
-                    // Because we need to write bdb with db write lock hold,
+                    // Because we need to write bdb with the table write lock held,
                     // to avoid block other threads too long, we periodically release and
-                    // acquire the db write lock (every MAX_DB_WLOCK_HOLDING_TIME_MS milliseconds).
+                    // acquire the table write lock periodically.
                     long currentTime = System.currentTimeMillis();
-                    if (currentTime - lockStartTime > MAX_DB_WLOCK_HOLDING_TIME_MS) {
-                        locker.unLockDatabase(db, LockType.WRITE);
+                    if (currentTime - lockStartTime > maxTableWriteLockHoldingTimeMs) {
+                        locker.unLockTablesWithIntensiveDbLock(db, Lists.newArrayList(tableId), LockType.WRITE);
+                        locked = false;
                         db = globalStateMgr.getLocalMetastore().getDbIncludeRecycleBin(dbId);
                         if (db == null) {
-                            continue DB_TRAVERSE;
+                            continue TABLE_TRAVERSE;
                         }
-                        locker.lockDatabase(db, LockType.WRITE);
+                        locker.lockTableWithIntensiveDbLock(db, tableId, LockType.WRITE);
+                        locked = true;
                         lockStartTime = currentTime;
+                        tabletMetaList = invertedIndex.getTabletMetaList(tabletIds);
                     }
 
                     TabletMeta tabletMeta = tabletMetaList.get(i);
@@ -837,7 +852,9 @@ public class ReportHandler extends Daemon implements MemoryTrackable {
                         continue;
                     }
                     long tabletId = tabletIds.get(i);
-                    long tableId = tabletMeta.getTableId();
+                    if (tabletMeta.getDbId() != dbId || tabletMeta.getTableId() != tableId) {
+                        continue;
+                    }
                     long partitionId = tabletMeta.getPhysicalPartitionId();
 
                     LOG.debug("delete tablet {} in partition {} of table {} in db {} from meta. backend[{}]",
@@ -1003,9 +1020,11 @@ public class ReportHandler extends Daemon implements MemoryTrackable {
                         }
                     }
                 } // end for tabletMetas
-                LOG.info("delete {} replica(s) from globalStateMgr in db[{}]", deleteCounter, dbId);
+                LOG.info("delete {} replica(s) from globalStateMgr in db[{}] table[{}]", deleteCounter, dbId, tableId);
             } finally {
-                locker.unLockDatabase(db, LockType.WRITE);
+                if (locked) {
+                    locker.unLockTablesWithIntensiveDbLock(db, Lists.newArrayList(tableId), LockType.WRITE);
+                }
             }
         } // end for dbs
 
